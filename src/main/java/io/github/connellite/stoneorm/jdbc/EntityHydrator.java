@@ -2,15 +2,15 @@ package io.github.connellite.stoneorm.jdbc;
 
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import io.github.connellite.reflection.ReflectionUtil;
+import io.github.connellite.exception.TypeCoercionException;
 import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.mapping.EntityField;
 import io.github.connellite.stoneorm.mapping.EntityModel;
-import io.github.connellite.util.NumberUtils;
-import io.github.connellite.util.UuidUtil;
+import io.github.connellite.util.TypeCoercionUtil;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.UUID;
+import java.util.Collection;
 
 public final class EntityHydrator {
 
@@ -36,7 +36,7 @@ public final class EntityHydrator {
         if (value == null && f.javaType().isPrimitive()) {
             return;
         }
-        Object coerced = coerce(value, f.javaType());
+        Object coerced = coerce(value, f);
         MethodHandleReflectionUtil.set(f.varHandle(), f.javaField(), entity, coerced);
     }
 
@@ -50,9 +50,16 @@ public final class EntityHydrator {
     }
 
     public static <T> T mapRow(EntityModel model, ResultSet rs) throws SQLException {
+        return mapRow(model, rs, null);
+    }
+
+    public static <T> T mapRow(EntityModel model, ResultSet rs, Collection<String> availableColumns) throws SQLException {
         T entity = newInstance(model);
         for (EntityField f : model.fields()) {
             String col = f.columnName();
+            if (availableColumns != null && !availableColumns.contains(col)) {
+                continue;
+            }
             Object raw = rs.getObject(col);
             if (raw == null || rs.wasNull()) {
                 if (!f.javaType().isPrimitive()) {
@@ -65,35 +72,12 @@ public final class EntityHydrator {
         return entity;
     }
 
-    private static Object coerce(Object value, Class<?> target) {
-        if (value == null) {
-            if (target.isPrimitive()) {
-                throw new StoneOrmException("Cannot set null on primitive: " + target);
-            }
-            return null;
+    private static Object coerce(Object value, EntityField field) {
+        try {
+            return TypeCoercionUtil.coerce(value, field.javaType());
+        } catch (TypeCoercionException e) {
+            throw new StoneOrmException("Cannot map column '" + field.columnName()
+                    + "' to " + field.javaType().getName(), e);
         }
-        if (target.isInstance(value)) {
-            return value;
-        }
-        Class<?> boxed = ReflectionUtil.primitiveToWrapper(target);
-        if (Number.class.isAssignableFrom(boxed) && value instanceof Number n) {
-            return NumberUtils.narrowNumber(n, boxed);
-        }
-        if (boxed == Boolean.class) {
-            if (value instanceof Boolean b) {
-                return b;
-            }
-            if (value instanceof Number num) {
-                return NumberUtils.toBoolean(num.longValue());
-            }
-            throw new StoneOrmException("Unsupported conversion to boolean from " + value.getClass());
-        }
-        if (boxed == UUID.class) {
-            return UuidUtil.convert2Uuid(value);
-        }
-        if (boxed == String.class) {
-            return value.toString();
-        }
-        throw new StoneOrmException("Unsupported conversion to " + target.getName() + " from " + value.getClass());
     }
 }

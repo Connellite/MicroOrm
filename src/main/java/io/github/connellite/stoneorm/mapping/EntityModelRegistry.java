@@ -14,6 +14,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class EntityModelRegistry {
@@ -64,14 +65,33 @@ public final class EntityModelRegistry {
                 if (pk != null) {
                     throw new StoneOrmException("Multiple @Id fields on " + entityClass.getName());
                 }
+                validateIdField(entityClass, f, idAnn);
                 String col = columnName(f, colAnn);
                 boolean nullable = colAnn != null && colAnn.nullable();
-                pk = new EntityField(f, col, true, idAnn.autoIncrement(), nullable);
+                pk = new EntityField(
+                        f,
+                        col,
+                        true,
+                        idAnn.autoIncrement(),
+                        nullable,
+                        colAnn != null && colAnn.unique(),
+                        colAnn != null && colAnn.indexed(),
+                        colAnn == null ? "" : colAnn.sqlType(),
+                        colAnn == null ? 0 : colAnn.length());
                 fields.add(pk);
             } else {
                 String col = columnName(f, colAnn);
                 boolean nullable = colAnn == null || colAnn.nullable();
-                fields.add(new EntityField(f, col, false, false, nullable));
+                fields.add(new EntityField(
+                        f,
+                        col,
+                        false,
+                        false,
+                        nullable,
+                        colAnn != null && colAnn.unique(),
+                        colAnn != null && colAnn.indexed(),
+                        colAnn == null ? "" : colAnn.sqlType(),
+                        colAnn == null ? 0 : colAnn.length()));
             }
         }
         if (pk == null) {
@@ -80,6 +100,20 @@ public final class EntityModelRegistry {
         EntityModel model = new EntityModel(entityClass, table, fields, pk);
         SqlGenerator.validateColumnNames(model);
         return model;
+    }
+
+    private static void validateIdField(Class<?> entityClass, Field field, Id idAnn) {
+        Class<?> type = ReflectionUtil.primitiveToWrapper(field.getType());
+        boolean numeric = Number.class.isAssignableFrom(type);
+        boolean uuid = type == UUID.class;
+        if (!numeric && !uuid) {
+            throw new StoneOrmException("@Id field must be numeric or UUID on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        if (idAnn.autoIncrement() && !numeric) {
+            throw new StoneOrmException("@Id(autoIncrement = true) requires a numeric field on "
+                    + entityClass.getName() + "." + field.getName());
+        }
     }
 
     private static String columnName(Field f, Column colAnn) {

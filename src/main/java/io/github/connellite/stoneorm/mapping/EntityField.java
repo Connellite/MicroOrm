@@ -15,13 +15,34 @@ public final class EntityField {
     private final boolean id;
     private final boolean autoIncrement;
     private final boolean nullable;
+    private final boolean unique;
+    private final boolean indexed;
+    private final String sqlType;
+    private final int length;
 
     public EntityField(Field javaField, String columnName, boolean id, boolean autoIncrement, boolean nullable) {
+        this(javaField, columnName, id, autoIncrement, nullable, false, false, "", 0);
+    }
+
+    public EntityField(
+            Field javaField,
+            String columnName,
+            boolean id,
+            boolean autoIncrement,
+            boolean nullable,
+            boolean unique,
+            boolean indexed,
+            String sqlType,
+            int length) {
         this.javaField = javaField;
         this.columnName = columnName;
         this.id = id;
         this.autoIncrement = autoIncrement;
         this.nullable = nullable;
+        this.unique = unique;
+        this.indexed = indexed;
+        this.sqlType = sqlType == null ? "" : sqlType;
+        this.length = length;
         try {
             this.varHandle = MethodHandleReflectionUtil.varHandle(javaField);
         } catch (IllegalAccessException e) {
@@ -51,6 +72,22 @@ public final class EntityField {
 
     public boolean nullable() {
         return nullable;
+    }
+
+    public boolean unique() {
+        return unique;
+    }
+
+    public boolean indexed() {
+        return indexed;
+    }
+
+    public String sqlType() {
+        return sqlType;
+    }
+
+    public int length() {
+        return length;
     }
 
     public Class<?> javaType() {

@@ -12,4 +12,14 @@ public @interface Column {
     String name() default "";
 
     boolean nullable() default true;
+
+    boolean unique() default false;
+
+    boolean indexed() default false;
+
+    /** Explicit SQLite column type. If blank, StoneOrm infers a type from the Java field. */
+    String sqlType() default "";
+
+    /** Optional logical length metadata; */
+    int length() default 0;
 }
