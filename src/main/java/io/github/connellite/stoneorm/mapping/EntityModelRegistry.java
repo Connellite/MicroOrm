@@ -1,5 +1,7 @@
 package io.github.connellite.stoneorm.mapping;
 
+import io.github.connellite.collections.ConcurrentReferenceHashMap;
+import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.annotation.Column;
 import io.github.connellite.stoneorm.annotation.Entity;
@@ -7,26 +9,30 @@ import io.github.connellite.stoneorm.annotation.Id;
 import io.github.connellite.stoneorm.annotation.Transient;
 import io.github.connellite.stoneorm.sql.SqlGenerator;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class EntityModelRegistry {
 
-    private final ConcurrentHashMap<Class<?>, EntityModel> cache = new ConcurrentHashMap<>();
+    private static final int CACHE_INITIAL_CAPACITY = 64;
+
+    private final Set<Class<?>> registered = ConcurrentHashMap.newKeySet();
+    private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
+            new ConcurrentReferenceHashMap<>(CACHE_INITIAL_CAPACITY, ConcurrentReferenceHashMap.ReferenceType.WEAK);
 
     public EntityModel get(Class<?> entityClass) {
-        EntityModel m = cache.get(entityClass);
-        if (m == null) {
+        if (!registered.contains(entityClass)) {
             throw new StoneOrmException("Entity not registered: " + entityClass.getName());
         }
-        return m;
+        return cache.computeIfAbsent(entityClass, this::build);
     }
 
     public EntityModel register(Class<?> entityClass) {
+        registered.add(entityClass);
         return cache.computeIfAbsent(entityClass, this::build);
     }
 
@@ -36,13 +42,11 @@ public final class EntityModelRegistry {
             throw new StoneOrmException("Missing @Entity on " + entityClass.getName());
         }
         String table = entityAnn.name().isBlank() ? defaultTableName(entityClass) : entityAnn.name();
-        Constructor<?> ctor;
         try {
-            ctor = entityClass.getDeclaredConstructor();
+            ReflectionUtil.getConstructor(entityClass);
         } catch (NoSuchMethodException e) {
             throw new StoneOrmException("Entity requires a no-arg constructor: " + entityClass.getName(), e);
         }
-        ctor.trySetAccessible();
 
         List<EntityField> fields = new ArrayList<>();
         EntityField pk = null;

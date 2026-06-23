@@ -1,10 +1,10 @@
 package io.github.connellite.stoneorm.jdbc;
 
+import io.github.connellite.jdbc.NamedPreparedStatement;
+import io.github.connellite.jdbc.NamedQuery;
 import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.mapping.EntityModel;
 import io.github.connellite.stoneorm.sql.BoundStatement;
-
-import io.github.connellite.jdbc.NamedPreparedStatement;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -19,8 +19,7 @@ public final class SqlExecutor {
     }
 
     public static int executeUpdate(Connection connection, BoundStatement stmt) {
-        try (NamedPreparedStatement nps = new NamedPreparedStatement(connection, stmt.sql())) {
-            nps.setAll(stmt.parameters());
+        try (NamedPreparedStatement nps = prepare(connection, stmt)) {
             return nps.executeUpdate();
         } catch (SQLException e) {
             throw StoneOrmException.wrap(e);
@@ -31,7 +30,7 @@ public final class SqlExecutor {
      * Insert and apply generated keys to {@code entity} when the statement requests generated keys.
      */
     public static int executeInsertReturning(Connection connection, BoundStatement stmt, EntityModel model, Object entity) {
-        try (NamedPreparedStatement nps = new NamedPreparedStatement(
+        try (NamedPreparedStatement nps = NamedPreparedStatement.of(
                 connection, stmt.sql(), Statement.RETURN_GENERATED_KEYS)) {
             nps.setAll(stmt.parameters());
             int n = nps.executeUpdate();
@@ -80,15 +79,13 @@ public final class SqlExecutor {
     }
 
     public static <T> List<T> queryEntities(Connection connection, BoundStatement stmt, EntityModel model) {
-        try (NamedPreparedStatement nps = new NamedPreparedStatement(connection, stmt.sql())) {
-            nps.setAll(stmt.parameters());
-            try (ResultSet rs = nps.executeQuery()) {
-                List<T> out = new ArrayList<>();
-                while (rs.next()) {
-                    out.add(EntityHydrator.mapRow(model, rs));
-                }
-                return out;
+        try (NamedPreparedStatement nps = prepare(connection, stmt);
+             ResultSet rs = nps.executeQuery()) {
+            List<T> out = new ArrayList<>();
+            while (rs.next()) {
+                out.add(EntityHydrator.mapRow(model, rs));
             }
+            return out;
         } catch (SQLException e) {
             throw StoneOrmException.wrap(e);
         }
@@ -103,5 +100,9 @@ public final class SqlExecutor {
             throw new StoneOrmException("Expected at most one row, got " + rows.size());
         }
         return rows.get(0);
+    }
+
+    private static NamedPreparedStatement prepare(Connection connection, BoundStatement stmt) throws SQLException {
+        return NamedQuery.of(stmt.sql()).setAll(stmt.parameters()).prepare(connection);
     }
 }

@@ -1,11 +1,13 @@
 package io.github.connellite.stoneorm.jdbc;
 
+import io.github.connellite.reflection.MethodHandleReflectionUtil;
+import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.mapping.EntityField;
 import io.github.connellite.stoneorm.mapping.EntityModel;
+import io.github.connellite.util.NumberUtils;
+import io.github.connellite.util.UuidUtil;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
@@ -27,32 +29,21 @@ public final class EntityHydrator {
     }
 
     public static Object getFieldValue(Object entity, EntityField f) {
-        try {
-            return f.javaField().get(entity);
-        } catch (IllegalAccessException e) {
-            throw new StoneOrmException("Cannot read field " + f.javaField().getName(), e);
-        }
+        return MethodHandleReflectionUtil.get(f.varHandle(), entity);
     }
 
     public static void setFieldValue(Object entity, EntityField f, Object value) {
-        try {
-            Field jf = f.javaField();
-            if (value == null && jf.getType().isPrimitive()) {
-                return;
-            }
-            Object coerced = coerce(value, jf.getType());
-            jf.set(entity, coerced);
-        } catch (IllegalAccessException e) {
-            throw new StoneOrmException("Cannot write field " + f.javaField().getName(), e);
+        if (value == null && f.javaType().isPrimitive()) {
+            return;
         }
+        Object coerced = coerce(value, f.javaType());
+        MethodHandleReflectionUtil.set(f.varHandle(), f.javaField(), entity, coerced);
     }
 
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(EntityModel model) {
         try {
-            Constructor<?> ctor = model.entityClass().getDeclaredConstructor();
-            ctor.trySetAccessible();
-            return (T) ctor.newInstance();
+            return (T) ReflectionUtil.getInstance(model.entityClass());
         } catch (ReflectiveOperationException e) {
             throw new StoneOrmException("Cannot instantiate " + model.entityClass().getName(), e);
         }
@@ -62,49 +53,13 @@ public final class EntityHydrator {
         T entity = newInstance(model);
         for (EntityField f : model.fields()) {
             String col = f.columnName();
-            Class<?> t = f.javaType();
-            if (t == long.class) {
-                long v = rs.getLong(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
-                }
-            } else if (t == int.class) {
-                int v = rs.getInt(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
-                }
-            } else if (t == short.class) {
-                short v = rs.getShort(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
-                }
-            } else if (t == byte.class) {
-                byte v = rs.getByte(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
-                }
-            } else if (t == boolean.class) {
-                boolean v = rs.getBoolean(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
-                }
-            } else if (t == double.class) {
-                double v = rs.getDouble(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
-                }
-            } else if (t == float.class) {
-                float v = rs.getFloat(col);
-                if (!rs.wasNull()) {
-                    setFieldValue(entity, f, v);
+            Object raw = rs.getObject(col);
+            if (raw == null || rs.wasNull()) {
+                if (!f.javaType().isPrimitive()) {
+                    setFieldValue(entity, f, null);
                 }
             } else {
-                Object raw = rs.getObject(col);
-                if (raw == null || rs.wasNull()) {
-                    setFieldValue(entity, f, null);
-                } else {
-                    setFieldValue(entity, f, raw);
-                }
+                setFieldValue(entity, f, raw);
             }
         }
         return entity;
@@ -120,37 +75,23 @@ public final class EntityHydrator {
         if (target.isInstance(value)) {
             return value;
         }
-        if (target == long.class || target == Long.class) {
-            return ((Number) value).longValue();
+        Class<?> boxed = ReflectionUtil.primitiveToWrapper(target);
+        if (Number.class.isAssignableFrom(boxed) && value instanceof Number n) {
+            return NumberUtils.narrowNumber(n, boxed);
         }
-        if (target == int.class || target == Integer.class) {
-            return ((Number) value).intValue();
-        }
-        if (target == short.class || target == Short.class) {
-            return ((Number) value).shortValue();
-        }
-        if (target == byte.class || target == Byte.class) {
-            return ((Number) value).byteValue();
-        }
-        if (target == boolean.class || target == Boolean.class) {
+        if (boxed == Boolean.class) {
             if (value instanceof Boolean b) {
                 return b;
             }
-            return ((Number) value).intValue() != 0;
-        }
-        if (target == double.class || target == Double.class) {
-            return ((Number) value).doubleValue();
-        }
-        if (target == float.class || target == Float.class) {
-            return ((Number) value).floatValue();
-        }
-        if (target == UUID.class) {
-            if (value instanceof UUID u) {
-                return u;
+            if (value instanceof Number num) {
+                return NumberUtils.toBoolean(num.longValue());
             }
-            return UUID.fromString(value.toString());
+            throw new StoneOrmException("Unsupported conversion to boolean from " + value.getClass());
         }
-        if (target == String.class) {
+        if (boxed == UUID.class) {
+            return UuidUtil.convert2Uuid(value);
+        }
+        if (boxed == String.class) {
             return value.toString();
         }
         throw new StoneOrmException("Unsupported conversion to " + target.getName() + " from " + value.getClass());
