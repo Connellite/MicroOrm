@@ -25,8 +25,8 @@ class OracleOrmContractTest extends AbstractOrmContractTest {
     }
 
     @Override
-    protected Orm createOrm(Connection connection) {
-        return Orm.oracle(connection);
+    protected MicroOrm createOrm(Connection connection) {
+        return MicroOrm.oracle(connection);
     }
 
     @Override

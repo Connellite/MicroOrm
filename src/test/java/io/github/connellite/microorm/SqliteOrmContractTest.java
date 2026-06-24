@@ -16,8 +16,8 @@ class SqliteOrmContractTest extends AbstractOrmContractTest {
     }
 
     @Override
-    protected Orm createOrm(Connection connection) {
-        return Orm.sqlite(connection);
+    protected MicroOrm createOrm(Connection connection) {
+        return MicroOrm.sqlite(connection);
     }
 
     @Override

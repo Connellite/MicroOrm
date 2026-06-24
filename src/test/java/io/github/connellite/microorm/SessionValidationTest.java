@@ -26,7 +26,7 @@ class SessionValidationTest {
     @Test
     void insertRowRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Item.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
                 assertThrows(NullPointerException.class, () -> session.insertRow(null));
             }
@@ -36,7 +36,7 @@ class SessionValidationTest {
     @Test
     void updateRowRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Item.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
                 assertThrows(NullPointerException.class, () -> session.updateRow(null));
             }
@@ -46,7 +46,7 @@ class SessionValidationTest {
     @Test
     void deleteRowRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Item.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
                 assertThrows(NullPointerException.class, () -> session.deleteRow(null));
             }
@@ -56,7 +56,7 @@ class SessionValidationTest {
     @Test
     void batchInsertRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Item.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
                 java.util.ArrayList<Item> batch = new java.util.ArrayList<>();
                 batch.add(new Item());
@@ -69,7 +69,7 @@ class SessionValidationTest {
     @Test
     void selectRowRejectsNullId() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Item.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
                 assertThrows(MicroOrmException.class, () -> session.selectRow(Item.class, null));
             }
@@ -79,7 +79,7 @@ class SessionValidationTest {
     @Test
     void deleteByIdRejectsNullId() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Item.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
                 assertThrows(MicroOrmException.class, () -> session.deleteById(Item.class, null));
             }
@@ -98,7 +98,7 @@ class SessionValidationTest {
     @Test
     void updateRowRejectsEntityWithOnlyPrimaryKey() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(PkOnly.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(PkOnly.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(PkOnly.class);
                 PkOnly row = new PkOnly();

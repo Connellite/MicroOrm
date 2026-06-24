@@ -29,8 +29,8 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
     }
 
     @Override
-    protected Orm createOrm(Connection connection) {
-        return Orm.mssql(connection);
+    protected MicroOrm createOrm(Connection connection) {
+        return MicroOrm.mssql(connection);
     }
 
     @Override

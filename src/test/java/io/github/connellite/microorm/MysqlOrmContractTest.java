@@ -24,8 +24,8 @@ class MysqlOrmContractTest extends AbstractOrmContractTest {
     }
 
     @Override
-    protected Orm createOrm(Connection connection) {
-        return Orm.mysql(connection);
+    protected MicroOrm createOrm(Connection connection) {
+        return MicroOrm.mysql(connection);
     }
 
     @Override

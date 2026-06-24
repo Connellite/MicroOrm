@@ -203,7 +203,7 @@ class SpringSessionTest {
     @Test
     void sessionCloseWithoutSpringProxyRollsBackOpenTransaction() throws SQLException {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(connection).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(connection).register(Widget.class);
             UUID id;
             try (Session setup = orm.openSession()) {
                 setup.createEntity(Widget.class);
@@ -223,7 +223,7 @@ class SpringSessionTest {
     @Test
     void localRollbackTransactionStillWorksWithoutSpringProxy() throws SQLException {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(connection).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(connection).register(Widget.class);
             UUID id;
             try (Session session = orm.openSession()) {
                 session.createEntity(Widget.class);
@@ -247,7 +247,7 @@ class SpringSessionTest {
         TransactionAwareDataSourceProxy proxy = new TransactionAwareDataSourceProxy(dataSource);
         DataSourceTransactionManager txManager = new DataSourceTransactionManager(proxy);
         TransactionTemplate tx = new TransactionTemplate(txManager);
-        Orm orm = Orm.sqlite(proxy).register(Widget.class);
+        MicroOrm orm = MicroOrm.sqlite(proxy).register(Widget.class);
         return new SpringFixture(orm, tx);
     }
 
@@ -257,10 +257,10 @@ class SpringSessionTest {
     }
 
     private static final class SpringFixture {
-        private final Orm orm;
+        private final MicroOrm orm;
         private final TransactionTemplate tx;
 
-        private SpringFixture(Orm orm, TransactionTemplate tx) {
+        private SpringFixture(MicroOrm orm, TransactionTemplate tx) {
             this.orm = orm;
             this.tx = tx;
         }

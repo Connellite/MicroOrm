@@ -119,7 +119,7 @@ abstract class AbstractOrmContractTest {
 
     protected abstract Connection openConnection() throws SQLException;
 
-    protected abstract Orm createOrm(Connection connection);
+    protected abstract MicroOrm createOrm(Connection connection);
 
     protected abstract String quote(String identifier);
 
@@ -128,7 +128,7 @@ abstract class AbstractOrmContractTest {
     @Test
     void uuidCrudStreamQueryAndStorageContract() throws SQLException {
         try (Connection connection = openConnection()) {
-            Orm orm = createOrm(connection).register(UuidWidget.class, UuidWidgetWithDescription.class);
+            MicroOrm orm = createOrm(connection).register(UuidWidget.class, UuidWidgetWithDescription.class);
             try (Session session = orm.openSession()) {
                 session.dropEntity(UuidWidget.class);
                 session.createEntity(UuidWidget.class);
@@ -185,7 +185,7 @@ abstract class AbstractOrmContractTest {
     @Test
     void numericAutoIncrementAndBatchContract() throws SQLException {
         try (Connection connection = openConnection()) {
-            Orm orm = createOrm(connection).register(NumericWidget.class);
+            MicroOrm orm = createOrm(connection).register(NumericWidget.class);
             try (Session session = orm.openSession()) {
                 session.dropEntity(NumericWidget.class);
                 session.createEntity(NumericWidget.class);

@@ -28,7 +28,7 @@ public class User {
 }
 
 try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) {
-    Orm orm = Orm.sqlite(connection).register(User.class);
+    MicroOrm orm = MicroOrm.sqlite(connection).register(User.class);
     orm.withSession(session -> {
         session.createEntity(User.class);
 
@@ -42,7 +42,7 @@ try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) 
 }
 ```
 
-Use `Orm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool. Prefer `orm.withSession(...)` so pooled connections are always released.
+Use `MicroOrm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool. Prefer `orm.withSession(...)` so pooled connections are always released.
 
 ## Requirements
 

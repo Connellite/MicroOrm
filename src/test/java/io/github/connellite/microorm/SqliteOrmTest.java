@@ -147,7 +147,7 @@ class SqliteOrmTest {
     @Test
     void crudLifecycle() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
@@ -194,7 +194,7 @@ class SqliteOrmTest {
     @Test
     void uuidIdSupportsGeneratedAndExplicitValues() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
@@ -218,7 +218,7 @@ class SqliteOrmTest {
     @Test
     void numericAutoIncrementIdCrudLifecycle() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(NumericWidget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(NumericWidget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(NumericWidget.class);
                 s.createEntity(NumericWidget.class);
@@ -246,7 +246,7 @@ class SqliteOrmTest {
     @Test
     void numericAutoIncrementBatchFillsGeneratedIds() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(NumericWidget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(NumericWidget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(NumericWidget.class);
                 s.createEntity(NumericWidget.class);
@@ -268,7 +268,7 @@ class SqliteOrmTest {
     @Test
     void explicitNumericIdIsSupported() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(AssignedNumericWidget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(AssignedNumericWidget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(AssignedNumericWidget.class);
                 s.createEntity(AssignedNumericWidget.class);
@@ -289,15 +289,15 @@ class SqliteOrmTest {
     @Test
     void rejectsUnsupportedIdTypes() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            assertThrows(MicroOrmException.class, () -> Orm.sqlite(c).register(InvalidStringId.class));
-            assertThrows(MicroOrmException.class, () -> Orm.sqlite(c).register(InvalidUuidAutoIncrementId.class));
+            assertThrows(MicroOrmException.class, () -> MicroOrm.sqlite(c).register(InvalidStringId.class));
+            assertThrows(MicroOrmException.class, () -> MicroOrm.sqlite(c).register(InvalidUuidAutoIncrementId.class));
         }
     }
 
     @Test
     void transactionCommit() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             UUID id;
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
@@ -320,7 +320,7 @@ class SqliteOrmTest {
     @Test
     void batchInsertExistsDeleteByIdAndFilteredSelects() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
@@ -355,7 +355,7 @@ class SqliteOrmTest {
     @Test
     void syncEntityAddsNullableColumnsWithoutDroppingData() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            Orm orm = Orm.sqlite(c).register(Widget.class);
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);

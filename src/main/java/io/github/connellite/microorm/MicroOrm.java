@@ -21,72 +21,72 @@ import java.util.Objects;
  * Entry point for MicroOrm. Choose a dialect factory, {@link #register(Class[]) register} entity classes,
  * then {@link #openSession()} for CRUD and schema operations.
  */
-public final class Orm {
+public final class MicroOrm {
 
     private final Dialect dialect;
     private final ConnectionProvider provider;
     private final EntityModelRegistry registry;
 
-    public Orm(Dialect dialect, ConnectionProvider provider, EntityModelRegistry registry) {
+    public MicroOrm(Dialect dialect, ConnectionProvider provider, EntityModelRegistry registry) {
         this.dialect = dialect;
         this.provider = provider;
         this.registry = registry;
     }
 
     /** SQLite with a single JDBC connection (typical tests); connection is not closed by {@link Session#close()}. */
-    public static Orm sqlite(Connection connection) {
+    public static MicroOrm sqlite(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new Orm(SqliteDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(SqliteDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
     /** SQLite backed by a {@link DataSource} (pool-friendly; connection released on {@link Session#close()}). */
-    public static Orm sqlite(DataSource dataSource) {
+    public static MicroOrm sqlite(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new Orm(SqliteDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(SqliteDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
-    public static Orm postgres(Connection connection) {
+    public static MicroOrm postgres(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new Orm(PostgresDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(PostgresDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
-    public static Orm postgres(DataSource dataSource) {
+    public static MicroOrm postgres(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new Orm(PostgresDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(PostgresDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
-    public static Orm mysql(Connection connection) {
+    public static MicroOrm mysql(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new Orm(MysqlDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(MysqlDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
-    public static Orm mysql(DataSource dataSource) {
+    public static MicroOrm mysql(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new Orm(MysqlDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(MysqlDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
-    public static Orm mssql(Connection connection) {
+    public static MicroOrm mssql(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new Orm(MssqlDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(MssqlDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
-    public static Orm mssql(DataSource dataSource) {
+    public static MicroOrm mssql(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new Orm(MssqlDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(MssqlDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
-    public static Orm oracle(Connection connection) {
+    public static MicroOrm oracle(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new Orm(OracleDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(OracleDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
-    public static Orm oracle(DataSource dataSource) {
+    public static MicroOrm oracle(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new Orm(OracleDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(OracleDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
     /** Registers entity classes and returns {@code this} for chaining. */
-    public Orm register(Class<?>... entityClasses) {
+    public MicroOrm register(Class<?>... entityClasses) {
         Objects.requireNonNull(entityClasses, "entityClasses");
         for (Class<?> c : entityClasses) {
             Objects.requireNonNull(c, "entity class cannot be null");

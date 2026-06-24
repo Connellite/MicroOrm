@@ -25,8 +25,8 @@ class PostgresOrmContractTest extends AbstractOrmContractTest {
     }
 
     @Override
-    protected Orm createOrm(Connection connection) {
-        return Orm.postgres(connection);
+    protected MicroOrm createOrm(Connection connection) {
+        return MicroOrm.postgres(connection);
     }
 
     @Override
