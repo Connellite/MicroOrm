@@ -3,13 +3,14 @@ package io.github.connellite.microorm.connection;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Objects;
 
 public final class DataSourceConnectionProvider implements ConnectionProvider {
 
     private final DataSource dataSource;
 
     public DataSourceConnectionProvider(DataSource dataSource) {
-        this.dataSource = dataSource;
+        this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
     }
 
     @Override

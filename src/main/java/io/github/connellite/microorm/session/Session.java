@@ -134,17 +134,20 @@ public final class Session implements AutoCloseable {
     public int updateRow(Object entity) {
         Objects.requireNonNull(entity, "updateRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
+        EntityHydrator.requirePkSet(entity, m.primaryKey());
         return SqlExecutor.executeUpdate(connection, sql.update(m, entity));
     }
 
     public int deleteRow(Object entity) {
         Objects.requireNonNull(entity, "deleteRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
+        EntityHydrator.requirePkSet(entity, m.primaryKey());
         return SqlExecutor.executeUpdate(connection, sql.delete(m, entity));
     }
 
     public int deleteById(Class<?> entityClass, Object id) {
         EntityModel m = registry.get(entityClass);
+        EntityHydrator.requirePkValue(id, m.primaryKey());
         return SqlExecutor.executeUpdate(connection, sql.deleteById(m, id));
     }
 
@@ -156,12 +159,14 @@ public final class Session implements AutoCloseable {
 
     public boolean existsById(Class<?> type, Object id) {
         EntityModel m = registry.get(type);
+        EntityHydrator.requirePkValue(id, m.primaryKey());
         return SqlExecutor.queryExists(connection, sql.existsById(m, id));
     }
 
     /** Returns {@code null} when no row matches the primary key. */
     public <T> T selectRow(Class<T> type, Object id) {
         EntityModel m = registry.get(type);
+        EntityHydrator.requirePkValue(id, m.primaryKey());
         try (Stream<T> rows = SqlExecutor.queryEntitiesStream(connection, sql.selectById(m, id), m, dialect.valueMapper())) {
             List<T> list = rows.toList();
             if (list.isEmpty()) {
@@ -174,40 +179,50 @@ public final class Session implements AutoCloseable {
         }
     }
 
+    /** Materializes all rows; closes the underlying JDBC resources. */
     public <T> List<T> selectRows(Class<T> type) {
         try (Stream<T> rows = streamRows(type)) {
             return rows.toList();
         }
     }
 
+    /**
+     * Lazy row stream; must be closed (try-with-resources) to release JDBC resources.
+     * Prefer {@link #selectRows(Class)} when the full result fits in memory.
+     */
     public <T> Stream<T> streamRows(Class<T> type) {
         EntityModel m = registry.get(type);
         return SqlExecutor.queryEntitiesStream(connection, sql.selectAll(m), m, dialect.valueMapper());
     }
 
+    /** Materializes filtered rows; closes the underlying JDBC resources. */
     public <T> List<T> selectRows(Class<T> type, Map<String, ?> filters) {
         try (Stream<T> rows = streamRows(type, filters)) {
             return rows.toList();
         }
     }
 
+    /** Lazy filtered row stream; must be closed (try-with-resources). */
     public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
         EntityModel m = registry.get(type);
         return SqlExecutor.queryEntitiesStream(connection, sql.selectWhere(m, filters), m, dialect.valueMapper());
     }
 
+    /** Materializes custom-query rows; closes the underlying JDBC resources. */
     public <T> List<T> selectRows(Class<T> type, Query query) {
         try (Stream<T> rows = streamRows(type, query)) {
             return rows.toList();
         }
     }
 
+    /** Lazy custom-query row stream; must be closed (try-with-resources). */
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
         EntityModel m = registry.get(type);
         return SqlExecutor.queryEntitiesStream(connection, query, m, dialect.valueMapper());
     }
 
     public int execute(Query query) {
+        Objects.requireNonNull(query, "query cannot be null");
         return SqlExecutor.executeUpdate(connection, query);
     }
 

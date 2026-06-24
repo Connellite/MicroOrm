@@ -31,11 +31,24 @@ public interface SqlGenerator {
     BoundStatement selectWhere(EntityModel model, Map<String, ?> filters);
 
     static void validateColumnNames(EntityModel model) {
+        validateIdentifier(model.tableName(), "table");
         for (EntityField f : model.fields()) {
-            String n = f.columnName();
-            if (!n.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
-                throw new MicroOrmException("Invalid SQL column / parameter name (use [a-zA-Z_][a-zA-Z0-9_]*): " + n);
-            }
+            validateIdentifier(f.columnName(), "column / parameter");
+        }
+    }
+
+    static void validateIdentifier(String name, String kind) {
+        if (name == null || name.isBlank()) {
+            throw new MicroOrmException("Invalid SQL " + kind + " name: blank");
+        }
+        if (!name.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            throw new MicroOrmException("Invalid SQL " + kind + " name (use [a-zA-Z_][a-zA-Z0-9_]*): " + name);
+        }
+    }
+
+    static void validateSqlType(String sqlType, String context) {
+        if (!sqlType.matches("[A-Za-z0-9_(),. ]+")) {
+            throw new MicroOrmException("Invalid @Column(sqlType) on " + context + ": " + sqlType);
         }
     }
 }

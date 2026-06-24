@@ -29,7 +29,7 @@ public class User {
 
 try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) {
     Orm orm = Orm.sqlite(connection).register(User.class);
-    try (Session session = orm.openSession()) {
+    orm.withSession(session -> {
         session.createEntity(User.class);
 
         User user = new User();
@@ -37,11 +37,12 @@ try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) 
         session.insertRow(user);
 
         User loaded = session.selectRow(User.class, user.id);
-    }
+        return loaded;
+    });
 }
 ```
 
-Use `Orm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool.
+Use `Orm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool. Prefer `orm.withSession(...)` so pooled connections are always released.
 
 ## Requirements
 
@@ -87,8 +88,9 @@ Entity classes on the classpath (unnamed module) do not need the `add-reads` fla
 - No relationships, migrations framework, or entity inheritance
 - `Session` is not thread-safe — one session per thread
 - Supported field types: numeric primitives/wrappers, `boolean`, `String`, `UUID`, `float`/`double`
-- Numeric `0` is treated as unset for `@Id(autoIncrement = true)` inserts
+- Numeric `0` is treated as unset for `@Id(autoIncrement = true)` inserts and PK lookups
+- Entity inheritance is not supported (mapped superclass fields are rejected at registration)
 
 ## License
 
-See repository license file when published.
+Apache License 2.0 — see [LICENSE](LICENSE).

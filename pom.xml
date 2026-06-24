@@ -11,6 +11,14 @@
     <name>MicroOrm</name>
     <description>Lightweight JDBC ORM (SQLite first), built on ExtraLib.</description>
 
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -133,23 +141,50 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
-                    <argLine>--add-reads io.github.connellite.ExtraLib=io.github.connellite.microorm</argLine>
+                    <argLine>@{argLine} --add-reads io.github.connellite.ExtraLib=io.github.connellite.microorm</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>${maven-javadoc-plugin.version}</version>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
+                    <sourcepath>${project.basedir}/src/main/java</sourcepath>
+                    <subpackages>io.github.connellite.microorm</subpackages>
                     <release>${maven.compiler.source}</release>
-                    <legacyMode>true</legacyMode>
                     <doclint>none</doclint>
                     <quiet>true</quiet>
-                    <failOnError>false</failOnError>
+                    <failOnError>true</failOnError>
+                    <additionalDependencies>
+                        <additionalDependency>
+                            <groupId>io.github.connellite</groupId>
+                            <artifactId>ExtraLib</artifactId>
+                            <version>${extralib.version}</version>
+                        </additionalDependency>
+                    </additionalDependencies>
                 </configuration>
                 <executions>
                     <execution>

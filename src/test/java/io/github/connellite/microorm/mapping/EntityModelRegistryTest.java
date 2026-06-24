@@ -61,6 +61,31 @@ class EntityModelRegistryTest {
         private String label;
     }
 
+    @Entity(name = "bad-table")
+    static class InvalidTableName {
+        @Id
+        private long id;
+    }
+
+    @Entity(name = "unsupported_type")
+    static class UnsupportedFieldType {
+        @Id
+        private long id;
+
+        private java.time.LocalDateTime createdAt;
+    }
+
+    static class MappedSuperclass {
+        @Column
+        protected String inherited;
+    }
+
+    @Entity(name = "inheritance_child")
+    static class InheritanceChild extends MappedSuperclass {
+        @Id
+        private long id;
+    }
+
     @Test
     void registerBuildsModelWithTableAndFields() {
         EntityModelRegistry registry = new EntityModelRegistry();
@@ -114,5 +139,23 @@ class EntityModelRegistryTest {
     void rejectsInvalidColumnNames() {
         EntityModelRegistry registry = new EntityModelRegistry();
         assertThrows(MicroOrmException.class, () -> registry.register(InvalidColumnName.class));
+    }
+
+    @Test
+    void rejectsInvalidTableName() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        assertThrows(MicroOrmException.class, () -> registry.register(InvalidTableName.class));
+    }
+
+    @Test
+    void rejectsUnsupportedFieldType() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        assertThrows(MicroOrmException.class, () -> registry.register(UnsupportedFieldType.class));
+    }
+
+    @Test
+    void rejectsInheritedMappedFields() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        assertThrows(MicroOrmException.class, () -> registry.register(InheritanceChild.class));
     }
 }

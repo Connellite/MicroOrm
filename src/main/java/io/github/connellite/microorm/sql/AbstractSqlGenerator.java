@@ -71,6 +71,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             sets.add(dialect.quote(f.columnName()) + " = :" + f.columnName());
             params.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
+        if (sets.isEmpty()) {
+            throw new MicroOrmException("Entity has no updatable columns: " + model.entityClass().getName());
+        }
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
         String sql = "UPDATE " + dialect.quote(model.tableName()) + " SET " + String.join(", ", sets)

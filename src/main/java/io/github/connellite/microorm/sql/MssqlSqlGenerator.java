@@ -10,6 +10,9 @@ public final class MssqlSqlGenerator extends AbstractSqlGenerator {
 
     @Override
     protected String limitOne(String sql) {
-        return sql.replaceFirst("SELECT 1", "SELECT TOP 1 1");
+        if (sql.startsWith("SELECT 1 FROM ")) {
+            return "SELECT TOP 1 1 FROM " + sql.substring("SELECT 1 FROM ".length());
+        }
+        return sql;
     }
 }

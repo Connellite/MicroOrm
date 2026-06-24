@@ -13,6 +13,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +22,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class EntityModelRegistry {
 
     private static final int CACHE_INITIAL_CAPACITY = 64;
+
+    private static final Set<Class<?>> SUPPORTED_FIELD_TYPES = Set.of(
+            long.class, Long.class,
+            int.class, Integer.class,
+            short.class, Short.class,
+            byte.class, Byte.class,
+            boolean.class, Boolean.class,
+            float.class, Float.class,
+            double.class, Double.class,
+            String.class,
+            UUID.class);
 
     private final Set<Class<?>> registered = ConcurrentHashMap.newKeySet();
     private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
@@ -36,6 +48,7 @@ public final class EntityModelRegistry {
 
     /** Registers an entity class and builds or returns cached metadata. */
     public EntityModel register(Class<?> entityClass) {
+        Objects.requireNonNull(entityClass, "entityClass");
         registered.add(entityClass);
         return cache.computeIfAbsent(entityClass, this::build);
     }
@@ -46,11 +59,14 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("Missing @Entity on " + entityClass.getName());
         }
         String table = entityAnn.name().isBlank() ? defaultTableName(entityClass) : entityAnn.name();
+        SqlGenerator.validateIdentifier(table, "table");
         try {
             ReflectionUtil.getConstructor(entityClass);
         } catch (NoSuchMethodException e) {
             throw new MicroOrmException("Entity requires a no-arg constructor: " + entityClass.getName(), e);
         }
+
+        rejectInheritedMappedFields(entityClass);
 
         List<EntityField> fields = new ArrayList<>();
         EntityField pk = null;
@@ -83,6 +99,7 @@ public final class EntityModelRegistry {
                         colAnn == null ? 0 : colAnn.length());
                 fields.add(pk);
             } else {
+                validateFieldType(entityClass, f);
                 String col = columnName(f, colAnn);
                 boolean nullable = colAnn == null || colAnn.nullable();
                 fields.add(new EntityField(
@@ -106,6 +123,7 @@ public final class EntityModelRegistry {
     }
 
     private static void validateIdField(Class<?> entityClass, Field field, Id idAnn) {
+        validateFieldType(entityClass, field);
         Class<?> type = ReflectionUtil.primitiveToWrapper(field.getType());
         boolean numeric = Number.class.isAssignableFrom(type);
         boolean uuid = type == UUID.class;
@@ -124,6 +142,36 @@ public final class EntityModelRegistry {
             return colAnn.name();
         }
         return f.getName();
+    }
+
+    private static void validateFieldType(Class<?> entityClass, Field field) {
+        if (!SUPPORTED_FIELD_TYPES.contains(field.getType())) {
+            throw new MicroOrmException("Unsupported field type " + field.getType().getName()
+                    + " on " + entityClass.getName() + "." + field.getName());
+        }
+        Column colAnn = field.getAnnotation(Column.class);
+        if (colAnn != null && !colAnn.sqlType().isBlank()) {
+            SqlGenerator.validateSqlType(colAnn.sqlType(), entityClass.getName() + "." + field.getName());
+        }
+    }
+
+    private static void rejectInheritedMappedFields(Class<?> entityClass) {
+        Class<?> superClass = entityClass.getSuperclass();
+        if (superClass == null || superClass == Object.class) {
+            return;
+        }
+        for (Field f : superClass.getDeclaredFields()) {
+            if (Modifier.isStatic(f.getModifiers())) {
+                continue;
+            }
+            if (f.getAnnotation(Transient.class) != null) {
+                continue;
+            }
+            if (f.getAnnotation(Id.class) != null || f.getAnnotation(Column.class) != null) {
+                throw new MicroOrmException("Entity inheritance is not supported; move mapped fields to "
+                        + entityClass.getName() + " (found " + superClass.getName() + "." + f.getName() + ")");
+            }
+        }
     }
 
     private static String defaultTableName(Class<?> c) {

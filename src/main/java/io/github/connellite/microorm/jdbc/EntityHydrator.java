@@ -20,14 +20,27 @@ public final class EntityHydrator {
     }
 
     public static boolean isUnsetPk(Object entity, EntityField pk) {
-        Object v = getFieldValue(entity, pk);
-        if (v == null) {
+        return isUnsetPkValue(getFieldValue(entity, pk), pk);
+    }
+
+    public static boolean isUnsetPkValue(Object value, EntityField pk) {
+        if (value == null) {
             return true;
         }
-        if (v instanceof Number n) {
+        if (pk.autoIncrement() && value instanceof Number n) {
             return n.longValue() == 0L;
         }
         return false;
+    }
+
+    public static void requirePkValue(Object value, EntityField pk) {
+        if (isUnsetPkValue(value, pk)) {
+            throw new MicroOrmException("Primary key value is required for column '" + pk.columnName() + "'");
+        }
+    }
+
+    public static void requirePkSet(Object entity, EntityField pk) {
+        requirePkValue(getFieldValue(entity, pk), pk);
     }
 
     public static Object getFieldValue(Object entity, EntityField f) {

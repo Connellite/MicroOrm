@@ -80,7 +80,9 @@ public final class SqlExecutor {
         if (rows == null || rows.isEmpty()) {
             return 0;
         }
-        if (model.primaryKey().autoIncrement() && !JdbcDatabaseSupport.supportsBatchGeneratedKeys(connection)) {
+        if (model.primaryKey().autoIncrement()
+                && (!JdbcDatabaseSupport.supportsBatchGeneratedKeys(connection)
+                || JdbcDatabaseSupport.isSqlite(connection))) {
             return executeSequentialInsertReturning(connection, sql, rows, model, entities);
         }
         int chunkSize = batchSize <= 0 ? 200 : batchSize;
@@ -146,30 +148,12 @@ public final class SqlExecutor {
                     applied++;
                 }
             }
-            if (applied < count && JdbcDatabaseSupport.isSqlite(connection)) {
-                applySqliteLastInsertRowIds(connection, model, entities, entityOffset, count);
+            if (applied < count) {
+                throw new MicroOrmException("Batch INSERT returned " + applied + " generated keys, expected " + count
+                        + " for " + model.entityClass().getName());
             }
         }
         return total;
-    }
-
-    private static void applySqliteLastInsertRowIds(
-            Connection connection,
-            EntityModel model,
-            List<?> entities,
-            int entityOffset,
-            int count) throws SQLException {
-        try (Statement st = connection.createStatement();
-             ResultSet rs = st.executeQuery("SELECT last_insert_rowid()")) {
-            if (!rs.next()) {
-                return;
-            }
-            long lastId = rs.getLong(1);
-            long firstId = lastId - count + 1;
-            for (int i = 0; i < count; i++) {
-                EntityHydrator.setFieldValue(entities.get(entityOffset + i), model.primaryKey(), firstId + i);
-            }
-        }
     }
 
     private static int affectedRows(int[] counts) {
@@ -177,6 +161,8 @@ public final class SqlExecutor {
         for (int count : counts) {
             if (count > 0) {
                 total += count;
+            } else if (count == Statement.SUCCESS_NO_INFO) {
+                total += 1;
             }
         }
         return total;
