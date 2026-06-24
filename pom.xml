@@ -10,6 +10,7 @@
     <packaging>jar</packaging>
     <name>MicroOrm</name>
     <description>Lightweight JDBC ORM (SQLite first), built on ExtraLib.</description>
+    <url>https://github.com/Connellite/MicroOrm</url>
 
     <licenses>
         <license>
@@ -18,6 +19,21 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <id>connellite</id>
+            <name>connellite</name>
+            <url>https://github.com/connellite</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/connellite/MicroOrm.git</connection>
+        <developerConnection>scm:git:git@github.com:connellite/MicroOrm.git</developerConnection>
+        <url>https://github.com/connellite/MicroOrm</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
