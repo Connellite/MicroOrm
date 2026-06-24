@@ -16,6 +16,11 @@ public final class OracleJdbcValueMapper implements JdbcValueMapper {
 
     @Override
     public Object fromJdbcValue(EntityField field, Object value) {
+        if (value != null && (field.javaType() == boolean.class || field.javaType() == Boolean.class)) {
+            if (value instanceof Number n) {
+                return n.intValue() != 0;
+            }
+        }
         return delegate.fromJdbcValue(field, value);
     }
 }

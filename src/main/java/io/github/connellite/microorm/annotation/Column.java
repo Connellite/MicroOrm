@@ -17,9 +17,9 @@ public @interface Column {
 
     boolean indexed() default false;
 
-    /** Explicit SQLite column type. If blank, MicroOrm infers a type from the Java field. */
+    /** Explicit SQL column type. If blank, MicroOrm infers a type from the Java field. */
     String sqlType() default "";
 
-    /** Optional logical length metadata; */
+    /** Optional logical length metadata (for example VARCHAR length). */
     int length() default 0;
 }

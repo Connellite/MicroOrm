@@ -7,5 +7,6 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
+/** Marks a field as excluded from persistence mapping. */
 public @interface Transient {
 }

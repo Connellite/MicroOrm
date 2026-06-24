@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
 
+/** Maps {@link java.sql.ResultSet} rows to entity instances and reads/writes field values. */
 public final class EntityHydrator {
 
     private EntityHydrator() {
@@ -35,7 +36,8 @@ public final class EntityHydrator {
 
     public static void setFieldValue(Object entity, EntityField f, Object value) {
         if (value == null && f.javaType().isPrimitive()) {
-            return;
+            throw new MicroOrmException("Cannot map SQL NULL to primitive field '"
+                    + f.javaField().getName() + "' on " + entity.getClass().getName());
         }
         Object coerced = coerce(value, f);
         MethodHandleReflectionUtil.set(f.varHandle(), f.javaField(), entity, coerced);
@@ -67,9 +69,7 @@ public final class EntityHydrator {
             }
             Object raw = rs.getObject(col);
             if (raw == null || rs.wasNull()) {
-                if (!f.javaType().isPrimitive()) {
-                    setFieldValue(entity, f, null);
-                }
+                setFieldValue(entity, f, null);
             } else {
                 setFieldValue(entity, f, valueMapper == null ? raw : valueMapper.fromJdbcValue(f, raw));
             }

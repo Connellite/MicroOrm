@@ -16,9 +16,16 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+/**
+ * Unit of work over a single JDBC {@link Connection}. Not thread-safe — use one session per thread.
+ * <p>
+ * DML ({@code insert}, {@code update}, {@code delete}, {@code select}) throws {@link io.github.connellite.microorm.MicroOrmException}
+ * on failure; DDL ({@code createEntity}, {@code syncEntity}, {@code dropEntity}) declares {@link SQLException}.
+ */
 public final class Session implements AutoCloseable {
 
     private final Connection connection;
@@ -81,6 +88,7 @@ public final class Session implements AutoCloseable {
     }
 
     public <T> T insertRow(T entity) {
+        Objects.requireNonNull(entity, "insertRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
         assignGeneratedUuidIfNeeded(entity, m);
         BoundStatement bs = sql.insert(m, entity);
@@ -124,11 +132,13 @@ public final class Session implements AutoCloseable {
     }
 
     public int updateRow(Object entity) {
+        Objects.requireNonNull(entity, "updateRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
         return SqlExecutor.executeUpdate(connection, sql.update(m, entity));
     }
 
     public int deleteRow(Object entity) {
+        Objects.requireNonNull(entity, "deleteRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
         return SqlExecutor.executeUpdate(connection, sql.delete(m, entity));
     }
@@ -149,6 +159,7 @@ public final class Session implements AutoCloseable {
         return SqlExecutor.queryExists(connection, sql.existsById(m, id));
     }
 
+    /** Returns {@code null} when no row matches the primary key. */
     public <T> T selectRow(Class<T> type, Object id) {
         EntityModel m = registry.get(type);
         try (Stream<T> rows = SqlExecutor.queryEntitiesStream(connection, sql.selectById(m, id), m, dialect.valueMapper())) {

@@ -8,6 +8,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Entity {
-    /** Logical table name; if blank, derived from class simple name (lowerCamel → snake_case simplified: lowercase). */
+    /** Logical table name; if blank, derived from the class simple name in lowercase. */
     String name() default "";
 }

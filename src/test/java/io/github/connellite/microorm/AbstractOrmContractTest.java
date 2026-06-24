@@ -170,6 +170,14 @@ abstract class AbstractOrmContractTest {
 
                 assertEquals(1, session.deleteById(UuidWidget.class, explicitId));
                 assertNull(session.selectRow(UuidWidget.class, explicitId));
+
+                UuidWidget toDelete = session.selectRow(UuidWidget.class, generated.getId());
+                assertEquals(1, session.deleteRow(toDelete));
+                assertNull(session.selectRow(UuidWidget.class, generated.getId()));
+
+                UuidWidget remaining = session.insertRow(UuidWidget.of("bulk-delete", true));
+                assertEquals(1, session.deleteAllRows(UuidWidget.class));
+                assertNull(session.selectRow(UuidWidget.class, remaining.getId()));
             }
         }
     }
@@ -194,6 +202,13 @@ abstract class AbstractOrmContractTest {
                 assertTrue(batch.get(0).getId() > 0);
                 assertTrue(batch.get(1).getId() > batch.get(0).getId());
                 assertEquals(4, session.selectRows(NumericWidget.class).size());
+
+                assertEquals(1, session.execute(Query.of(
+                                "UPDATE " + quote("contract_numeric_widgets")
+                                        + " SET " + quote("name") + " = :name WHERE " + quote("id") + " = :id")
+                        .set("name", "updated")
+                        .set("id", first.getId())));
+                assertEquals("updated", session.selectRow(NumericWidget.class, first.getId()).getName());
             }
         }
     }

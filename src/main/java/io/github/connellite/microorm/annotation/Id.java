@@ -8,6 +8,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Id {
-    /** When true, column is omitted on insert and filled from generated keys (SQLite INTEGER PRIMARY KEY AUTOINCREMENT). */
+    /** When true, the primary key column is omitted on insert and filled from generated keys. */
     boolean autoIncrement() default false;
 }

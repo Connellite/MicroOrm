@@ -7,6 +7,7 @@ import io.github.connellite.microorm.type.JdbcValueMapper;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/** Database-specific quoting, DDL, SQL generation, and JDBC value mapping. */
 public interface Dialect {
 
     String quote(String identifier);

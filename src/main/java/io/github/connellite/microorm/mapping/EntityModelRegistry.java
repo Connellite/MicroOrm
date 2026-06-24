@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/** Thread-safe registry of entity metadata built from annotations. */
 public final class EntityModelRegistry {
 
     private static final int CACHE_INITIAL_CAPACITY = 64;
@@ -25,6 +26,7 @@ public final class EntityModelRegistry {
     private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
             new ConcurrentReferenceHashMap<>(CACHE_INITIAL_CAPACITY, ConcurrentReferenceHashMap.ReferenceType.WEAK);
 
+    /** Returns metadata for a previously {@link #register(Class) registered} entity. */
     public EntityModel get(Class<?> entityClass) {
         if (!registered.contains(entityClass)) {
             throw new MicroOrmException("Entity not registered: " + entityClass.getName());
@@ -32,6 +34,7 @@ public final class EntityModelRegistry {
         return cache.computeIfAbsent(entityClass, this::build);
     }
 
+    /** Registers an entity class and builds or returns cached metadata. */
     public EntityModel register(Class<?> entityClass) {
         registered.add(entityClass);
         return cache.computeIfAbsent(entityClass, this::build);

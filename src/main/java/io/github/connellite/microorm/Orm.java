@@ -16,6 +16,10 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/**
+ * Entry point for MicroOrm. Choose a dialect factory, {@link #register(Class[]) register} entity classes,
+ * then {@link #openSession()} for CRUD and schema operations.
+ */
 public final class Orm {
 
     private final Dialect dialect;
@@ -33,6 +37,7 @@ public final class Orm {
         return new Orm(SqliteDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
+    /** SQLite backed by a {@link DataSource} (pool-friendly; connection released on {@link Session#close()}). */
     public static Orm sqlite(DataSource dataSource) {
         return new Orm(SqliteDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
@@ -69,6 +74,7 @@ public final class Orm {
         return new Orm(OracleDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
+    /** Registers entity classes and returns {@code this} for chaining. */
     public Orm register(Class<?>... entityClasses) {
         for (Class<?> c : entityClasses) {
             registry.register(c);
@@ -76,6 +82,7 @@ public final class Orm {
         return this;
     }
 
+    /** Opens a new session with a connection acquired from the configured provider. */
     public Session openSession() throws SQLException {
         Connection c = provider.acquire();
         return new Session(c, provider, registry, dialect);

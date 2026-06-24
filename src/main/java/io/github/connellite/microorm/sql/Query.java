@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Named-parameter SQL for custom reads and updates. Values are bound via ExtraLib — never concatenated into the SQL text.
+ */
 public final class Query {
 
     private final String sql;
@@ -20,16 +23,19 @@ public final class Query {
         }
     }
 
+    /** Creates a query from raw SQL with {@code :name} placeholders. */
     public static Query of(String sql) {
         return new Query(sql);
     }
 
+    /** Binds a scalar parameter. Each name may be bound only once. */
     public Query set(String name, Object value) {
         putUnique(name);
         parameters.put(name, value);
         return this;
     }
 
+    /** Binds multiple scalar parameters. */
     public Query setAll(Map<String, ?> values) {
         if (values == null || values.isEmpty()) {
             return this;
@@ -40,6 +46,7 @@ public final class Query {
         return this;
     }
 
+    /** Binds a collection for IN-clause expansion ({@code :name} in SQL). */
     public Query setCollection(String name, Collection<?> values) {
         Objects.requireNonNull(values, "values");
         if (values.isEmpty()) {
