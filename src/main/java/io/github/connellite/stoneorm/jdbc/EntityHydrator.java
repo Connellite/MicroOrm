@@ -1,11 +1,12 @@
 package io.github.connellite.stoneorm.jdbc;
 
+import io.github.connellite.exception.TypeCoercionException;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import io.github.connellite.reflection.ReflectionUtil;
-import io.github.connellite.exception.TypeCoercionException;
 import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.mapping.EntityField;
 import io.github.connellite.stoneorm.mapping.EntityModel;
+import io.github.connellite.stoneorm.type.JdbcValueMapper;
 import io.github.connellite.util.TypeCoercionUtil;
 
 import java.sql.ResultSet;
@@ -50,10 +51,14 @@ public final class EntityHydrator {
     }
 
     public static <T> T mapRow(EntityModel model, ResultSet rs) throws SQLException {
-        return mapRow(model, rs, null);
+        return mapRow(model, rs, null, null);
     }
 
-    public static <T> T mapRow(EntityModel model, ResultSet rs, Collection<String> availableColumns) throws SQLException {
+    public static <T> T mapRow(
+            EntityModel model,
+            ResultSet rs,
+            Collection<String> availableColumns,
+            JdbcValueMapper valueMapper) throws SQLException {
         T entity = newInstance(model);
         for (EntityField f : model.fields()) {
             String col = f.columnName();
@@ -66,7 +71,7 @@ public final class EntityHydrator {
                     setFieldValue(entity, f, null);
                 }
             } else {
-                setFieldValue(entity, f, raw);
+                setFieldValue(entity, f, valueMapper == null ? raw : valueMapper.fromJdbcValue(f, raw));
             }
         }
         return entity;

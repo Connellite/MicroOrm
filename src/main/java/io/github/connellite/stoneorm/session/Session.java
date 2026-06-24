@@ -150,7 +150,16 @@ public final class Session implements AutoCloseable {
 
     public <T> T selectRow(Class<T> type, Object id) {
         EntityModel m = registry.get(type);
-        return SqlExecutor.querySingle(connection, sql.selectById(m, id), m);
+        try (Stream<T> rows = SqlExecutor.queryEntitiesStream(connection, sql.selectById(m, id), m, dialect.valueMapper())) {
+            List<T> list = rows.toList();
+            if (list.isEmpty()) {
+                return null;
+            }
+            if (list.size() > 1) {
+                throw new io.github.connellite.stoneorm.StoneOrmException("Expected at most one row, got " + list.size());
+            }
+            return list.get(0);
+        }
     }
 
     public <T> List<T> selectRows(Class<T> type) {
@@ -161,7 +170,7 @@ public final class Session implements AutoCloseable {
 
     public <T> Stream<T> streamRows(Class<T> type) {
         EntityModel m = registry.get(type);
-        return SqlExecutor.queryEntitiesStream(connection, sql.selectAll(m), m);
+        return SqlExecutor.queryEntitiesStream(connection, sql.selectAll(m), m, dialect.valueMapper());
     }
 
     public <T> List<T> selectRows(Class<T> type, Map<String, ?> filters) {
@@ -172,7 +181,7 @@ public final class Session implements AutoCloseable {
 
     public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
         EntityModel m = registry.get(type);
-        return SqlExecutor.queryEntitiesStream(connection, sql.selectWhere(m, filters), m);
+        return SqlExecutor.queryEntitiesStream(connection, sql.selectWhere(m, filters), m, dialect.valueMapper());
     }
 
     public <T> List<T> selectRows(Class<T> type, Query query) {
@@ -183,7 +192,7 @@ public final class Session implements AutoCloseable {
 
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
         EntityModel m = registry.get(type);
-        return SqlExecutor.queryEntitiesStream(connection, query, m);
+        return SqlExecutor.queryEntitiesStream(connection, query, m, dialect.valueMapper());
     }
 
     public int execute(Query query) {

@@ -1,10 +1,10 @@
 package io.github.connellite.stoneorm.dialect;
 
 import io.github.connellite.stoneorm.mapping.EntityModel;
+import io.github.connellite.stoneorm.schema.MssqlSchemaManager;
 import io.github.connellite.stoneorm.schema.SchemaManager;
-import io.github.connellite.stoneorm.schema.SqliteSchemaManager;
+import io.github.connellite.stoneorm.sql.MssqlSqlGenerator;
 import io.github.connellite.stoneorm.sql.SqlGenerator;
-import io.github.connellite.stoneorm.sql.SqliteSqlGenerator;
 import io.github.connellite.stoneorm.type.DefaultJdbcValueMapper;
 import io.github.connellite.stoneorm.type.JdbcValueMapper;
 import io.github.connellite.stoneorm.type.UuidStorage;
@@ -12,21 +12,20 @@ import io.github.connellite.stoneorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-/** SQLite 3 — identifiers quoted as "name". */
-public final class SqliteDialect implements Dialect {
+public final class MssqlDialect implements Dialect {
 
-    public static final SqliteDialect INSTANCE = new SqliteDialect();
+    public static final MssqlDialect INSTANCE = new MssqlDialect();
 
-    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.STRING);
-    private final SqlGenerator sqlGenerator = new SqliteSqlGenerator(this);
-    private final SchemaManager schemaManager = new SqliteSchemaManager(this);
+    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY);
+    private final SqlGenerator sqlGenerator = new MssqlSqlGenerator(this);
+    private final SchemaManager schemaManager = new MssqlSchemaManager(this);
 
-    private SqliteDialect() {
+    private MssqlDialect() {
     }
 
     @Override
     public String quote(String identifier) {
-        return '"' + identifier.replace("\"", "\"\"") + '"';
+        return "[" + identifier.replace("]", "]]") + "]";
     }
 
     @Override

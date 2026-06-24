@@ -54,7 +54,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             if (omitPk && f.id()) {
                 continue;
             }
-            named.put(f.columnName(), EntityHydrator.getFieldValue(entity, f));
+            named.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         return named;
     }
@@ -69,10 +69,10 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
                 continue;
             }
             sets.add(dialect.quote(f.columnName()) + " = :" + f.columnName());
-            params.put(f.columnName(), EntityHydrator.getFieldValue(entity, f));
+            params.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         String pkName = pk.columnName();
-        params.put(pkName, EntityHydrator.getFieldValue(entity, pk));
+        params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
         String sql = "UPDATE " + dialect.quote(model.tableName()) + " SET " + String.join(", ", sets)
                 + " WHERE " + dialect.quote(pkName) + " = :" + pkName;
         return BoundStatement.of(sql, params);
@@ -89,7 +89,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         EntityField pk = model.primaryKey();
         String pkName = pk.columnName();
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put(pkName, id);
+        params.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
         return BoundStatement.of(
                 "DELETE FROM " + dialect.quote(model.tableName()) + " WHERE " + dialect.quote(pkName) + " = :" + pkName,
                 params);
@@ -100,7 +100,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         EntityField pk = model.primaryKey();
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
-        p.put(pkName, id);
+        p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
         return BoundStatement.of(selectAllSql(model) + " WHERE " + dialect.quote(pkName) + " = :" + pkName, p);
     }
 
@@ -109,7 +109,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         EntityField pk = model.primaryKey();
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
-        p.put(pkName, id);
+        p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
         String sql = "SELECT 1 FROM " + dialect.quote(model.tableName())
                 + " WHERE " + dialect.quote(pkName) + " = :" + pkName;
         return BoundStatement.of(limitOne(sql), p);
@@ -134,7 +134,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
                 throw new StoneOrmException("Duplicate filter for column: " + param);
             }
             predicates.add(dialect.quote(field.columnName()) + " = :" + param);
-            params.put(param, entry.getValue());
+            params.put(param, dialect.valueMapper().toJdbcValue(field, entry.getValue()));
         }
         return BoundStatement.of(selectAllSql(model) + " WHERE " + String.join(" AND ", predicates), params);
     }

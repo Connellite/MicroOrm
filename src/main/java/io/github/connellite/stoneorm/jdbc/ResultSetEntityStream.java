@@ -3,6 +3,7 @@ package io.github.connellite.stoneorm.jdbc;
 import io.github.connellite.jdbc.NamedPreparedStatement;
 import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.mapping.EntityModel;
+import io.github.connellite.stoneorm.type.JdbcValueMapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -22,7 +23,8 @@ final class ResultSetEntityStream {
             NamedPreparedStatement statement,
             ResultSet resultSet,
             EntityModel model,
-            Collection<String> availableColumns) {
+            Collection<String> availableColumns,
+            JdbcValueMapper valueMapper) {
         Iterator<T> iterator = new Iterator<>() {
             private boolean advanced;
             private boolean hasNext;
@@ -47,7 +49,7 @@ final class ResultSetEntityStream {
                 }
                 advanced = false;
                 try {
-                    return EntityHydrator.mapRow(model, resultSet, availableColumns);
+                    return EntityHydrator.mapRow(model, resultSet, availableColumns, valueMapper);
                 } catch (SQLException e) {
                     throw StoneOrmException.wrap(e);
                 }

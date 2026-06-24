@@ -8,6 +8,7 @@ import io.github.connellite.stoneorm.StoneOrmException;
 import io.github.connellite.stoneorm.mapping.EntityModel;
 import io.github.connellite.stoneorm.sql.BoundStatement;
 import io.github.connellite.stoneorm.sql.Query;
+import io.github.connellite.stoneorm.type.JdbcValueMapper;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -80,6 +81,9 @@ public final class SqlExecutor {
         if (rows == null || rows.isEmpty()) {
             return 0;
         }
+        if (model.primaryKey().autoIncrement() && !JdbcDatabaseSupport.supportsBatchGeneratedKeys(connection)) {
+            return executeSequentialInsertReturning(connection, sql, rows, model, entities);
+        }
         int chunkSize = batchSize <= 0 ? 200 : batchSize;
         int total = 0;
         try (NamedPreparedStatement nps = NamedPreparedStatement.of(connection, sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -100,6 +104,33 @@ public final class SqlExecutor {
         }
     }
 
+    private static int executeSequentialInsertReturning(
+            Connection connection,
+            String sql,
+            List<Map<String, Object>> rows,
+            EntityModel model,
+            List<?> entities) {
+        int total = 0;
+        for (int i = 0; i < rows.size(); i++) {
+            try (NamedPreparedStatement nps = NamedPreparedStatement.of(connection, sql, Statement.RETURN_GENERATED_KEYS)) {
+                nps.setAll(rows.get(i));
+                total += nps.executeUpdate();
+                if (model.primaryKey().autoIncrement()) {
+                    try (ResultSet keys = nps.unwrap().getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            throw new StoneOrmException("INSERT did not return generated keys for "
+                                    + model.entityClass().getName());
+                        }
+                        applyGeneratedKey(entities.get(i), model, keys);
+                    }
+                }
+            } catch (SQLException e) {
+                throw StoneOrmException.wrap(e);
+            }
+        }
+        return total;
+    }
+
     private static int executeBatchAndApplyKeys(
             Connection connection,
             NamedPreparedStatement nps,
@@ -116,7 +147,7 @@ public final class SqlExecutor {
                     applied++;
                 }
             }
-            if (applied < count) {
+            if (applied < count && JdbcDatabaseSupport.isSqlite(connection)) {
                 applySqliteLastInsertRowIds(connection, model, entities, entityOffset, count);
             }
         }
@@ -154,62 +185,57 @@ public final class SqlExecutor {
 
     private static void applyGeneratedKey(Object entity, EntityModel model, ResultSet keys) throws SQLException {
         var pk = model.primaryKey();
-        Class<?> t = pk.javaType();
-        if (t == long.class || t == Long.class) {
-            long v = keys.getLong(1);
-            if (keys.wasNull()) {
-                throw new StoneOrmException("Generated key was NULL for " + model.entityClass().getName());
-            }
-            EntityHydrator.setFieldValue(entity, pk, v);
-        } else if (t == int.class || t == Integer.class) {
-            int v = keys.getInt(1);
-            if (keys.wasNull()) {
-                throw new StoneOrmException("Generated key was NULL for " + model.entityClass().getName());
-            }
-            EntityHydrator.setFieldValue(entity, pk, v);
-        } else if (t == short.class || t == Short.class) {
-            short v = keys.getShort(1);
-            if (keys.wasNull()) {
-                throw new StoneOrmException("Generated key was NULL for " + model.entityClass().getName());
-            }
-            EntityHydrator.setFieldValue(entity, pk, v);
-        } else {
-            Object key = keys.getObject(1);
-            if (key == null || keys.wasNull()) {
-                throw new StoneOrmException("Generated key was NULL for " + model.entityClass().getName());
-            }
-            EntityHydrator.setFieldValue(entity, pk, key);
+        Object key = keys.getObject(1);
+        if (key == null || keys.wasNull()) {
+            throw new StoneOrmException("Generated key was NULL for " + model.entityClass().getName());
         }
+        EntityHydrator.setFieldValue(entity, pk, key);
     }
 
     public static <T> List<T> queryEntities(Connection connection, BoundStatement stmt, EntityModel model) {
-        try (Stream<T> stream = queryEntitiesStream(connection, stmt, model)) {
+        try (Stream<T> stream = queryEntitiesStream(connection, stmt, model, null)) {
             return stream.toList();
         }
     }
 
     public static <T> List<T> queryEntities(Connection connection, Query query, EntityModel model) {
-        try (Stream<T> stream = queryEntitiesStream(connection, query, model)) {
+        try (Stream<T> stream = queryEntitiesStream(connection, query, model, null)) {
             return stream.toList();
         }
     }
 
     public static <T> Stream<T> queryEntitiesStream(Connection connection, BoundStatement stmt, EntityModel model) {
+        return queryEntitiesStream(connection, stmt, model, null);
+    }
+
+    public static <T> Stream<T> queryEntitiesStream(
+            Connection connection,
+            BoundStatement stmt,
+            EntityModel model,
+            JdbcValueMapper valueMapper) {
         try {
             NamedPreparedStatement nps = prepare(connection, stmt);
             ResultSet rs = nps.executeQuery();
-            return ResultSetEntityStream.stream(nps, rs, model, null);
+            return ResultSetEntityStream.stream(nps, rs, model, null, valueMapper);
         } catch (SQLException e) {
             throw StoneOrmException.wrap(e);
         }
     }
 
     public static <T> Stream<T> queryEntitiesStream(Connection connection, Query query, EntityModel model) {
+        return queryEntitiesStream(connection, query, model, null);
+    }
+
+    public static <T> Stream<T> queryEntitiesStream(
+            Connection connection,
+            Query query,
+            EntityModel model,
+            JdbcValueMapper valueMapper) {
         try {
             NamedPreparedStatement nps = prepare(connection, query);
             ResultSet rs = nps.executeQuery();
             Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);
-            return ResultSetEntityStream.stream(nps, rs, model, columnLabels);
+            return ResultSetEntityStream.stream(nps, rs, model, columnLabels, valueMapper);
         } catch (SQLException e) {
             throw StoneOrmException.wrap(e);
         }
