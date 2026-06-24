@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.github.connellite</groupId>
-    <artifactId>StoneOrm</artifactId>
+    <artifactId>MicroOrm</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>StoneOrm</name>
+    <name>MicroOrm</name>
     <description>Lightweight JDBC ORM (SQLite first), built on ExtraLib.</description>
 
     <properties>
@@ -122,6 +122,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>
