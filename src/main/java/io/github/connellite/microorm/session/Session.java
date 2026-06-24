@@ -9,6 +9,7 @@ import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.connection.ConnectionProvider;
+import io.github.connellite.microorm.connection.SpringJdbcSupport;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -208,10 +209,15 @@ public final class Session implements AutoCloseable {
         }
     }
 
+    /**
+     * Releases the JDBC connection. Rolls back an open local transaction unless the connection is
+     * managed by Spring ({@code TransactionAwareDataSourceProxy}), in which case commit/rollback is
+     * left to Spring.
+     */
     @Override
     public void close() throws SQLException {
         if (connection != null && !connection.isClosed()) {
-            if (!connection.getAutoCommit()) {
+            if (!connection.getAutoCommit() && !SpringJdbcSupport.isTransactionManagedConnection(connection)) {
                 connection.rollback();
             }
             provider.release(connection);
