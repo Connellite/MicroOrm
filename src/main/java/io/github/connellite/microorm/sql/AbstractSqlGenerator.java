@@ -7,12 +7,15 @@ import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
+import io.github.connellite.microorm.relation.LazyRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public abstract class AbstractSqlGenerator implements SqlGenerator {
 
@@ -36,6 +39,10 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
 
     @Override
     public String insertSql(EntityModel model, boolean omitPk) {
+        return insertSql(model, omitPk, Set.of());
+    }
+
+    public String insertSql(EntityModel model, boolean omitPk, Set<String> omitJoinColumns) {
         List<String> colQuoted = new ArrayList<>();
         List<String> slots = new ArrayList<>();
         for (EntityField f : model.fields()) {
@@ -46,6 +53,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             slots.add(":" + f.columnName());
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (omitJoinColumns.contains(relation.joinColumn())) {
+                continue;
+            }
             colQuoted.add(dialect.quote(relation.joinColumn()));
             slots.add(":" + relation.joinColumn());
         }
@@ -53,29 +63,42 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
                 + String.join(", ", colQuoted) + ") VALUES (" + String.join(", ", slots) + ")";
     }
 
-    @Override
-    public Map<String, Object> insertParameters(EntityModel model, Object entity, boolean omitPk) {
-        return insertParameters(model, entity, omitPk, null, null);
+    public record RelationInsertParts(String sql, Map<String, Object> parameters) {
     }
 
-    public Map<String, Object> insertParameters(
+    public RelationInsertParts buildRelationInsert(
             EntityModel model,
             Object entity,
             boolean omitPk,
             EntityModelRegistry registry,
-            List<io.github.connellite.microorm.mapping.RelationPersister.DeferredFkUpdate> deferred) {
+            List<RelationPersister.DeferredFkUpdate> deferred) {
         Map<String, Object> named = new LinkedHashMap<>();
+        Set<String> omitJoinColumns = new java.util.HashSet<>();
         for (EntityField f : model.fields()) {
             if (omitPk && f.id()) {
                 continue;
             }
             named.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
-        if (registry != null) {
-            for (ManyToOneField relation : model.manyToOneRelations()) {
-                Object value = resolveJoinColumnForWrite(entity, model, relation, registry, deferred);
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            Object value = resolveJoinColumnForWrite(entity, model, relation, registry, deferred);
+            if (value == null && relation.nullable()) {
+                omitJoinColumns.add(relation.joinColumn());
+            } else {
                 named.put(relation.joinColumn(), value);
             }
+        }
+        return new RelationInsertParts(insertSql(model, omitPk, omitJoinColumns), named);
+    }
+
+    @Override
+    public Map<String, Object> insertParameters(EntityModel model, Object entity, boolean omitPk) {
+        Map<String, Object> named = new LinkedHashMap<>();
+        for (EntityField f : model.fields()) {
+            if (omitPk && f.id()) {
+                continue;
+            }
+            named.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         return named;
     }
@@ -123,7 +146,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModelRegistry registry) {
         EntityField pk = model.primaryKey();
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put(relation.joinColumn(), RelationValues.joinColumnValue(entity, model, relation, registry, dialect()));
+        params.put(relation.joinColumn(), joinColumnJdbcValue(entity, relation, registry));
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
         String sql = "UPDATE " + dialect.quote(model.tableName())
@@ -137,9 +160,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModel model,
             ManyToOneField relation,
             EntityModelRegistry registry,
-            List<io.github.connellite.microorm.mapping.RelationPersister.DeferredFkUpdate> deferred) {
-        io.github.connellite.microorm.relation.LazyRef<?> ref =
-                io.github.connellite.microorm.relation.LazyRef.get(relation, entity);
+            List<RelationPersister.DeferredFkUpdate> deferred) {
+        LazyRef<?> ref = LazyRef.get(relation, entity);
         if (ref == null) {
             if (!relation.nullable()) {
                 throw new MicroOrmException("Required @ManyToOne '" + relation.javaField().getName()
@@ -152,15 +174,35 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModel targetModel = registry.get(relation.targetEntityClass());
             if (RelationValues.isNew(attached, targetModel)) {
                 if (deferred != null && relation.nullable()) {
-                    deferred.add(new io.github.connellite.microorm.mapping.RelationPersister.DeferredFkUpdate(
-                            entity, model, relation));
+                    deferred.add(new RelationPersister.DeferredFkUpdate(entity, model, relation));
                     return null;
                 }
                 throw new MicroOrmException("Cannot persist required @ManyToOne '" + relation.javaField().getName()
                         + "' before referenced entity has a primary key: " + model.entityClass().getName());
             }
         }
-        return RelationValues.joinColumnValue(entity, model, relation, registry, dialect());
+        EntityModel targetModel = registry.get(relation.targetEntityClass());
+        Object raw = RelationValues.resolveRawForeignKey(ref, relation, registry);
+        if (raw == null) {
+            return null;
+        }
+        return dialect().valueMapper().toJdbcValue(targetModel.primaryKey(), raw);
+    }
+
+    private Object joinColumnJdbcValue(
+            Object entity,
+            ManyToOneField relation,
+            EntityModelRegistry registry) {
+        LazyRef<?> ref = LazyRef.get(relation, entity);
+        if (ref == null) {
+            return null;
+        }
+        Object raw = RelationValues.resolveRawForeignKey(ref, relation, registry);
+        if (raw == null) {
+            return null;
+        }
+        EntityModel targetModel = registry.get(relation.targetEntityClass());
+        return dialect().valueMapper().toJdbcValue(targetModel.primaryKey(), raw);
     }
 
     @Override

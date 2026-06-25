@@ -309,9 +309,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
         AbstractSqlGenerator generator = (AbstractSqlGenerator) sql;
-        BoundStatement bs = BoundStatement.of(
-                sql.insertSql(model, omitPk),
-                generator.insertParameters(model, entity, omitPk, registry, deferred));
+        AbstractSqlGenerator.RelationInsertParts parts =
+                generator.buildRelationInsert(model, entity, omitPk, registry, deferred);
+        BoundStatement bs = BoundStatement.of(parts.sql(), parts.parameters());
         SqlExecutor.executeInsertReturning(connection, bs, model, entity);
     }
 
