@@ -13,11 +13,7 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected String baseType(EntityField f) {
-        if (!f.sqlType().isBlank()) {
-            return f.sqlType();
-        }
-        Class<?> t = f.javaType();
+    protected String baseTypeForJava(Class<?> t, int length) {
         if (t == long.class || t == Long.class) {
             return "BIGINT";
         }
@@ -34,7 +30,7 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
             return "REAL";
         }
         if (t == String.class) {
-            return f.length() > 0 ? "VARCHAR(" + f.length() + ")" : "TEXT";
+            return length > 0 ? "VARCHAR(" + length + ")" : "TEXT";
         }
         if (t == UUID.class) {
             return "UUID";

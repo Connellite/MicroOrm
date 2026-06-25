@@ -74,11 +74,7 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected String baseType(EntityField f) {
-        if (!f.sqlType().isBlank()) {
-            return f.sqlType();
-        }
-        Class<?> t = f.javaType();
+    protected String baseTypeForJava(Class<?> t, int length) {
         if (t == long.class || t == Long.class) {
             return "NUMBER(19)";
         }
@@ -95,7 +91,7 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
             return "BINARY_FLOAT";
         }
         if (t == String.class) {
-            return "VARCHAR2(" + (f.length() > 0 ? f.length() : 255) + ")";
+            return "VARCHAR2(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
             return "RAW(16)";

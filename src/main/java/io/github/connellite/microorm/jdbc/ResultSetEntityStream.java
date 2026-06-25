@@ -3,6 +3,8 @@ package io.github.connellite.microorm.jdbc;
 import io.github.connellite.jdbc.NamedPreparedStatement;
 import io.github.connellite.microorm.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
 import java.sql.ResultSet;
@@ -24,7 +26,9 @@ final class ResultSetEntityStream {
             ResultSet resultSet,
             EntityModel model,
             Collection<String> availableColumns,
-            JdbcValueMapper valueMapper) {
+            JdbcValueMapper valueMapper,
+            LazyLoadContext lazyContext,
+            EntityModelRegistry registry) {
         Iterator<T> iterator = new Iterator<>() {
             private boolean advanced;
             private boolean hasNext;
@@ -49,7 +53,7 @@ final class ResultSetEntityStream {
                 }
                 advanced = false;
                 try {
-                    return EntityHydrator.mapRow(model, resultSet, availableColumns, valueMapper);
+                    return EntityHydrator.mapRow(model, resultSet, availableColumns, valueMapper, lazyContext, registry);
                 } catch (SQLException e) {
                     throw MicroOrmException.wrap(e);
                 }

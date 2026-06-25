@@ -35,11 +35,7 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected String baseType(EntityField f) {
-        if (!f.sqlType().isBlank()) {
-            return f.sqlType();
-        }
-        Class<?> t = f.javaType();
+    protected String baseTypeForJava(Class<?> t, int length) {
         if (t == long.class || t == Long.class || t == int.class || t == Integer.class
                 || t == short.class || t == Short.class || t == byte.class || t == Byte.class) {
             return "INTEGER";

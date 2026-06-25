@@ -4,6 +4,7 @@ import io.github.connellite.microorm.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.ManyToOneField;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -25,6 +26,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     @Override
     public void createTable(Connection connection, EntityModel model) throws SQLException {
         if (!existingColumns(connection, model).isEmpty()) {
+            // Table already exists — ensure indexes only; never recreate or drop.
             createIndexes(connection, model);
             return;
         }
@@ -49,6 +51,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                 validateAddColumn(model, f);
                 st.execute("ALTER TABLE " + dialect.quote(model.tableName()) + " ADD " + columnDefinition(f, false));
             }
+            for (ManyToOneField relation : model.manyToOneRelations()) {
+                if (existingColumns.contains(normalize(relation.joinColumn()))) {
+                    continue;
+                }
+                validateAddJoinColumn(model, relation);
+                st.execute("ALTER TABLE " + dialect.quote(model.tableName()) + " ADD " + joinColumnDefinition(relation));
+            }
         }
         createIndexes(connection, model);
     }
@@ -68,8 +77,23 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         for (EntityField f : model.fields()) {
             columns.add(columnDefinition(f, true));
         }
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            columns.add(joinColumnDefinition(relation));
+        }
         return "CREATE TABLE " + dialect.quote(model.tableName()) + " (" + columns + ")";
     }
+
+    protected String joinColumnDefinition(ManyToOneField relation) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(dialect.quote(relation.joinColumn())).append(' ');
+        sb.append(baseTypeForJava(relation.foreignKeyJavaType(), 0));
+        if (!relation.nullable()) {
+            sb.append(" NOT NULL");
+        }
+        return sb.toString();
+    }
+
+    protected abstract String baseTypeForJava(Class<?> javaType, int length);
 
     protected String columnDefinition(EntityField f, boolean includeUnique) {
         StringBuilder sb = new StringBuilder();
@@ -88,6 +112,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             }
         }
         return sb.toString();
+    }
+
+    protected String baseType(EntityField field) {
+        if (!field.sqlType().isBlank()) {
+            return field.sqlType();
+        }
+        return baseTypeForJava(field.javaType(), field.length());
     }
 
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
@@ -151,6 +182,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         return "DROP TABLE " + dialect.quote(model.tableName());
     }
 
+    protected void validateAddJoinColumn(EntityModel model, io.github.connellite.microorm.mapping.ManyToOneField relation) {
+        if (!relation.nullable()) {
+            throw new MicroOrmException("Cannot add NOT NULL join column to existing table: "
+                    + model.tableName() + "." + relation.joinColumn());
+        }
+    }
+
     protected void validateAddColumn(EntityModel model, EntityField f) {
         if (f.id()) {
             throw new MicroOrmException("Cannot add missing primary key column to existing table: "
@@ -173,8 +211,6 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     protected String normalize(String identifier) {
         return identifier == null ? "" : identifier.toLowerCase(Locale.ROOT);
     }
-
-    protected abstract String baseType(EntityField field);
 
     protected abstract String autoIncrementPrimaryKeyDefinition(EntityField field);
 }

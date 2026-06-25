@@ -7,6 +7,8 @@ import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Transient;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -72,7 +74,17 @@ class EntityModelRegistryTest {
         @Id
         private long id;
 
-        private java.time.LocalDateTime createdAt;
+        private List<String> tags;
+    }
+
+    @Entity(name = "temporal_fields")
+    static class TemporalFields {
+        @Id
+        private long id;
+
+        private java.util.Date createdAt;
+
+        private LocalDateTime updatedAt;
     }
 
     static class MappedSuperclass {
@@ -151,6 +163,13 @@ class EntityModelRegistryTest {
     void rejectsUnsupportedFieldType() {
         EntityModelRegistry registry = new EntityModelRegistry();
         assertThrows(MicroOrmException.class, () -> registry.register(UnsupportedFieldType.class));
+    }
+
+    @Test
+    void acceptsTemporalFieldTypes() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(TemporalFields.class);
+        assertEquals(3, model.fields().size());
     }
 
     @Test

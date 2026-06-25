@@ -183,6 +183,41 @@ abstract class AbstractOrmContractTest {
     }
 
     @Test
+    void repeatedSchemaInitializationPreservesData() throws SQLException {
+        try (Connection connection = openConnection()) {
+            MicroOrm orm = createOrm(connection).register(UuidWidget.class, UuidWidgetWithDescription.class);
+            try (Session session = orm.openSession()) {
+                session.createEntity(UuidWidget.class);
+
+                UuidWidget first = session.insertRow(UuidWidget.of("alpha", true));
+                UuidWidget second = session.insertRow(UuidWidget.of("beta", false));
+                assertEquals(2, session.selectRows(UuidWidget.class).size());
+
+                session.createEntity(UuidWidget.class);
+                assertEquals(2, session.selectRows(UuidWidget.class).size());
+                assertEquals("alpha", session.selectRow(UuidWidget.class, first.getId()).getName());
+                assertEquals("beta", session.selectRow(UuidWidget.class, second.getId()).getName());
+
+                session.updateEntity(UuidWidget.class);
+                assertEquals(2, session.selectRows(UuidWidget.class).size());
+                assertEquals("alpha", session.selectRow(UuidWidget.class, first.getId()).getName());
+
+                session.updateEntity(UuidWidgetWithDescription.class);
+                assertEquals(2, session.selectRows(UuidWidgetWithDescription.class).size());
+                UuidWidgetWithDescription afterSync = session.selectRow(UuidWidgetWithDescription.class, first.getId());
+                assertEquals("alpha", afterSync.getName());
+                assertTrue(afterSync.isEnabled());
+                assertNull(afterSync.getDescription());
+
+                session.createEntity(UuidWidgetWithDescription.class);
+                session.updateEntity(UuidWidgetWithDescription.class);
+                assertEquals(2, session.selectRows(UuidWidgetWithDescription.class).size());
+                assertEquals("beta", session.selectRow(UuidWidgetWithDescription.class, second.getId()).getName());
+            }
+        }
+    }
+
+    @Test
     void numericAutoIncrementAndBatchContract() throws SQLException {
         try (Connection connection = openConnection()) {
             MicroOrm orm = createOrm(connection).register(NumericWidget.class);

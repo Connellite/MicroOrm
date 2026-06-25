@@ -3,6 +3,7 @@ package io.github.connellite.microorm.sql;
 import io.github.connellite.microorm.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.ManyToOneField;
 
 import java.util.Map;
 
@@ -30,10 +31,15 @@ public interface SqlGenerator {
 
     BoundStatement selectWhere(EntityModel model, Map<String, ?> filters);
 
+    BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
+
     static void validateColumnNames(EntityModel model) {
         validateIdentifier(model.tableName(), "table");
         for (EntityField f : model.fields()) {
             validateIdentifier(f.columnName(), "column / parameter");
+        }
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            validateIdentifier(relation.joinColumn(), "column / parameter");
         }
     }
 

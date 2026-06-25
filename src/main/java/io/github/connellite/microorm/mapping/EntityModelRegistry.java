@@ -6,7 +6,12 @@ import io.github.connellite.microorm.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.JoinColumn;
+import io.github.connellite.microorm.annotation.ManyToOne;
+import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.annotation.Transient;
+import io.github.connellite.microorm.relation.LazyCollection;
+import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.sql.SqlGenerator;
 
 import java.lang.reflect.Field;
@@ -22,17 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class EntityModelRegistry {
 
     private static final int CACHE_INITIAL_CAPACITY = 64;
-
-    private static final Set<Class<?>> SUPPORTED_FIELD_TYPES = Set.of(
-            long.class, Long.class,
-            int.class, Integer.class,
-            short.class, Short.class,
-            byte.class, Byte.class,
-            boolean.class, Boolean.class,
-            float.class, Float.class,
-            double.class, Double.class,
-            String.class,
-            UUID.class);
 
     private final Set<Class<?>> registered = ConcurrentHashMap.newKeySet();
     private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
@@ -69,6 +63,8 @@ public final class EntityModelRegistry {
         rejectInheritedMappedFields(entityClass);
 
         List<EntityField> fields = new ArrayList<>();
+        List<ManyToOneField> manyToOneRelations = new ArrayList<>();
+        List<OneToManyField> oneToManyRelations = new ArrayList<>();
         EntityField pk = null;
         for (Field f : entityClass.getDeclaredFields()) {
             if (Modifier.isStatic(f.getModifiers())) {
@@ -78,6 +74,14 @@ public final class EntityModelRegistry {
                 continue;
             }
             f.trySetAccessible();
+            if (LazyRef.class.isAssignableFrom(f.getType())) {
+                manyToOneRelations.add(buildManyToOne(entityClass, f));
+                continue;
+            }
+            if (LazyCollection.class.isAssignableFrom(f.getType())) {
+                oneToManyRelations.add(buildOneToMany(entityClass, f));
+                continue;
+            }
             Id idAnn = f.getAnnotation(Id.class);
             Column colAnn = f.getAnnotation(Column.class);
             if (idAnn != null) {
@@ -117,9 +121,97 @@ public final class EntityModelRegistry {
         if (pk == null) {
             throw new MicroOrmException("Missing @Id on " + entityClass.getName());
         }
-        EntityModel model = new EntityModel(entityClass, table, fields, pk);
+        EntityModel model = new EntityModel(entityClass, table, fields, pk, manyToOneRelations, oneToManyRelations);
         SqlGenerator.validateColumnNames(model);
         return model;
+    }
+
+    private static ManyToOneField buildManyToOne(Class<?> entityClass, Field field) {
+        if (field.getAnnotation(ManyToOne.class) == null) {
+            throw new MicroOrmException("LazyRef field requires @ManyToOne on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        Class<?> targetType = resolveLazyRefTarget(entityClass, field);
+        requireEntity(targetType);
+        JoinColumn joinColumn = field.getAnnotation(JoinColumn.class);
+        String column = joinColumn != null && !joinColumn.name().isBlank()
+                ? joinColumn.name()
+                : field.getName() + "_id";
+        boolean nullable = joinColumn == null || joinColumn.nullable();
+        Class<?> fkType = primaryKeyJavaType(targetType);
+        return new ManyToOneField(field, targetType, column, nullable, fkType);
+    }
+
+    private static Class<?> primaryKeyJavaType(Class<?> entityClass) {
+        for (Field f : entityClass.getDeclaredFields()) {
+            if (f.getAnnotation(Id.class) != null) {
+                return f.getType();
+            }
+        }
+        throw new MicroOrmException("Missing @Id on " + entityClass.getName());
+    }
+
+    private static OneToManyField buildOneToMany(Class<?> entityClass, Field field) {
+        OneToMany oneToMany = field.getAnnotation(OneToMany.class);
+        if (oneToMany == null) {
+            throw new MicroOrmException("LazyCollection field requires @OneToMany on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        String mappedBy = oneToMany.mappedBy();
+        if (mappedBy.isBlank()) {
+            throw new MicroOrmException("@OneToMany.mappedBy is required on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        Class<?> childType = resolveLazyCollectionTarget(entityClass, field);
+        requireEntity(childType);
+        validateInverseManyToOne(childType, mappedBy, entityClass);
+        return new OneToManyField(field, childType, mappedBy);
+    }
+
+    private static void validateInverseManyToOne(Class<?> childClass, String mappedByField, Class<?> ownerClass) {
+        Field inverse;
+        try {
+            inverse = childClass.getDeclaredField(mappedByField);
+        } catch (NoSuchFieldException e) {
+            throw new MicroOrmException("mappedBy field '" + mappedByField + "' not found on " + childClass.getName(), e);
+        }
+        if (inverse.getAnnotation(ManyToOne.class) == null) {
+            throw new MicroOrmException("mappedBy field must have @ManyToOne on "
+                    + childClass.getName() + "." + mappedByField);
+        }
+        if (!LazyRef.class.isAssignableFrom(inverse.getType())) {
+            throw new MicroOrmException("mappedBy field must be LazyRef on "
+                    + childClass.getName() + "." + mappedByField);
+        }
+        Class<?> inverseTarget = resolveLazyRefTarget(childClass, inverse);
+        if (inverseTarget != ownerClass) {
+            throw new MicroOrmException("mappedBy @ManyToOne must reference " + ownerClass.getName()
+                    + " on " + childClass.getName() + "." + mappedByField);
+        }
+    }
+
+    private static Class<?> resolveLazyRefTarget(Class<?> entityClass, Field field) {
+        List<Class<?>> typeArgs = ReflectionUtil.getAllGenericParameterClasses(field);
+        if (typeArgs.isEmpty()) {
+            throw new MicroOrmException("LazyRef field requires a type argument on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        return typeArgs.get(0);
+    }
+
+    private static Class<?> resolveLazyCollectionTarget(Class<?> entityClass, Field field) {
+        List<Class<?>> typeArgs = ReflectionUtil.getAllGenericParameterClasses(field);
+        if (typeArgs.isEmpty()) {
+            throw new MicroOrmException("LazyCollection field requires a type argument on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        return typeArgs.get(0);
+    }
+
+    private static void requireEntity(Class<?> type) {
+        if (type.getAnnotation(Entity.class) == null) {
+            throw new MicroOrmException("Association target must be @Entity: " + type.getName());
+        }
     }
 
     private static void validateIdField(Class<?> entityClass, Field field, Id idAnn) {
@@ -145,7 +237,7 @@ public final class EntityModelRegistry {
     }
 
     private static void validateFieldType(Class<?> entityClass, Field field) {
-        if (!SUPPORTED_FIELD_TYPES.contains(field.getType())) {
+        if (!SupportedFieldTypes.isSupported(field.getType())) {
             throw new MicroOrmException("Unsupported field type " + field.getType().getName()
                     + " on " + entityClass.getName() + "." + field.getName());
         }
@@ -167,7 +259,10 @@ public final class EntityModelRegistry {
             if (f.getAnnotation(Transient.class) != null) {
                 continue;
             }
-            if (f.getAnnotation(Id.class) != null || f.getAnnotation(Column.class) != null) {
+            if (f.getAnnotation(Id.class) != null
+                    || f.getAnnotation(Column.class) != null
+                    || f.getAnnotation(ManyToOne.class) != null
+                    || f.getAnnotation(OneToMany.class) != null) {
                 throw new MicroOrmException("Entity inheritance is not supported; move mapped fields to "
                         + entityClass.getName() + " (found " + superClass.getName() + "." + f.getName() + ")");
             }

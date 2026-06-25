@@ -6,6 +6,8 @@ import io.github.connellite.jdbc.NamedQuery;
 import io.github.connellite.jdbc.ResultSetMetaDataUtils;
 import io.github.connellite.microorm.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.type.JdbcValueMapper;
@@ -198,10 +200,20 @@ public final class SqlExecutor {
             BoundStatement stmt,
             EntityModel model,
             JdbcValueMapper valueMapper) {
+        return queryEntitiesStream(connection, stmt, model, valueMapper, null, null);
+    }
+
+    public static <T> Stream<T> queryEntitiesStream(
+            Connection connection,
+            BoundStatement stmt,
+            EntityModel model,
+            JdbcValueMapper valueMapper,
+            LazyLoadContext lazyContext,
+            EntityModelRegistry registry) {
         try {
             NamedPreparedStatement nps = prepare(connection, stmt);
             ResultSet rs = nps.executeQuery();
-            return ResultSetEntityStream.stream(nps, rs, model, null, valueMapper);
+            return ResultSetEntityStream.stream(nps, rs, model, null, valueMapper, lazyContext, registry);
         } catch (SQLException e) {
             throw MicroOrmException.wrap(e);
         }
@@ -216,11 +228,21 @@ public final class SqlExecutor {
             Query query,
             EntityModel model,
             JdbcValueMapper valueMapper) {
+        return queryEntitiesStream(connection, query, model, valueMapper, null, null);
+    }
+
+    public static <T> Stream<T> queryEntitiesStream(
+            Connection connection,
+            Query query,
+            EntityModel model,
+            JdbcValueMapper valueMapper,
+            LazyLoadContext lazyContext,
+            EntityModelRegistry registry) {
         try {
             NamedPreparedStatement nps = prepare(connection, query);
             ResultSet rs = nps.executeQuery();
             Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);
-            return ResultSetEntityStream.stream(nps, rs, model, columnLabels, valueMapper);
+            return ResultSetEntityStream.stream(nps, rs, model, columnLabels, valueMapper, lazyContext, registry);
         } catch (SQLException e) {
             throw MicroOrmException.wrap(e);
         }

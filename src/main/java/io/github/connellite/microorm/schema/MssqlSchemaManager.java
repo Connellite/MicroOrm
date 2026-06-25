@@ -12,11 +12,7 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected String baseType(EntityField f) {
-        if (!f.sqlType().isBlank()) {
-            return f.sqlType();
-        }
-        Class<?> t = f.javaType();
+    protected String baseTypeForJava(Class<?> t, int length) {
         if (t == long.class || t == Long.class) {
             return "BIGINT";
         }
@@ -33,7 +29,7 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
             return "REAL";
         }
         if (t == String.class) {
-            return "NVARCHAR(" + (f.length() > 0 ? f.length() : 255) + ")";
+            return "NVARCHAR(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
             return "BINARY(16)";

@@ -353,6 +353,46 @@ class SqliteOrmTest {
     }
 
     @Test
+    void repeatedCreateEntityPreservesExistingData() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
+            try (Session s = orm.openSession()) {
+                s.createEntity(Widget.class);
+                Widget saved = s.insertRow(newWidget("startup-row"));
+                UUID id = saved.getId();
+
+                s.createEntity(Widget.class);
+                s.createEntity(Widget.class);
+
+                Widget loaded = s.selectRow(Widget.class, id);
+                assertNotNull(loaded);
+                assertEquals("startup-row", loaded.getName());
+                assertEquals(1, s.selectRows(Widget.class).size());
+            }
+        }
+    }
+
+    @Test
+    void repeatedUpdateEntityPreservesExistingData() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class, WidgetWithDescription.class);
+            try (Session s = orm.openSession()) {
+                s.createEntity(Widget.class);
+                Widget saved = s.insertRow(newWidget("kept-on-update"));
+                UUID id = saved.getId();
+
+                s.updateEntity(Widget.class);
+                s.updateEntity(Widget.class);
+
+                Widget loaded = s.selectRow(Widget.class, id);
+                assertNotNull(loaded);
+                assertEquals("kept-on-update", loaded.getName());
+                assertEquals(1, s.selectRows(Widget.class).size());
+            }
+        }
+    }
+
+    @Test
     void syncEntityAddsNullableColumnsWithoutDroppingData() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
