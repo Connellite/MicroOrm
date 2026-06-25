@@ -35,7 +35,7 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
 
     @Override
     protected String quote(String identifier) {
-        return "[" + identifier + "]";
+        return identifier;
     }
 
     @Override

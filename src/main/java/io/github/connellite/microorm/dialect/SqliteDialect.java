@@ -12,8 +12,8 @@ import io.github.connellite.microorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-/** SQLite 3 — identifiers quoted as "name". */
-public final class SqliteDialect implements Dialect {
+/** SQLite 3 — unquoted identifiers are case-insensitive; backticks request quoted SQL. */
+public final class SqliteDialect extends AbstractDialect {
 
     public static final SqliteDialect INSTANCE = new SqliteDialect();
 
@@ -25,8 +25,8 @@ public final class SqliteDialect implements Dialect {
     }
 
     @Override
-    public String quote(String identifier) {
-        return '"' + identifier.replace("\"", "\"\"") + '"';
+    protected String quotePreserveCase(String identifier) {
+        return "\"" + identifier.replace("\"", "\"\"") + "\"";
     }
 
     @Override

@@ -99,7 +99,7 @@ final class RelationWriteFkSchema {
     private static String oracleDropTable(String table) {
         return """
                 BEGIN
-                    EXECUTE IMMEDIATE 'DROP TABLE "%s" CASCADE CONSTRAINTS PURGE';
+                    EXECUTE IMMEDIATE 'DROP TABLE %s CASCADE CONSTRAINTS PURGE';
                 EXCEPTION
                     WHEN OTHERS THEN
                         IF SQLCODE != -942 THEN
@@ -293,39 +293,39 @@ final class RelationWriteFkSchema {
     private static List<String> oracleCreate() {
         return List.of(
                 """
-                CREATE TABLE "write_documents" (
-                    "id" RAW(16) NOT NULL PRIMARY KEY,
-                    "title" VARCHAR2(255) NOT NULL
+                CREATE TABLE write_documents (
+                    id RAW(16) NOT NULL PRIMARY KEY,
+                    title VARCHAR2(255) NOT NULL
                 )
                 """,
                 """
-                CREATE TABLE "write_files" (
-                    "id" RAW(16) NOT NULL PRIMARY KEY,
-                    "name" VARCHAR2(255) NOT NULL,
-                    "document_id" RAW(16) NOT NULL,
+                CREATE TABLE write_files (
+                    id RAW(16) NOT NULL PRIMARY KEY,
+                    name VARCHAR2(255) NOT NULL,
+                    document_id RAW(16) NOT NULL,
                     CONSTRAINT fk_write_files_document
-                        FOREIGN KEY ("document_id") REFERENCES "write_documents"("id")
+                        FOREIGN KEY (document_id) REFERENCES write_documents(id)
                 )
                 """,
                 """
-                CREATE TABLE "write_doc_heads" (
-                    "id" RAW(16) NOT NULL PRIMARY KEY,
-                    "primary_file_id" RAW(16)
+                CREATE TABLE write_doc_heads (
+                    id RAW(16) NOT NULL PRIMARY KEY,
+                    primary_file_id RAW(16)
                 )
                 """,
                 """
-                CREATE TABLE "write_head_files" (
-                    "id" RAW(16) NOT NULL PRIMARY KEY,
-                    "label" VARCHAR2(255) NOT NULL,
-                    "head_id" RAW(16),
+                CREATE TABLE write_head_files (
+                    id RAW(16) NOT NULL PRIMARY KEY,
+                    label VARCHAR2(255) NOT NULL,
+                    head_id RAW(16),
                     CONSTRAINT fk_write_head_files_head
-                        FOREIGN KEY ("head_id") REFERENCES "write_doc_heads"("id")
+                        FOREIGN KEY (head_id) REFERENCES write_doc_heads(id)
                 )
                 """,
                 """
-                ALTER TABLE "write_doc_heads"
+                ALTER TABLE write_doc_heads
                     ADD CONSTRAINT fk_write_doc_heads_primary
-                        FOREIGN KEY ("primary_file_id") REFERENCES "write_head_files"("id")
+                        FOREIGN KEY (primary_file_id) REFERENCES write_head_files(id)
                 """);
     }
 }

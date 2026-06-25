@@ -6,12 +6,14 @@ import io.github.connellite.microorm.MicroOrmException;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 
+import io.github.connellite.microorm.sql.SqlIdentifier;
+
 /** One mapped column ↔ field. */
 public final class EntityField {
 
     private final Field javaField;
     private final VarHandle varHandle;
-    private final String columnName;
+    private final SqlIdentifier columnIdentifier;
     private final boolean id;
     private final boolean autoIncrement;
     private final boolean nullable;
@@ -21,7 +23,11 @@ public final class EntityField {
     private final int length;
 
     public EntityField(Field javaField, String columnName, boolean id, boolean autoIncrement, boolean nullable) {
-        this(javaField, columnName, id, autoIncrement, nullable, false, false, "", 0);
+        this(javaField, SqlIdentifier.unquoted(columnName), id, autoIncrement, nullable, false, false, "", 0);
+    }
+
+    public EntityField(Field javaField, SqlIdentifier columnIdentifier, boolean id, boolean autoIncrement, boolean nullable) {
+        this(javaField, columnIdentifier, id, autoIncrement, nullable, false, false, "", 0);
     }
 
     public EntityField(
@@ -34,8 +40,21 @@ public final class EntityField {
             boolean indexed,
             String sqlType,
             int length) {
+        this(javaField, SqlIdentifier.unquoted(columnName), id, autoIncrement, nullable, unique, indexed, sqlType, length);
+    }
+
+    public EntityField(
+            Field javaField,
+            SqlIdentifier columnIdentifier,
+            boolean id,
+            boolean autoIncrement,
+            boolean nullable,
+            boolean unique,
+            boolean indexed,
+            String sqlType,
+            int length) {
         this.javaField = javaField;
-        this.columnName = columnName;
+        this.columnIdentifier = columnIdentifier;
         this.id = id;
         this.autoIncrement = autoIncrement;
         this.nullable = nullable;
@@ -59,7 +78,11 @@ public final class EntityField {
     }
 
     public String columnName() {
-        return columnName;
+        return columnIdentifier.text();
+    }
+
+    public SqlIdentifier columnIdentifier() {
+        return columnIdentifier;
     }
 
     public boolean id() {

@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.jdbc;
 
+import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.mapping.EntityModel;
 
 import java.sql.Connection;
@@ -32,12 +33,8 @@ final class JdbcDatabaseSupport {
         return product != null && product.contains("oracle");
     }
 
-    /**
-     * Oracle uppercases unquoted identifiers; this ORM creates quoted, case-sensitive column names.
-     */
     static String[] oracleGeneratedKeyColumnNames(EntityModel model) {
-        String col = model.primaryKey().columnName();
-        return new String[] {"\"" + col.replace("\"", "\"\"") + "\""};
+        return new String[] {OracleDialect.INSTANCE.jdbcColumnLabel(model.primaryKey().columnIdentifier())};
     }
 
     private static String productName(Connection connection) {

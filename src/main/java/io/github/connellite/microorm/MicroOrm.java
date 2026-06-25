@@ -10,6 +10,7 @@ import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.SpringPhysicalNamingStrategy;
 import io.github.connellite.microorm.session.Session;
 
 import javax.sql.DataSource;
@@ -26,6 +27,11 @@ public final class MicroOrm {
     private final Dialect dialect;
     private final ConnectionProvider provider;
     private final EntityModelRegistry registry;
+
+    /** Creates a registry with Spring Boot-style snake_case physical names. */
+    public static EntityModelRegistry springNamingRegistry() {
+        return new EntityModelRegistry(SpringPhysicalNamingStrategy.INSTANCE);
+    }
 
     public MicroOrm(Dialect dialect, ConnectionProvider provider, EntityModelRegistry registry) {
         this.dialect = dialect;

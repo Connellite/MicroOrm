@@ -3,6 +3,7 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -24,14 +25,14 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected String dropTableDdl(EntityModel model) {
-        return "DROP TABLE IF EXISTS " + dialect.quote(model.tableName());
+        return "DROP TABLE IF EXISTS " + dialect.sqlName(model.tableIdentifier());
     }
 
     @Override
     protected String createIndexDdl(EntityModel model, EntityField field) {
         String indexName = indexName(model, field);
-        return "CREATE INDEX IF NOT EXISTS " + dialect.quote(indexName)
-                + " ON " + dialect.quote(model.tableName()) + " (" + dialect.quote(field.columnName()) + ")";
+        return "CREATE INDEX IF NOT EXISTS " + dialect.sqlName(SqlIdentifier.unquoted(indexName))
+                + " ON " + dialect.sqlName(model.tableIdentifier()) + " (" + dialect.sqlName(field.columnIdentifier()) + ")";
     }
 
     @Override
@@ -61,7 +62,7 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
         Set<String> columns = new HashSet<>();
         try (Statement st = connection.createStatement();
-             ResultSet rs = st.executeQuery("PRAGMA table_info(" + dialect.quote(model.tableName()) + ")")) {
+             ResultSet rs = st.executeQuery("PRAGMA table_info(" + dialect.sqlName(model.tableIdentifier()) + ")")) {
             while (rs.next()) {
                 columns.add(normalize(rs.getString("name")));
             }

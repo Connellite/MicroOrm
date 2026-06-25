@@ -10,6 +10,7 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
 import io.github.connellite.microorm.relation.LazyRef;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -49,17 +50,17 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             if (omitPk && f.id()) {
                 continue;
             }
-            colQuoted.add(dialect.quote(f.columnName()));
+            colQuoted.add(dialect.sqlName(f.columnIdentifier()));
             slots.add(":" + f.columnName());
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
             if (omitJoinColumns.contains(relation.joinColumn())) {
                 continue;
             }
-            colQuoted.add(dialect.quote(relation.joinColumn()));
+            colQuoted.add(dialect.sqlName(relation.joinColumnIdentifier()));
             slots.add(":" + relation.joinColumn());
         }
-        return "INSERT INTO " + dialect.quote(model.tableName()) + " ("
+        return "INSERT INTO " + dialect.sqlName(model.tableIdentifier()) + " ("
                 + String.join(", ", colQuoted) + ") VALUES (" + String.join(", ", slots) + ")";
     }
 
@@ -120,12 +121,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             if (f.id()) {
                 continue;
             }
-            sets.add(dialect.quote(f.columnName()) + " = :" + f.columnName());
+            sets.add(dialect.sqlName(f.columnIdentifier()) + " = :" + f.columnName());
             params.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         if (registry != null) {
             for (ManyToOneField relation : model.manyToOneRelations()) {
-                sets.add(dialect.quote(relation.joinColumn()) + " = :" + relation.joinColumn());
+                sets.add(dialect.sqlName(relation.joinColumnIdentifier()) + " = :" + relation.joinColumn());
                 params.put(relation.joinColumn(), resolveJoinColumnForWrite(entity, model, relation, registry, deferred));
             }
         }
@@ -134,8 +135,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         }
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
-        String sql = "UPDATE " + dialect.quote(model.tableName()) + " SET " + String.join(", ", sets)
-                + " WHERE " + dialect.quote(pkName) + " = :" + pkName;
+        String sql = "UPDATE " + dialect.sqlName(model.tableIdentifier()) + " SET " + String.join(", ", sets)
+                + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(sql, params);
     }
 
@@ -149,9 +150,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         params.put(relation.joinColumn(), joinColumnJdbcValue(entity, relation, registry));
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
-        String sql = "UPDATE " + dialect.quote(model.tableName())
-                + " SET " + dialect.quote(relation.joinColumn()) + " = :" + relation.joinColumn()
-                + " WHERE " + dialect.quote(pkName) + " = :" + pkName;
+        String sql = "UPDATE " + dialect.sqlName(model.tableIdentifier())
+                + " SET " + dialect.sqlName(relation.joinColumnIdentifier()) + " = :" + relation.joinColumn()
+                + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(sql, params);
     }
 
@@ -218,7 +219,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
         return BoundStatement.of(
-                "DELETE FROM " + dialect.quote(model.tableName()) + " WHERE " + dialect.quote(pkName) + " = :" + pkName,
+                "DELETE FROM " + dialect.sqlName(model.tableIdentifier()) + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName,
                 params);
     }
 
@@ -228,7 +229,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
         p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
-        return BoundStatement.of(selectAllSql(model) + " WHERE " + dialect.quote(pkName) + " = :" + pkName, p);
+        return BoundStatement.of(selectAllSql(model) + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName, p);
     }
 
     @Override
@@ -237,8 +238,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
         p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
-        String sql = "SELECT 1 FROM " + dialect.quote(model.tableName())
-                + " WHERE " + dialect.quote(pkName) + " = :" + pkName;
+        String sql = "SELECT 1 FROM " + dialect.sqlName(model.tableIdentifier())
+                + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(limitOne(sql), p);
     }
 
@@ -260,7 +261,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             if (params.containsKey(param)) {
                 throw new MicroOrmException("Duplicate filter for column: " + param);
             }
-            predicates.add(dialect.quote(field.columnName()) + " = :" + param);
+            predicates.add(dialect.sqlName(field.columnIdentifier()) + " = :" + param);
             params.put(param, dialect.valueMapper().toJdbcValue(field, entry.getValue()));
         }
         return BoundStatement.of(selectAllSql(model) + " WHERE " + String.join(" AND ", predicates), params);
@@ -271,11 +272,21 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         if (joinColumn == null || joinColumn.isBlank()) {
             throw new MicroOrmException("Join column name cannot be blank");
         }
+        SqlIdentifier identifier = resolveJoinColumn(model, joinColumn);
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(joinColumn, joinValue);
         return BoundStatement.of(
-                selectAllSql(model) + " WHERE " + dialect.quote(joinColumn) + " = :" + joinColumn,
+                selectAllSql(model) + " WHERE " + dialect.sqlName(identifier) + " = :" + joinColumn,
                 params);
+    }
+
+    private static SqlIdentifier resolveJoinColumn(EntityModel model, String joinColumn) {
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (relation.joinColumn().equals(joinColumn)) {
+                return relation.joinColumnIdentifier();
+            }
+        }
+        return SqlIdentifier.unquoted(joinColumn);
     }
 
     protected abstract String limitOne(String sql);
@@ -287,12 +298,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
     private String selectAllSql(EntityModel model) {
         List<String> cols = new ArrayList<>();
         for (EntityField f : model.fields()) {
-            cols.add(dialect.quote(model.tableName()) + "." + dialect.quote(f.columnName()));
+            cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(f.columnIdentifier()));
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            cols.add(dialect.quote(model.tableName()) + "." + dialect.quote(relation.joinColumn()));
+            cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(relation.joinColumnIdentifier()));
         }
-        return "SELECT " + String.join(", ", cols) + " FROM " + dialect.quote(model.tableName());
+        return "SELECT " + String.join(", ", cols) + " FROM " + dialect.sqlName(model.tableIdentifier());
     }
 
     private static EntityField fieldByName(EntityModel model, String name) {

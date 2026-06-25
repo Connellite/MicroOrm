@@ -156,6 +156,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 entities);
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public <T> int insertRows(List<T> entities) {
         return insertRows(entities, 200);
     }
@@ -188,7 +189,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
-        String q = "DELETE FROM " + dialect.quote(m.tableName());
+        String q = "DELETE FROM " + dialect.sqlName(m.tableIdentifier());
         return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, java.util.Map.of()));
     }
 
@@ -207,7 +208,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
         try (Stream<T> rows = SqlExecutor.queryEntitiesStream(
-                connection, sql.selectById(m, id), m, dialect.valueMapper(), context, registry)) {
+                connection, sql.selectById(m, id), m, dialect, dialect.valueMapper(), context, registry)) {
             List<T> list = rows.toList();
             if (list.isEmpty()) {
                 return null;
@@ -234,7 +235,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityModel m = registry.get(type);
         SessionLazyContext context = lazyLoadContext();
         return SqlExecutor.queryEntitiesStream(
-                connection, sql.selectAll(m), m, dialect.valueMapper(), context, registry);
+                connection, sql.selectAll(m), m, dialect, dialect.valueMapper(), context, registry);
     }
 
     /** Materializes filtered rows; closes the underlying JDBC resources. */
@@ -249,7 +250,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityModel m = registry.get(type);
         SessionLazyContext context = lazyLoadContext();
         return SqlExecutor.queryEntitiesStream(
-                connection, sql.selectWhere(m, filters), m, dialect.valueMapper(), context, registry);
+                connection, sql.selectWhere(m, filters), m, dialect, dialect.valueMapper(), context, registry);
     }
 
     /** Materializes custom-query rows; closes the underlying JDBC resources. */
@@ -264,7 +265,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityModel m = registry.get(type);
         SessionLazyContext context = lazyLoadContext();
         return SqlExecutor.queryEntitiesStream(
-                connection, query, m, dialect.valueMapper(), context, registry);
+                connection, query, m, dialect, dialect.valueMapper(), context, registry);
     }
 
     public int execute(Query query) {
@@ -345,8 +346,8 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
         EntityModel ownerModel = registry.get(inverse.targetEntityClass());
         Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
-        execute(Query.of("DELETE FROM " + dialect.quote(childModel.tableName())
-                        + " WHERE " + dialect.quote(inverse.joinColumn()) + " = :ownerId")
+        execute(Query.of("DELETE FROM " + dialect.sqlName(childModel.tableIdentifier())
+                        + " WHERE " + dialect.sqlName(inverse.joinColumnIdentifier()) + " = :ownerId")
                 .set("ownerId", jdbcOwnerPk));
     }
 
@@ -363,6 +364,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 connection,
                 sql.selectByJoinColumn(childModel, inverse.joinColumn(), jdbcOwnerPk),
                 childModel,
+                dialect,
                 dialect.valueMapper(),
                 lazyLoadContext(),
                 registry)) {

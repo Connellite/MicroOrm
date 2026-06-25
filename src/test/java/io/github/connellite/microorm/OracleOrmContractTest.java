@@ -31,7 +31,7 @@ class OracleOrmContractTest extends AbstractOrmContractTest {
 
     @Override
     protected String quote(String identifier) {
-        return "\"" + identifier + "\"";
+        return identifier.toUpperCase();
     }
 
     @Override
@@ -41,8 +41,8 @@ class OracleOrmContractTest extends AbstractOrmContractTest {
                 FROM USER_TAB_COLUMNS
                 WHERE TABLE_NAME = ? AND COLUMN_NAME = ?
                 """)) {
-            ps.setString(1, "contract_uuid_widgets");
-            ps.setString(2, "id");
+            ps.setString(1, "CONTRACT_UUID_WIDGETS");
+            ps.setString(2, "ID");
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     throw new AssertionError("UUID id column metadata was not found");

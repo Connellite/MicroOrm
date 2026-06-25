@@ -6,8 +6,12 @@ import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public interface SqlGenerator {
+
+    Pattern IDENTIFIER_PATTERN = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
+    Pattern SQL_TYPE_PATTERN = Pattern.compile("[A-Za-z0-9_(),. ]+");
 
     BoundStatement insert(EntityModel model, Object entity);
 
@@ -34,12 +38,12 @@ public interface SqlGenerator {
     BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
 
     static void validateColumnNames(EntityModel model) {
-        validateIdentifier(model.tableName(), "table");
+        validateIdentifier(model.tableIdentifier().text(), "table");
         for (EntityField f : model.fields()) {
-            validateIdentifier(f.columnName(), "column / parameter");
+            validateIdentifier(f.columnIdentifier().text(), "column / parameter");
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            validateIdentifier(relation.joinColumn(), "column / parameter");
+            validateIdentifier(relation.joinColumnIdentifier().text(), "column / parameter");
         }
     }
 
@@ -47,13 +51,13 @@ public interface SqlGenerator {
         if (name == null || name.isBlank()) {
             throw new MicroOrmException("Invalid SQL " + kind + " name: blank");
         }
-        if (!name.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+        if (!IDENTIFIER_PATTERN.matcher(name).matches()) {
             throw new MicroOrmException("Invalid SQL " + kind + " name (use [a-zA-Z_][a-zA-Z0-9_]*): " + name);
         }
     }
 
     static void validateSqlType(String sqlType, String context) {
-        if (!sqlType.matches("[A-Za-z0-9_(),. ]+")) {
+        if (!SQL_TYPE_PATTERN.matcher(sqlType).matches()) {
             throw new MicroOrmException("Invalid @Column(sqlType) on " + context + ": " + sqlType);
         }
     }

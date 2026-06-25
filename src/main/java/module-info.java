@@ -12,6 +12,7 @@ module io.github.connellite.microorm {
     exports io.github.connellite.microorm.mapping;
     exports io.github.connellite.microorm.session;
     exports io.github.connellite.microorm.sql;
+    exports io.github.connellite.microorm.type;
     exports io.github.connellite.microorm.relation;
 
     opens io.github.connellite.microorm to io.github.connellite.ExtraLib;

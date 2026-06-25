@@ -12,7 +12,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-public final class MssqlDialect implements Dialect {
+public final class MssqlDialect extends AbstractDialect {
 
     public static final MssqlDialect INSTANCE = new MssqlDialect();
 
@@ -24,7 +24,7 @@ public final class MssqlDialect implements Dialect {
     }
 
     @Override
-    public String quote(String identifier) {
+    protected String quotePreserveCase(String identifier) {
         return "[" + identifier.replace("]", "]]") + "]";
     }
 

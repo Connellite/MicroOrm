@@ -5,6 +5,7 @@ import io.github.connellite.jdbc.NamedPreparedStatement;
 import io.github.connellite.jdbc.NamedQuery;
 import io.github.connellite.jdbc.ResultSetMetaDataUtils;
 import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.relation.LazyLoadContext;
@@ -200,20 +201,21 @@ public final class SqlExecutor {
             BoundStatement stmt,
             EntityModel model,
             JdbcValueMapper valueMapper) {
-        return queryEntitiesStream(connection, stmt, model, valueMapper, null, null);
+        return queryEntitiesStream(connection, stmt, model, null, valueMapper, null, null);
     }
 
     public static <T> Stream<T> queryEntitiesStream(
             Connection connection,
             BoundStatement stmt,
             EntityModel model,
+            Dialect dialect,
             JdbcValueMapper valueMapper,
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
         try {
             NamedPreparedStatement nps = prepare(connection, stmt);
             ResultSet rs = nps.executeQuery();
-            return ResultSetEntityStream.stream(nps, rs, model, null, valueMapper, lazyContext, registry);
+            return ResultSetEntityStream.stream(nps, rs, model, null, dialect, valueMapper, lazyContext, registry);
         } catch (SQLException e) {
             throw MicroOrmException.wrap(e);
         }
@@ -228,13 +230,14 @@ public final class SqlExecutor {
             Query query,
             EntityModel model,
             JdbcValueMapper valueMapper) {
-        return queryEntitiesStream(connection, query, model, valueMapper, null, null);
+        return queryEntitiesStream(connection, query, model, null, valueMapper, null, null);
     }
 
     public static <T> Stream<T> queryEntitiesStream(
             Connection connection,
             Query query,
             EntityModel model,
+            Dialect dialect,
             JdbcValueMapper valueMapper,
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
@@ -242,7 +245,8 @@ public final class SqlExecutor {
             NamedPreparedStatement nps = prepare(connection, query);
             ResultSet rs = nps.executeQuery();
             Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);
-            return ResultSetEntityStream.stream(nps, rs, model, columnLabels, valueMapper, lazyContext, registry);
+            return ResultSetEntityStream.stream(
+                    nps, rs, model, columnLabels, dialect, valueMapper, lazyContext, registry);
         } catch (SQLException e) {
             throw MicroOrmException.wrap(e);
         }

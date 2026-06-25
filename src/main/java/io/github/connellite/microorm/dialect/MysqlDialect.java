@@ -12,7 +12,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-public final class MysqlDialect implements Dialect {
+public final class MysqlDialect extends AbstractDialect {
 
     public static final MysqlDialect INSTANCE = new MysqlDialect();
 
@@ -24,8 +24,13 @@ public final class MysqlDialect implements Dialect {
     }
 
     @Override
-    public String quote(String identifier) {
+    protected String quotePreserveCase(String identifier) {
         return "`" + identifier.replace("`", "``") + "`";
+    }
+
+    @Override
+    protected String unquotedCatalogName(String identifier) {
+        return lower(identifier);
     }
 
     @Override

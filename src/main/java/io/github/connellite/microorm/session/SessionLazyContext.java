@@ -67,6 +67,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 connection,
                 sql.selectByJoinColumn(childModel, inverse.joinColumn(), jdbcValue),
                 childModel,
+                dialect,
                 dialect.valueMapper(),
                 this,
                 registry)) {

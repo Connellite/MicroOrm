@@ -5,6 +5,7 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -14,8 +15,11 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.regex.Pattern;
 
 public abstract class AbstractSchemaManager implements SchemaManager {
+
+    private static final Pattern INDEX_NAME_SANITIZER = Pattern.compile("[^a-zA-Z0-9_]");
 
     protected final Dialect dialect;
 
@@ -45,18 +49,18 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         }
         try (Statement st = connection.createStatement()) {
             for (EntityField f : model.fields()) {
-                if (existingColumns.contains(normalize(f.columnName()))) {
+                if (existingColumns.contains(normalize(dialect.catalogName(f.columnIdentifier())))) {
                     continue;
                 }
                 validateAddColumn(model, f);
-                st.execute("ALTER TABLE " + dialect.quote(model.tableName()) + " ADD " + columnDefinition(f, false));
+                st.execute("ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + columnDefinition(f, false));
             }
             for (ManyToOneField relation : model.manyToOneRelations()) {
-                if (existingColumns.contains(normalize(relation.joinColumn()))) {
+                if (existingColumns.contains(normalize(dialect.catalogName(relation.joinColumnIdentifier())))) {
                     continue;
                 }
                 validateAddJoinColumn(model, relation);
-                st.execute("ALTER TABLE " + dialect.quote(model.tableName()) + " ADD " + joinColumnDefinition(relation));
+                st.execute("ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + joinColumnDefinition(relation));
             }
         }
         createIndexes(connection, model);
@@ -80,12 +84,12 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         for (ManyToOneField relation : model.manyToOneRelations()) {
             columns.add(joinColumnDefinition(relation));
         }
-        return "CREATE TABLE " + dialect.quote(model.tableName()) + " (" + columns + ")";
+        return "CREATE TABLE " + dialect.sqlName(model.tableIdentifier()) + " (" + columns + ")";
     }
 
     protected String joinColumnDefinition(ManyToOneField relation) {
         StringBuilder sb = new StringBuilder();
-        sb.append(dialect.quote(relation.joinColumn())).append(' ');
+        sb.append(dialect.sqlName(relation.joinColumnIdentifier())).append(' ');
         sb.append(baseTypeForJava(relation.foreignKeyJavaType(), 0));
         if (!relation.nullable()) {
             sb.append(" NOT NULL");
@@ -97,7 +101,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected String columnDefinition(EntityField f, boolean includeUnique) {
         StringBuilder sb = new StringBuilder();
-        sb.append(dialect.quote(f.columnName())).append(' ');
+        sb.append(dialect.sqlName(f.columnIdentifier())).append(' ');
         if (f.id() && f.autoIncrement()) {
             sb.append(autoIncrementPrimaryKeyDefinition(f));
         } else if (f.id()) {
@@ -123,13 +127,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
         Set<String> columns = new HashSet<>();
-        try (ResultSet rs = connection.getMetaData().getColumns(null, null, model.tableName(), null)) {
+        String table = dialect.catalogName(model.tableIdentifier());
+        try (ResultSet rs = connection.getMetaData().getColumns(null, null, table, null)) {
             while (rs.next()) {
                 columns.add(normalize(rs.getString("COLUMN_NAME")));
             }
         }
         if (columns.isEmpty()) {
-            try (ResultSet rs = connection.getMetaData().getColumns(null, null, model.tableName().toUpperCase(Locale.ROOT), null)) {
+            try (ResultSet rs = connection.getMetaData().getColumns(null, null, table.toUpperCase(Locale.ROOT), null)) {
                 while (rs.next()) {
                     columns.add(normalize(rs.getString("COLUMN_NAME")));
                 }
@@ -154,10 +159,10 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected boolean indexExists(Connection connection, EntityModel model, EntityField field) throws SQLException {
         String indexName = indexName(model, field);
-        if (findIndex(connection, model.tableName(), indexName)) {
+        if (findIndex(connection, dialect.catalogName(model.tableIdentifier()), indexName)) {
             return true;
         }
-        return findIndex(connection, model.tableName().toUpperCase(Locale.ROOT), indexName);
+        return findIndex(connection, dialect.catalogName(model.tableIdentifier()).toUpperCase(Locale.ROOT), indexName);
     }
 
     private boolean findIndex(Connection connection, String tableName, String indexName) throws SQLException {
@@ -174,12 +179,12 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected String createIndexDdl(EntityModel model, EntityField field) {
         String indexName = indexName(model, field);
-        return "CREATE INDEX " + dialect.quote(indexName)
-                + " ON " + dialect.quote(model.tableName()) + " (" + dialect.quote(field.columnName()) + ")";
+        return "CREATE INDEX " + dialect.sqlName(SqlIdentifier.unquoted(indexName))
+                + " ON " + dialect.sqlName(model.tableIdentifier()) + " (" + dialect.sqlName(field.columnIdentifier()) + ")";
     }
 
     protected String dropTableDdl(EntityModel model) {
-        return "DROP TABLE " + dialect.quote(model.tableName());
+        return "DROP TABLE " + dialect.sqlName(model.tableIdentifier());
     }
 
     protected void validateAddJoinColumn(EntityModel model, io.github.connellite.microorm.mapping.ManyToOneField relation) {
@@ -205,7 +210,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     }
 
     protected String indexName(EntityModel model, EntityField field) {
-        return ("idx_" + model.tableName() + "_" + field.columnName()).replaceAll("[^a-zA-Z0-9_]", "_");
+        return INDEX_NAME_SANITIZER.matcher("idx_" + model.tableName() + "_" + field.columnName()).replaceAll("_");
     }
 
     protected String normalize(String identifier) {

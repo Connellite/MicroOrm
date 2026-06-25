@@ -4,6 +4,7 @@ import io.github.connellite.exception.TypeCoercionException;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
@@ -12,6 +13,7 @@ import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.relation.LazyCollection;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.relation.LazyRef;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.util.TypeCoercionUtil;
 
@@ -72,7 +74,7 @@ public final class EntityHydrator {
     }
 
     public static <T> T mapRow(EntityModel model, ResultSet rs) throws SQLException {
-        return mapRow(model, rs, null, null, null, null);
+        return mapRow(model, rs, null, null, null, null, null);
     }
 
     public static <T> T mapRow(
@@ -80,7 +82,7 @@ public final class EntityHydrator {
             ResultSet rs,
             Collection<String> availableColumns,
             JdbcValueMapper valueMapper) throws SQLException {
-        return mapRow(model, rs, availableColumns, valueMapper, null, null);
+        return mapRow(model, rs, availableColumns, valueMapper, null, null, null);
     }
 
     public static <T> T mapRow(
@@ -88,23 +90,23 @@ public final class EntityHydrator {
             ResultSet rs,
             Collection<String> availableColumns,
             JdbcValueMapper valueMapper,
+            Dialect dialect,
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) throws SQLException {
         T entity = newInstance(model);
         for (EntityField f : model.fields()) {
-            String col = f.columnName();
-            if (availableColumns != null && !availableColumns.contains(col)) {
+            if (!hasColumn(availableColumns, dialect, f.columnIdentifier())) {
                 continue;
             }
-            Object raw = rs.getObject(col);
+            Object raw = readColumn(rs, dialect, f.columnIdentifier());
             if (raw == null || rs.wasNull()) {
                 setFieldValue(entity, f, null);
             } else {
                 setFieldValue(entity, f, valueMapper == null ? raw : valueMapper.fromJdbcValue(f, raw));
             }
         }
-        if (lazyContext != null && registry != null) {
-            attachRelations(entity, model, rs, availableColumns, valueMapper, lazyContext, registry);
+        if (lazyContext != null && registry != null && dialect != null) {
+            attachRelations(entity, model, rs, availableColumns, valueMapper, dialect, lazyContext, registry);
         }
         return entity;
     }
@@ -115,14 +117,15 @@ public final class EntityHydrator {
             ResultSet rs,
             Collection<String> availableColumns,
             JdbcValueMapper valueMapper,
+            Dialect dialect,
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) throws SQLException {
         Object ownerId = getFieldValue(entity, model.primaryKey());
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            if (availableColumns != null && !availableColumns.contains(relation.joinColumn())) {
+            if (!hasColumn(availableColumns, dialect, relation.joinColumnIdentifier())) {
                 continue;
             }
-            Object raw = rs.getObject(relation.joinColumn());
+            Object raw = readColumn(rs, dialect, relation.joinColumnIdentifier());
             Object foreignKey = null;
             if (raw != null && !rs.wasNull()) {
                 EntityModel targetModel = registry.get(relation.targetEntityClass());
@@ -136,6 +139,27 @@ public final class EntityHydrator {
             LazyCollection<?> collection = LazyCollection.of(lazyContext, relation, ownerId);
             LazyCollection.set(relation, entity, collection);
         }
+    }
+
+    private static Object readColumn(ResultSet rs, Dialect dialect, SqlIdentifier identifier) throws SQLException {
+        if (dialect == null) {
+            return rs.getObject(identifier.text());
+        }
+        return rs.getObject(dialect.jdbcColumnLabel(identifier));
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private static boolean hasColumn(Collection<String> availableColumns, Dialect dialect, SqlIdentifier identifier) {
+        if (availableColumns == null) {
+            return true;
+        }
+        String label = dialect == null ? identifier.text() : dialect.jdbcColumnLabel(identifier);
+        for (String column : availableColumns) {
+            if (column.equals(label) || column.equalsIgnoreCase(label)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Object coerceToTargetPk(Object raw, EntityField targetPk, JdbcValueMapper valueMapper) {

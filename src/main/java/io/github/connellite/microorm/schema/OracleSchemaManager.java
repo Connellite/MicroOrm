@@ -3,6 +3,7 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -20,7 +21,8 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        if (!tableExists(connection, model.tableName())) {
+        String table = dialect.catalogName(model.tableIdentifier());
+        if (!tableExists(connection, table)) {
             return Set.of();
         }
         Set<String> columns = new HashSet<>();
@@ -30,7 +32,7 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
                 WHERE owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
                   AND table_name = ?
                 """)) {
-            ps.setString(1, model.tableName());
+            ps.setString(1, table);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     columns.add(normalize(rs.getString("column_name")));
@@ -65,8 +67,8 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
                   AND table_name = ?
                   AND index_name = ?
                 """)) {
-            ps.setString(1, model.tableName());
-            ps.setString(2, indexName);
+            ps.setString(1, dialect.catalogName(model.tableIdentifier()));
+            ps.setString(2, dialect.catalogName(SqlIdentifier.unquoted(indexName)));
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }

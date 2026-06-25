@@ -45,6 +45,6 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected String dropTableDdl(EntityModel model) {
-        return "DROP TABLE IF EXISTS " + dialect.quote(model.tableName());
+        return "DROP TABLE IF EXISTS " + dialect.sqlName(model.tableIdentifier());
     }
 }

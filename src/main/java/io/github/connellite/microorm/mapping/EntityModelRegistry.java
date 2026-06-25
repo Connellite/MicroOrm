@@ -13,6 +13,7 @@ import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.relation.LazyCollection;
 import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.sql.SqlGenerator;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -22,15 +23,25 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /** Thread-safe registry of entity metadata built from annotations. */
 public final class EntityModelRegistry {
 
     private static final int CACHE_INITIAL_CAPACITY = 64;
 
+    private final PhysicalNamingStrategy physicalNamingStrategy;
     private final Set<Class<?>> registered = ConcurrentHashMap.newKeySet();
     private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
             new ConcurrentReferenceHashMap<>(CACHE_INITIAL_CAPACITY, ConcurrentReferenceHashMap.ReferenceType.WEAK);
+
+    public EntityModelRegistry() {
+        this(IdentityPhysicalNamingStrategy.INSTANCE);
+    }
+
+    public EntityModelRegistry(PhysicalNamingStrategy physicalNamingStrategy) {
+        this.physicalNamingStrategy = Objects.requireNonNull(physicalNamingStrategy, "physicalNamingStrategy");
+    }
 
     /** Returns metadata for a previously {@link #register(Class) registered} entity. */
     public EntityModel get(Class<?> entityClass) {
@@ -52,8 +63,10 @@ public final class EntityModelRegistry {
         if (entityAnn == null) {
             throw new MicroOrmException("Missing @Entity on " + entityClass.getName());
         }
-        String table = entityAnn.name().isBlank() ? defaultTableName(entityClass) : entityAnn.name();
-        SqlGenerator.validateIdentifier(table, "table");
+        SqlIdentifier table = entityAnn.name().isBlank()
+                ? toPhysicalTable(SqlIdentifier.unquoted(entityClass.getSimpleName()))
+                : toPhysicalTable(SqlIdentifier.parse(entityAnn.name()));
+        SqlGenerator.validateIdentifier(table.text(), "table");
         try {
             ReflectionUtil.getConstructor(entityClass);
         } catch (NoSuchMethodException e) {
@@ -89,7 +102,7 @@ public final class EntityModelRegistry {
                     throw new MicroOrmException("Multiple @Id fields on " + entityClass.getName());
                 }
                 validateIdField(entityClass, f, idAnn);
-                String col = columnName(f, colAnn);
+                SqlIdentifier col = toPhysicalColumn(columnIdentifier(f, colAnn));
                 boolean nullable = colAnn != null && colAnn.nullable();
                 pk = new EntityField(
                         f,
@@ -104,7 +117,7 @@ public final class EntityModelRegistry {
                 fields.add(pk);
             } else {
                 validateFieldType(entityClass, f);
-                String col = columnName(f, colAnn);
+                SqlIdentifier col = toPhysicalColumn(columnIdentifier(f, colAnn));
                 boolean nullable = colAnn == null || colAnn.nullable();
                 fields.add(new EntityField(
                         f,
@@ -126,7 +139,7 @@ public final class EntityModelRegistry {
         return model;
     }
 
-    private static ManyToOneField buildManyToOne(Class<?> entityClass, Field field) {
+    private ManyToOneField buildManyToOne(Class<?> entityClass, Field field) {
         if (field.getAnnotation(ManyToOne.class) == null) {
             throw new MicroOrmException("LazyRef field requires @ManyToOne on "
                     + entityClass.getName() + "." + field.getName());
@@ -134,9 +147,9 @@ public final class EntityModelRegistry {
         Class<?> targetType = resolveLazyRefTarget(entityClass, field);
         requireEntity(targetType);
         JoinColumn joinColumn = field.getAnnotation(JoinColumn.class);
-        String column = joinColumn != null && !joinColumn.name().isBlank()
-                ? joinColumn.name()
-                : field.getName() + "_id";
+        SqlIdentifier column = joinColumn != null && !joinColumn.name().isBlank()
+                ? toPhysicalColumn(SqlIdentifier.parse(joinColumn.name()))
+                : toPhysicalColumn(SqlIdentifier.unquoted(field.getName() + "_id"));
         boolean nullable = joinColumn == null || joinColumn.nullable();
         Class<?> fkType = primaryKeyJavaType(targetType);
         return new ManyToOneField(field, targetType, column, nullable, fkType);
@@ -229,11 +242,26 @@ public final class EntityModelRegistry {
         }
     }
 
-    private static String columnName(Field f, Column colAnn) {
-        if (colAnn != null && !colAnn.name().isBlank()) {
-            return colAnn.name();
+    private SqlIdentifier toPhysicalTable(SqlIdentifier logical) {
+        return toPhysical(logical, physicalNamingStrategy::toPhysicalTableName);
+    }
+
+    private SqlIdentifier toPhysicalColumn(SqlIdentifier logical) {
+        return toPhysical(logical, physicalNamingStrategy::toPhysicalColumnName);
+    }
+
+    private static SqlIdentifier toPhysical(SqlIdentifier logical, Function<String, String> transform) {
+        if (logical.quoted()) {
+            return logical;
         }
-        return f.getName();
+        return SqlIdentifier.unquoted(transform.apply(logical.text()));
+    }
+
+    private static SqlIdentifier columnIdentifier(Field f, Column colAnn) {
+        if (colAnn != null && !colAnn.name().isBlank()) {
+            return SqlIdentifier.parse(colAnn.name());
+        }
+        return SqlIdentifier.unquoted(f.getName());
     }
 
     private static void validateFieldType(Class<?> entityClass, Field field) {
@@ -267,9 +295,5 @@ public final class EntityModelRegistry {
                         + entityClass.getName() + " (found " + superClass.getName() + "." + f.getName() + ")");
             }
         }
-    }
-
-    private static String defaultTableName(Class<?> c) {
-        return c.getSimpleName().toLowerCase();
     }
 }

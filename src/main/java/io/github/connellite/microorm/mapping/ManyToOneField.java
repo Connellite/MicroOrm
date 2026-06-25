@@ -6,13 +6,15 @@ import io.github.connellite.microorm.MicroOrmException;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 
+import io.github.connellite.microorm.sql.SqlIdentifier;
+
 /** Metadata for a {@link io.github.connellite.microorm.annotation.ManyToOne} {@link io.github.connellite.microorm.relation.LazyRef} field. */
 public final class ManyToOneField {
 
     private final Field javaField;
     private final VarHandle varHandle;
     private final Class<?> targetEntityClass;
-    private final String joinColumn;
+    private final SqlIdentifier joinColumnIdentifier;
     private final boolean nullable;
     private final Class<?> foreignKeyJavaType;
 
@@ -22,9 +24,18 @@ public final class ManyToOneField {
             String joinColumn,
             boolean nullable,
             Class<?> foreignKeyJavaType) {
+        this(javaField, targetEntityClass, SqlIdentifier.unquoted(joinColumn), nullable, foreignKeyJavaType);
+    }
+
+    public ManyToOneField(
+            Field javaField,
+            Class<?> targetEntityClass,
+            SqlIdentifier joinColumnIdentifier,
+            boolean nullable,
+            Class<?> foreignKeyJavaType) {
         this.javaField = javaField;
         this.targetEntityClass = targetEntityClass;
-        this.joinColumn = joinColumn;
+        this.joinColumnIdentifier = joinColumnIdentifier;
         this.nullable = nullable;
         this.foreignKeyJavaType = foreignKeyJavaType;
         try {
@@ -47,7 +58,11 @@ public final class ManyToOneField {
     }
 
     public String joinColumn() {
-        return joinColumn;
+        return joinColumnIdentifier.text();
+    }
+
+    public SqlIdentifier joinColumnIdentifier() {
+        return joinColumnIdentifier;
     }
 
     public boolean nullable() {

@@ -2,6 +2,7 @@ package io.github.connellite.microorm.jdbc;
 
 import io.github.connellite.jdbc.NamedPreparedStatement;
 import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.relation.LazyLoadContext;
@@ -26,6 +27,7 @@ final class ResultSetEntityStream {
             ResultSet resultSet,
             EntityModel model,
             Collection<String> availableColumns,
+            Dialect dialect,
             JdbcValueMapper valueMapper,
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
@@ -53,7 +55,8 @@ final class ResultSetEntityStream {
                 }
                 advanced = false;
                 try {
-                    return EntityHydrator.mapRow(model, resultSet, availableColumns, valueMapper, lazyContext, registry);
+                    return EntityHydrator.mapRow(
+                            model, resultSet, availableColumns, valueMapper, dialect, lazyContext, registry);
                 } catch (SQLException e) {
                     throw MicroOrmException.wrap(e);
                 }
