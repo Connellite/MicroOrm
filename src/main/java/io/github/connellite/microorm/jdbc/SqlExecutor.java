@@ -11,6 +11,7 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
+import io.github.connellite.microorm.util.SqlDebugLog;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
 import java.sql.Connection;
@@ -28,6 +29,7 @@ public final class SqlExecutor {
     }
 
     public static int executeUpdate(Connection connection, BoundStatement stmt) {
+        SqlDebugLog.boundStatement("update", stmt);
         try (NamedPreparedStatement nps = prepare(connection, stmt)) {
             return nps.executeUpdate();
         } catch (SQLException e) {
@@ -36,6 +38,7 @@ public final class SqlExecutor {
     }
 
     public static int executeUpdate(Connection connection, Query query) {
+        SqlDebugLog.query("update", query);
         try (NamedPreparedStatement nps = prepare(connection, query)) {
             return nps.executeUpdate();
         } catch (SQLException e) {
@@ -44,6 +47,7 @@ public final class SqlExecutor {
     }
 
     public static boolean queryExists(Connection connection, BoundStatement stmt) {
+        SqlDebugLog.boundStatement("exists", stmt);
         try (NamedPreparedStatement nps = prepare(connection, stmt);
              ResultSet rs = nps.executeQuery()) {
             return rs.next();
@@ -56,6 +60,7 @@ public final class SqlExecutor {
      * Insert and apply generated keys to {@code entity} when the statement requests generated keys.
      */
     public static int executeInsertReturning(Connection connection, BoundStatement stmt, EntityModel model, Object entity) {
+        SqlDebugLog.boundStatement("insert", stmt);
         try (NamedPreparedStatement nps = prepareInsertReturning(connection, stmt.sql(), model)) {
             nps.setAll(stmt.parameters());
             int n = nps.executeUpdate();
@@ -83,6 +88,7 @@ public final class SqlExecutor {
         if (rows == null || rows.isEmpty()) {
             return 0;
         }
+        SqlDebugLog.batch("batch insert", sql, rows.size());
         if (model.primaryKey().autoIncrement()
                 && (!JdbcDatabaseSupport.supportsBatchGeneratedKeys(connection)
                 || JdbcDatabaseSupport.isSqlite(connection))) {
@@ -115,6 +121,7 @@ public final class SqlExecutor {
             EntityModel model,
             List<?> entities) {
         int total = 0;
+        SqlDebugLog.batch("sequential insert", sql, rows.size());
         for (int i = 0; i < rows.size(); i++) {
             try (NamedPreparedStatement nps = prepareInsertReturning(connection, sql, model)) {
                 nps.setAll(rows.get(i));
@@ -213,6 +220,7 @@ public final class SqlExecutor {
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
         try {
+            SqlDebugLog.boundStatement("select", stmt);
             NamedPreparedStatement nps = prepare(connection, stmt);
             ResultSet rs = nps.executeQuery();
             return ResultSetEntityStream.stream(nps, rs, model, null, dialect, valueMapper, lazyContext, registry);
@@ -242,6 +250,7 @@ public final class SqlExecutor {
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
         try {
+            SqlDebugLog.query("select", query);
             NamedPreparedStatement nps = prepare(connection, query);
             ResultSet rs = nps.executeQuery();
             Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);

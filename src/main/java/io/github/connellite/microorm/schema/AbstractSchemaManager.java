@@ -2,6 +2,7 @@ package io.github.connellite.microorm.schema;
 
 import io.github.connellite.microorm.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
+import io.github.connellite.microorm.util.SqlDebugLog;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;
@@ -35,7 +36,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             return;
         }
         try (Statement st = connection.createStatement()) {
-            st.execute(buildCreateTableDdl(model));
+            executeSql(st, buildCreateTableDdl(model));
         }
         createIndexes(connection, model);
     }
@@ -53,14 +54,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                     continue;
                 }
                 validateAddColumn(model, f);
-                st.execute("ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + columnDefinition(f, false));
+                executeSql(st, "ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + columnDefinition(f, false));
             }
             for (ManyToOneField relation : model.manyToOneRelations()) {
                 if (existingColumns.contains(normalize(dialect.catalogName(relation.joinColumnIdentifier())))) {
                     continue;
                 }
                 validateAddJoinColumn(model, relation);
-                st.execute("ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + joinColumnDefinition(relation));
+                executeSql(st, "ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + joinColumnDefinition(relation));
             }
         }
         createIndexes(connection, model);
@@ -72,7 +73,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             return;
         }
         try (Statement st = connection.createStatement()) {
-            st.execute(dropTableDdl(model));
+            executeSql(st, dropTableDdl(model));
         }
     }
 
@@ -152,9 +153,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                 if (indexExists(connection, model, f)) {
                     continue;
                 }
-                st.execute(createIndexDdl(model, f));
+                executeSql(st, createIndexDdl(model, f));
             }
         }
+    }
+
+    private static void executeSql(Statement statement, String sql) throws SQLException {
+        SqlDebugLog.sql("schema", sql);
+        statement.execute(sql);
     }
 
     protected boolean indexExists(Connection connection, EntityModel model, EntityField field) throws SQLException {
