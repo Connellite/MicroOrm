@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.sql;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.jdbc.EntityHydrator;
 import io.github.connellite.microorm.mapping.EntityField;
@@ -10,7 +10,6 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
 import io.github.connellite.microorm.relation.LazyRef;
-import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

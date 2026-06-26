@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.jdbc;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;

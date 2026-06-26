@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.session;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.jdbc.SqlExecutor;
 import io.github.connellite.microorm.mapping.EntityModel;

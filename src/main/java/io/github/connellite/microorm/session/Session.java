@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.session;
 
 import io.github.connellite.microorm.dialect.Dialect;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.jdbc.EntityHydrator;
 import io.github.connellite.microorm.jdbc.SqlExecutor;
 import io.github.connellite.microorm.mapping.EntityField;
@@ -8,7 +9,6 @@ import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
-import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 /**
  * Unit of work over a single JDBC {@link Connection}. Not thread-safe — use one session per thread.
  * <p>
- * DML ({@code insert}, {@code update}, {@code delete}, {@code select}) throws {@link io.github.connellite.microorm.MicroOrmException}
+ * DML ({@code insert}, {@code update}, {@code delete}, {@code select}) throws {@link MicroOrmException}
  * on failure; DDL ({@code createEntity}, {@code syncEntity}, {@code dropEntity}) declares {@link SQLException}.
  */
 public final class Session implements AutoCloseable, RelationPersistSession {
@@ -214,7 +214,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 return null;
             }
             if (list.size() > 1) {
-                throw new io.github.connellite.microorm.MicroOrmException("Expected at most one row, got " + list.size());
+                throw new MicroOrmException("Expected at most one row, got " + list.size());
             }
             return list.get(0);
         }

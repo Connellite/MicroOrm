@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.session.Session;
 import org.junit.jupiter.api.Test;
 

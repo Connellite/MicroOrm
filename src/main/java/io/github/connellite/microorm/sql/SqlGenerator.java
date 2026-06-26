@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.sql;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;

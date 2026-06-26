@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.mapping;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;

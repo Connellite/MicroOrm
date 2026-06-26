@@ -3,7 +3,7 @@ package io.github.connellite.microorm.jdbc;
 import io.github.connellite.exception.TypeCoercionException;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import io.github.connellite.reflection.ReflectionUtil;
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;

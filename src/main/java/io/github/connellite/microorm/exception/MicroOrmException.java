@@ -1,4 +1,4 @@
-package io.github.connellite.microorm;
+package io.github.connellite.microorm.exception;
 
 import java.sql.SQLException;
 

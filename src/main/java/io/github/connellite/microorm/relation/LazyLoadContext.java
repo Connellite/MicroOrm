@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.relation;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.OneToManyField;
 
 import java.util.List;

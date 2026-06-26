@@ -6,6 +6,7 @@ import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.relation.LazyCollection;
 import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.session.Session;

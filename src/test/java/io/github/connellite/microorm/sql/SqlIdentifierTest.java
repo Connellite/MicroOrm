@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.sql;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.MysqlDialect;
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.dialect.PostgresDialect;

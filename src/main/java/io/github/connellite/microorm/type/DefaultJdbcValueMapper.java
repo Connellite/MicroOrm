@@ -1,7 +1,7 @@
 package io.github.connellite.microorm.type;
 
 import io.github.connellite.exception.TypeCoercionException;
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.util.TypeCoercionUtil;
 import io.github.connellite.util.UuidUtil;

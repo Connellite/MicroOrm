@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.mapping;
 
-import io.github.connellite.microorm.MicroOrmException;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.jdbc.EntityHydrator;
 import io.github.connellite.microorm.relation.LazyRef;

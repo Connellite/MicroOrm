@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.mapping;
 
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.util.List;
@@ -55,7 +56,7 @@ public record EntityModel(
                 return relation;
             }
         }
-        throw new io.github.connellite.microorm.MicroOrmException(
+        throw new MicroOrmException(
                 "No @ManyToOne field '" + fieldName + "' on " + entityClass.getName());
     }
 }
