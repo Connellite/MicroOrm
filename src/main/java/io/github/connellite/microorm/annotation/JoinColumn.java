@@ -5,7 +5,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Foreign-key column for a {@link ManyToOne} association. */
+/**
+ * Foreign-key column for a {@link ManyToOne} association. Stored on the owning entity table;
+ * the referenced entity is loaded lazily via {@link io.github.connellite.microorm.relation.LazyRef}.
+ */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface JoinColumn {

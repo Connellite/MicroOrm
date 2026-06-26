@@ -12,6 +12,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/** MySQL / MariaDB — unquoted identifiers lower-cased; UUID stored as binary. */
 public final class MysqlDialect extends AbstractDialect {
 
     public static final MysqlDialect INSTANCE = new MysqlDialect();

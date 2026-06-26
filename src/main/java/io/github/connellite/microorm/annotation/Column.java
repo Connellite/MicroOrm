@@ -5,6 +5,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Maps a Java field to a SQL column. Use backticks in {@link #name()} to force quoted SQL
+ * ({@code `size`} → case-preserved quoted identifier).
+ */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Column {

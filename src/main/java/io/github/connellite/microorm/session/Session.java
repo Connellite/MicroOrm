@@ -41,6 +41,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     private final Dialect dialect;
     private SessionLazyContext lazyContext;
 
+    /** Internal constructor — use {@link io.github.connellite.microorm.MicroOrm#openSession()}. */
     public Session(
             Connection connection,
             ConnectionProvider provider,
@@ -53,14 +54,17 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         this.sql = dialect.sqlGenerator();
     }
 
+    /** JDBC connection used by this session (same instance for the session lifetime). */
     public Connection connection() {
         return connection;
     }
 
+    /** Disables auto-commit for explicit {@link #commitTransaction()} / {@link #rollbackTransaction()}. */
     public void beginTransaction() throws SQLException {
         connection.setAutoCommit(false);
     }
 
+    /** Commits the current transaction and re-enables auto-commit. */
     public void commitTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             connection.commit();
@@ -68,6 +72,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         connection.setAutoCommit(true);
     }
 
+    /** Rolls back the current transaction and re-enables auto-commit. */
     public void rollbackTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             connection.rollback();
@@ -100,11 +105,17 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         syncEntity(entityClass);
     }
 
+    /** Drops the entity table and all rows (destructive). */
     public void dropEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
         dialect.dropTable(connection, m);
     }
 
+    /**
+     * Inserts one entity row. When the entity has {@link io.github.connellite.microorm.relation.LazyRef} /
+     * {@link io.github.connellite.microorm.relation.LazyCollection} fields, persists the object graph in dependency order.
+     * Auto-increment and UUID primary keys are filled on the entity when applicable.
+     */
     public <T> T insertRow(T entity) {
         Objects.requireNonNull(entity, "insertRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
@@ -117,6 +128,13 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return entity;
     }
 
+    /**
+     * Batch insert of entities of the same class. Uses JDBC batching when the dialect supports it.
+     * Entities with relations fall back to sequential {@link #insertRow(Object)} calls.
+     *
+     * @param batchSize JDBC batch chunk size (values {@code <= 0} use an internal default)
+     * @return number of rows inserted
+     */
     public <T> int insertRows(List<T> entities, int batchSize) {
         if (entities == null || entities.isEmpty()) {
             return 0;
@@ -156,11 +174,13 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 entities);
     }
 
+    /** Batch insert with default batch size ({@code 200}). */
     @SuppressWarnings("UnusedReturnValue")
     public <T> int insertRows(List<T> entities) {
         return insertRows(entities, 200);
     }
 
+    /** Updates one row by primary key. Returns {@code 0} when no row matched. */
     public int updateRow(Object entity) {
         Objects.requireNonNull(entity, "updateRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
@@ -171,6 +191,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return SqlExecutor.executeUpdate(connection, sql.update(m, entity));
     }
 
+    /** Deletes one row by primary key on the entity. Returns {@code 0} when no row matched. */
     public int deleteRow(Object entity) {
         Objects.requireNonNull(entity, "deleteRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
@@ -181,18 +202,21 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return SqlExecutor.executeUpdate(connection, sql.delete(m, entity));
     }
 
+    /** Deletes one row by primary key value. Returns {@code 0} when no row matched. */
     public int deleteById(Class<?> entityClass, Object id) {
         EntityModel m = registry.get(entityClass);
         EntityHydrator.requirePkValue(id, m.primaryKey());
         return SqlExecutor.executeUpdate(connection, sql.deleteById(m, id));
     }
 
+    /** Deletes all rows from the entity table (table definition is kept). */
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
         String q = "DELETE FROM " + dialect.sqlName(m.tableIdentifier());
         return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, java.util.Map.of()));
     }
 
+    /** Returns whether a row exists for the given primary key. */
     public boolean existsById(Class<?> type, Object id) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
@@ -229,6 +253,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     /**
      * Lazy row stream; must be closed (try-with-resources) to release JDBC resources.
+     * Hydrated entities receive a session-scoped {@link io.github.connellite.microorm.relation.LazyLoadContext}
+     * so {@link io.github.connellite.microorm.relation.LazyRef#get()} and
+     * {@link io.github.connellite.microorm.relation.LazyCollection#get()} work until {@link #close()}.
      * Prefer {@link #selectRows(Class)} when the full result fits in memory.
      */
     public <T> Stream<T> streamRows(Class<T> type) {
@@ -245,7 +272,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
-    /** Lazy filtered row stream; must be closed (try-with-resources). */
+    /** Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
     public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
         EntityModel m = registry.get(type);
         SessionLazyContext context = lazyLoadContext();
@@ -260,7 +287,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
-    /** Lazy custom-query row stream; must be closed (try-with-resources). */
+    /** Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
         EntityModel m = registry.get(type);
         SessionLazyContext context = lazyLoadContext();
@@ -268,6 +295,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 connection, query, m, dialect, dialect.valueMapper(), context, registry);
     }
 
+    /**
+     * Runs a custom update/delete {@link Query} (for example bulk updates not covered by entity CRUD).
+     *
+     * @return affected row count
+     */
     public int execute(Query query) {
         Objects.requireNonNull(query, "query cannot be null");
         return SqlExecutor.executeUpdate(connection, query);

@@ -12,6 +12,10 @@ public final class SpringJdbcSupport {
     private SpringJdbcSupport() {
     }
 
+    /**
+     * Returns {@code true} when the connection is wrapped by Spring's
+     * {@code TransactionAwareDataSourceProxy} (commit/rollback owned by Spring).
+     */
     public static boolean isTransactionManagedConnection(Connection connection) {
         if (connection == null) {
             return false;

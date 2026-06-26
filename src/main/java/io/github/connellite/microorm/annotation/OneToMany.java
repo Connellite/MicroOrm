@@ -5,7 +5,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Lazy one-to-many association; field type must be {@link io.github.connellite.microorm.relation.LazyCollection}. */
+/**
+ * Lazy one-to-many association (inverse side). Field type must be
+ * {@link io.github.connellite.microorm.relation.LazyCollection} with the child entity as type argument.
+ * {@link #mappedBy()} names the {@link ManyToOne} field on the child that owns the foreign key.
+ */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface OneToMany {

@@ -9,6 +9,7 @@ public final class KeepOpenConnectionProvider implements ConnectionProvider {
 
     private final Connection connection;
 
+    /** Wraps a caller-owned connection; {@link #release(Connection)} is a no-op. */
     public KeepOpenConnectionProvider(Connection connection) {
         this.connection = Objects.requireNonNull(connection, "connection");
     }

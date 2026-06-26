@@ -8,10 +8,14 @@ import io.github.connellite.util.UuidUtil;
 
 import java.util.UUID;
 
+/**
+ * Default {@link JdbcValueMapper} used by most dialects. UUID encoding follows {@link UuidStorage}.
+ */
 public final class DefaultJdbcValueMapper implements JdbcValueMapper {
 
     private final UuidStorage uuidStorage;
 
+    /** Creates a mapper with the given UUID JDBC representation. */
     public DefaultJdbcValueMapper(UuidStorage uuidStorage) {
         this.uuidStorage = uuidStorage;
     }

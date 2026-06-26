@@ -12,6 +12,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/** PostgreSQL — unquoted identifiers folded to lower case; UUID stored natively. */
 public final class PostgresDialect extends AbstractDialect {
 
     public static final PostgresDialect INSTANCE = new PostgresDialect();

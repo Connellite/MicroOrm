@@ -8,13 +8,20 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+/**
+ * Dialect-specific SQL builder for entity CRUD. Application code normally uses {@link io.github.connellite.microorm.session.Session}
+ * rather than calling these methods directly.
+ */
 public interface SqlGenerator {
 
+    /** Pattern for unquoted SQL identifiers ({@code [a-zA-Z_][a-zA-Z0-9_]*}). */
     Pattern IDENTIFIER_PATTERN = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
+    /** Pattern for explicit {@link io.github.connellite.microorm.annotation.Column#sqlType()} values. */
     Pattern SQL_TYPE_PATTERN = Pattern.compile("[A-Za-z0-9_(),. ]+");
 
     BoundStatement insert(EntityModel model, Object entity);
 
+    /** Insert with optional omission of the primary key column (auto-increment). */
     BoundStatement insert(EntityModel model, Object entity, boolean omitPk);
 
     String insertSql(EntityModel model, boolean omitPk);
@@ -37,6 +44,7 @@ public interface SqlGenerator {
 
     BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
 
+    /** Validates table and column names on a built {@link EntityModel}. */
     static void validateColumnNames(EntityModel model) {
         validateIdentifier(model.tableIdentifier().text(), "table");
         for (EntityField f : model.fields()) {
@@ -47,6 +55,7 @@ public interface SqlGenerator {
         }
     }
 
+    /** Validates a single identifier token. */
     static void validateIdentifier(String name, String kind) {
         if (name == null || name.isBlank()) {
             throw new MicroOrmException("Invalid SQL " + kind + " name: blank");
@@ -56,6 +65,7 @@ public interface SqlGenerator {
         }
     }
 
+    /** Validates an explicit {@link io.github.connellite.microorm.annotation.Column#sqlType()} declaration. */
     static void validateSqlType(String sqlType, String context) {
         if (!SQL_TYPE_PATTERN.matcher(sqlType).matches()) {
             throw new MicroOrmException("Invalid @Column(sqlType) on " + context + ": " + sqlType);

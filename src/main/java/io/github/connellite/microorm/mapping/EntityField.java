@@ -8,7 +8,7 @@ import java.lang.reflect.Field;
 
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
-/** One mapped column ↔ field. */
+/** One mapped scalar column and its Java field (VarHandle-backed access). */
 public final class EntityField {
 
     private final Field javaField;
@@ -69,26 +69,32 @@ public final class EntityField {
         }
     }
 
+    /** Declared Java field on the entity class. */
     public Field javaField() {
         return javaField;
     }
 
+    /** VarHandle for fast get/set on the entity instance. */
     public VarHandle varHandle() {
         return varHandle;
     }
 
+    /** Physical column name text (without SQL quoting). */
     public String columnName() {
         return columnIdentifier.text();
     }
 
+    /** Column identifier including quoting hint for the active {@link io.github.connellite.microorm.dialect.Dialect}. */
     public SqlIdentifier columnIdentifier() {
         return columnIdentifier;
     }
 
+    /** {@code true} for the {@link io.github.connellite.microorm.annotation.Id} field. */
     public boolean id() {
         return id;
     }
 
+    /** {@code true} when the primary key is database-generated on insert. */
     public boolean autoIncrement() {
         return autoIncrement;
     }
@@ -113,6 +119,7 @@ public final class EntityField {
         return length;
     }
 
+    /** Declared Java field type. */
     public Class<?> javaType() {
         return javaField.getType();
     }

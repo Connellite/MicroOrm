@@ -25,6 +25,7 @@ public final class LoggerFactory {
     private LoggerFactory() {
     }
 
+    /** Creates a {@link Logger} for the given class (SLF4J when on the classpath, otherwise JUL). */
     public static Logger getLogger(Class<?> hostClass) {
         if (USE_SLF4J) {
             return new Slf4jLogger(hostClass);

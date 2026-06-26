@@ -12,6 +12,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/** Microsoft SQL Server — bracket-quoted identifiers; UUID stored as binary. */
 public final class MssqlDialect extends AbstractDialect {
 
     public static final MssqlDialect INSTANCE = new MssqlDialect();

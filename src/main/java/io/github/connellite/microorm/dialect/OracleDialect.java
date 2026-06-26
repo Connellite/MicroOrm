@@ -11,6 +11,7 @@ import io.github.connellite.microorm.type.OracleJdbcValueMapper;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/** Oracle Database — unquoted identifiers upper-cased; booleans mapped to NUMBER(1). */
 public final class OracleDialect extends AbstractDialect {
 
     public static final OracleDialect INSTANCE = new OracleDialect();

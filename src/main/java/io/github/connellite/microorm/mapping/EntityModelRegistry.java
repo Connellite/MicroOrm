@@ -35,10 +35,12 @@ public final class EntityModelRegistry {
     private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
             new ConcurrentReferenceHashMap<>(CACHE_INITIAL_CAPACITY, ConcurrentReferenceHashMap.ReferenceType.WEAK);
 
+    /** Uses {@link IdentityPhysicalNamingStrategy} (default MicroOrm naming). */
     public EntityModelRegistry() {
         this(IdentityPhysicalNamingStrategy.INSTANCE);
     }
 
+    /** Creates a registry with the given physical naming strategy (for example {@link SpringPhysicalNamingStrategy}). */
     public EntityModelRegistry(PhysicalNamingStrategy physicalNamingStrategy) {
         this.physicalNamingStrategy = Objects.requireNonNull(physicalNamingStrategy, "physicalNamingStrategy");
     }

@@ -2,6 +2,9 @@ package io.github.connellite.microorm.type;
 
 import io.github.connellite.microorm.mapping.EntityField;
 
+/**
+ * Oracle-specific {@link JdbcValueMapper}: {@code boolean} columns read/written as {@code 0}/{@code 1}.
+ */
 public final class OracleJdbcValueMapper implements JdbcValueMapper {
 
     private final JdbcValueMapper delegate = new DefaultJdbcValueMapper(UuidStorage.BINARY);

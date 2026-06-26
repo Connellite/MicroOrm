@@ -5,8 +5,14 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import java.util.Objects;
 
 /**
- * SQL identifier with optional quoting (Hibernate/Spring JPA backtick convention).
- * {@code `size`} preserves case in quoted SQL; {@code size} uses the dialect default case.
+ * Logical SQL identifier plus quoting hint (Spring JPA / Hibernate backtick convention).
+ * <ul>
+ *   <li>{@code size} or unquoted names — physical case is chosen by the {@link io.github.connellite.microorm.dialect.Dialect}</li>
+ *   <li>{@code `size`} in {@link io.github.connellite.microorm.annotation.Column#name()} — quoted SQL preserving case</li>
+ * </ul>
+ *
+ * @param text   identifier text without surrounding backticks
+ * @param quoted {@code true} when the name was declared with backticks and must be quoted in SQL
  */
 public record SqlIdentifier(String text, boolean quoted) {
 
@@ -14,6 +20,10 @@ public record SqlIdentifier(String text, boolean quoted) {
         Objects.requireNonNull(text, "text");
     }
 
+    /**
+     * Parses a name from {@link io.github.connellite.microorm.annotation.Entity#name()},
+     * {@link io.github.connellite.microorm.annotation.Column#name()}, or {@link io.github.connellite.microorm.annotation.JoinColumn#name()}.
+     */
     public static SqlIdentifier parse(String raw) {
         Objects.requireNonNull(raw, "raw");
         String trimmed = raw.trim();
@@ -29,6 +39,7 @@ public record SqlIdentifier(String text, boolean quoted) {
         return new SqlIdentifier(trimmed, false);
     }
 
+    /** Creates an unquoted identifier (subject to dialect physical naming). */
     public static SqlIdentifier unquoted(String text) {
         validate(text);
         return new SqlIdentifier(text, false);

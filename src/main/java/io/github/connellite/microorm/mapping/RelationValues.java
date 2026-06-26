@@ -7,13 +7,15 @@ import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
 /**
- * Resolves {@link LazyRef} values to JDBC join-column parameters.
+ * Resolves {@link io.github.connellite.microorm.relation.LazyRef} values to JDBC join-column parameters
+ * during insert, update, and relation graph persistence.
  */
 public final class RelationValues {
 
     private RelationValues() {
     }
 
+    /** Join-column JDBC value for a {@link ManyToOneField} on {@code entity} (no cyclic deferral). */
     public static Object joinColumnValue(
             Object entity,
             EntityModel model,
@@ -58,6 +60,10 @@ public final class RelationValues {
         return mapper.toJdbcValue(targetModel.primaryKey(), rawKey);
     }
 
+    /**
+     * Primary key or explicit foreign key held by a {@link io.github.connellite.microorm.relation.LazyRef},
+     * without loading the target row from the database.
+     */
     public static Object resolveRawForeignKey(LazyRef<?> ref, ManyToOneField relation, EntityModelRegistry registry) {
         if (ref.foreignKey() != null) {
             return ref.foreignKey();
@@ -70,6 +76,7 @@ public final class RelationValues {
         return EntityHydrator.getFieldValue(attached, targetModel.primaryKey());
     }
 
+    /** {@code true} when the entity primary key is unset (new row for insert). */
     public static boolean isNew(Object entity, EntityModel model) {
         return EntityHydrator.isUnsetPk(entity, model.primaryKey());
     }

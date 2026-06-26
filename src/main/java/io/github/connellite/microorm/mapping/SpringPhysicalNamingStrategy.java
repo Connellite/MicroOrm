@@ -2,7 +2,11 @@ package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.util.StringUtils;
 
-/** Spring Boot-style physical naming: camelCase and PascalCase to snake_case. */
+/**
+ * Spring Boot-style physical naming: camelCase and PascalCase converted to {@code snake_case}.
+ * <p>
+ * Obtain via {@link io.github.connellite.microorm.MicroOrm#springNamingRegistry()}.
+ */
 public final class SpringPhysicalNamingStrategy implements PhysicalNamingStrategy {
 
     public static final SpringPhysicalNamingStrategy INSTANCE = new SpringPhysicalNamingStrategy();

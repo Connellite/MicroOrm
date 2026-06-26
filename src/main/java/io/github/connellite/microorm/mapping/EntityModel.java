@@ -5,6 +5,17 @@ import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.util.List;
 
+/**
+ * Immutable metadata for one {@link io.github.connellite.microorm.annotation.Entity} class:
+ * table name, columns, primary key, and lazy association descriptors.
+ *
+ * @param entityClass         mapped Java type
+ * @param tableIdentifier     physical table name (with quoting hint)
+ * @param fields              scalar columns (includes the primary key)
+ * @param primaryKey          the {@link io.github.connellite.microorm.annotation.Id} field
+ * @param manyToOneRelations  {@link ManyToOneField} descriptors
+ * @param oneToManyRelations  {@link OneToManyField} descriptors
+ */
 public record EntityModel(
         Class<?> entityClass,
         SqlIdentifier tableIdentifier,
@@ -42,14 +53,17 @@ public record EntityModel(
         this.oneToManyRelations = List.copyOf(oneToManyRelations);
     }
 
+    /** Logical table name text (without SQL quoting). */
     public String tableName() {
         return tableIdentifier.text();
     }
 
+    /** {@code true} when the entity declares {@code @ManyToOne} or {@code @OneToMany} fields. */
     public boolean hasRelations() {
         return !manyToOneRelations.isEmpty() || !oneToManyRelations.isEmpty();
     }
 
+    /** Returns {@link ManyToOneField} metadata for a Java field name. */
     public ManyToOneField manyToOneByFieldName(String fieldName) {
         for (ManyToOneField relation : manyToOneRelations) {
             if (relation.javaField().getName().equals(fieldName)) {
