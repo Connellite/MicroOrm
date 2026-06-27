@@ -9,6 +9,9 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.relation.LazyLoadContext;
+import io.github.connellite.microorm.dynamic.DynamicTable;
+import io.github.connellite.microorm.dynamic.DynamicValueBinder;
+import io.github.connellite.microorm.dynamic.MapRowMapper;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.util.SqlDebugLog;
@@ -18,6 +21,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -270,6 +274,26 @@ public final class SqlExecutor {
             throw new MicroOrmException("Expected at most one row, got " + rows.size());
         }
         return rows.get(0);
+    }
+
+    /** Materializes all rows from a dynamic-table query as maps keyed by column name. */
+    public static List<Map<String, Object>> queryMaps(
+            Connection connection,
+            BoundStatement stmt,
+            DynamicTable table,
+            Dialect dialect,
+            DynamicValueBinder binder) {
+        SqlDebugLog.boundStatement("dynamic-select", stmt);
+        try (NamedPreparedStatement nps = prepare(connection, stmt);
+             ResultSet rs = nps.executeQuery()) {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            while (rs.next()) {
+                rows.add(MapRowMapper.mapRow(rs, table, dialect, binder));
+            }
+            return rows;
+        } catch (SQLException e) {
+            throw MicroOrmException.wrap(e);
+        }
     }
 
     private static NamedPreparedStatement prepareInsertReturning(Connection connection, String sql, EntityModel model)

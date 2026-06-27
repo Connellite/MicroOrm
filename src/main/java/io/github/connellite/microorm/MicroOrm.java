@@ -9,6 +9,8 @@ import io.github.connellite.microorm.dialect.MysqlDialect;
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
+import io.github.connellite.microorm.dynamic.DynamicSession;
+import io.github.connellite.microorm.dynamic.DynamicTableRegistry;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.SpringPhysicalNamingStrategy;
 import io.github.connellite.microorm.session.Session;
@@ -27,6 +29,7 @@ public final class MicroOrm {
     private final Dialect dialect;
     private final ConnectionProvider provider;
     private final EntityModelRegistry registry;
+    private final DynamicTableRegistry dynamicRegistry;
 
     /** Creates a registry with Spring Boot-style snake_case physical names. */
     public static EntityModelRegistry springNamingRegistry() {
@@ -41,6 +44,7 @@ public final class MicroOrm {
         this.dialect = dialect;
         this.provider = provider;
         this.registry = registry;
+        this.dynamicRegistry = new DynamicTableRegistry();
     }
 
     /** SQLite with a single JDBC connection (typical tests); connection is not closed by {@link Session#close()}. */
@@ -119,6 +123,22 @@ public final class MicroOrm {
         return new Session(c, provider, registry, dialect);
     }
 
+    /** Opens a session for runtime-defined tables using the shared {@link #dynamicRegistry()}. */
+    public DynamicSession openDynamicSession() throws SQLException {
+        Connection c = provider.acquire();
+        return new DynamicSession(c, provider, dynamicRegistry, dialect);
+    }
+
+    /**
+     * Opens a dynamic session, runs {@code action}, and closes the session (including on failure).
+     */
+    public <T> T withDynamicSession(DynamicSessionAction<T> action) throws SQLException {
+        Objects.requireNonNull(action, "action");
+        try (DynamicSession session = openDynamicSession()) {
+            return action.apply(session);
+        }
+    }
+
     /**
      * Opens a session, runs {@code action}, and closes the session (including on failure).
      * Prefer this over manual {@link #openSession()} when using a pooled {@link DataSource}.
@@ -136,8 +156,19 @@ public final class MicroOrm {
         T apply(Session session) throws SQLException;
     }
 
+    /** Callback for {@link #withDynamicSession(DynamicSessionAction)}. */
+    @FunctionalInterface
+    public interface DynamicSessionAction<T> {
+        T apply(DynamicSession session) throws SQLException;
+    }
+
     /** Shared entity metadata registry (same instance passed to every {@link Session}). */
     public EntityModelRegistry registry() {
         return registry;
+    }
+
+    /** Shared runtime table registry (same instance passed to every {@link DynamicSession}). */
+    public DynamicTableRegistry dynamicRegistry() {
+        return dynamicRegistry;
     }
 }
