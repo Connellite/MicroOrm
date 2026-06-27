@@ -4,6 +4,7 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.query.EntityQuery;
 
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -41,6 +42,8 @@ public interface SqlGenerator {
     BoundStatement selectAll(EntityModel model);
 
     BoundStatement selectWhere(EntityModel model, Map<String, ?> filters);
+
+    BoundStatement select(EntityModel model, EntityQuery<?> query);
 
     BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
 

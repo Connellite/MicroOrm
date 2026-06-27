@@ -4,6 +4,7 @@ import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
 import org.junit.jupiter.api.Test;
@@ -349,6 +350,32 @@ class SqliteOrmTest {
 
                 assertEquals(1, s.deleteById(Widget.class, widgets.get(1).getId()));
                 assertEquals(2, s.selectRows(Widget.class).size());
+            }
+        }
+    }
+
+    @Test
+    void entityQuerySelectsFilteredOrderedAndLimitedRows() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
+            try (Session s = orm.openSession()) {
+                s.dropEntity(Widget.class);
+                s.createEntity(Widget.class);
+                s.insertRows(List.of(newWidget("a"), newWidget("b"), newWidget("b"), newWidget("c")));
+
+                EntityQuery<Widget> query = EntityQuery.of(Widget.class)
+                        .where(EntityQuery.field("name").in(List.of("b", "c")))
+                        .orderBy(EntityQuery.field("name").desc())
+                        .limit(2);
+
+                List<Widget> selected = s.selectRows(query);
+                assertEquals(2, selected.size());
+                assertEquals("c", selected.get(0).getName());
+                assertEquals("b", selected.get(1).getName());
+
+                try (var rows = s.streamRows(query)) {
+                    assertEquals(2, rows.count());
+                }
             }
         }
     }

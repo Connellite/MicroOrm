@@ -9,6 +9,12 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
+import io.github.connellite.microorm.query.CompositeCriterion;
+import io.github.connellite.microorm.query.Criterion;
+import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.FieldCriterion;
+import io.github.connellite.microorm.query.NotCriterion;
+import io.github.connellite.microorm.query.Order;
 import io.github.connellite.microorm.relation.LazyRef;
 
 import java.util.ArrayList;
@@ -267,6 +273,36 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
     }
 
     @Override
+    public BoundStatement select(EntityModel model, EntityQuery<?> query) {
+        if (query == null) {
+            return selectAll(model);
+        }
+        if (query.entityType() != model.entityClass()) {
+            throw new MicroOrmException("EntityQuery type " + query.entityType().getName()
+                    + " does not match model " + model.entityClass().getName());
+        }
+        Map<String, Object> params = new LinkedHashMap<>();
+        int[] paramCounter = {1};
+        String sql = selectAllSql(model);
+        if (query.criterion() != null) {
+            sql += " WHERE " + renderCriterion(model, query.criterion(), params, paramCounter);
+        }
+        if (!query.orders().isEmpty()) {
+            List<String> orderSql = new ArrayList<>();
+            for (Order order : query.orders()) {
+                EntityField field = fieldByName(model, order.fieldName());
+                orderSql.add(dialect.sqlName(field.columnIdentifier()) + " " + order.direction().name());
+            }
+            sql += " ORDER BY " + String.join(", ", orderSql);
+        }
+        return BoundStatement.of(applyLimitOffset(
+                sql,
+                query.limit().isPresent() ? query.limit().getAsInt() : null,
+                query.offset().isPresent() ? query.offset().getAsInt() : null,
+                !query.orders().isEmpty()), params);
+    }
+
+    @Override
     public BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue) {
         if (joinColumn == null || joinColumn.isBlank()) {
             throw new MicroOrmException("Join column name cannot be blank");
@@ -290,6 +326,22 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
 
     protected abstract String limitOne(String sql);
 
+    protected String applyLimitOffset(String sql, Integer limit, Integer offset, boolean hasOrder) {
+        if (limit == null && (offset == null || offset == 0)) {
+            return sql;
+        }
+        if (limit != null) {
+            sql += " LIMIT " + limit;
+        }
+        if (offset != null && offset > 0) {
+            if (limit == null) {
+                sql += " LIMIT -1";
+            }
+            sql += " OFFSET " + offset;
+        }
+        return sql;
+    }
+
     protected final Dialect dialect() {
         return dialect;
     }
@@ -303,6 +355,86 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(relation.joinColumnIdentifier()));
         }
         return "SELECT " + String.join(", ", cols) + " FROM " + dialect.sqlName(model.tableIdentifier());
+    }
+
+    private String renderCriterion(
+            EntityModel model,
+            Criterion criterion,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        if (criterion instanceof FieldCriterion fieldCriterion) {
+            return renderFieldCriterion(model, fieldCriterion, params, paramCounter);
+        }
+        if (criterion instanceof CompositeCriterion composite) {
+            String separator = " " + composite.operator().name() + " ";
+            List<String> rendered = new ArrayList<>();
+            for (Criterion child : composite.criteria()) {
+                rendered.add(renderCriterion(model, child, params, paramCounter));
+            }
+            return "(" + String.join(separator, rendered) + ")";
+        }
+        if (criterion instanceof NotCriterion notCriterion) {
+            return "NOT (" + renderCriterion(model, notCriterion.criterion(), params, paramCounter) + ")";
+        }
+        throw new MicroOrmException("Unsupported criterion type: " + criterion.getClass().getName());
+    }
+
+    private String renderFieldCriterion(
+            EntityModel model,
+            FieldCriterion criterion,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        EntityField field = fieldByName(model, criterion.fieldName());
+        String column = dialect.sqlName(field.columnIdentifier());
+        return switch (criterion.kind()) {
+            case COMPARISON -> renderComparison(field, column, criterion, params, paramCounter);
+            case IN -> renderIn(field, column, criterion, params, paramCounter);
+            case LIKE -> {
+                String param = nextParam(paramCounter);
+                params.put(param, dialect.valueMapper().toJdbcValue(field, criterion.value()));
+                yield column + " LIKE :" + param;
+            }
+            case IS_NULL -> column + " IS NULL";
+            case IS_NOT_NULL -> column + " IS NOT NULL";
+        };
+    }
+
+    private String renderComparison(
+            EntityField field,
+            String column,
+            FieldCriterion criterion,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        if (criterion.value() == null) {
+            return criterion.operator() == io.github.connellite.microorm.query.ComparisonOperator.NE
+                    ? column + " IS NOT NULL"
+                    : column + " IS NULL";
+        }
+        String param = nextParam(paramCounter);
+        params.put(param, dialect.valueMapper().toJdbcValue(field, criterion.value()));
+        return column + " " + criterion.operator().sql() + " :" + param;
+    }
+
+    private String renderIn(
+            EntityField field,
+            String column,
+            FieldCriterion criterion,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        List<String> placeholders = new ArrayList<>();
+        for (Object value : criterion.values()) {
+            if (value == null) {
+                throw new MicroOrmException("IN criterion does not support null values for field: " + criterion.fieldName());
+            }
+            String param = nextParam(paramCounter);
+            placeholders.add(":" + param);
+            params.put(param, dialect.valueMapper().toJdbcValue(field, value));
+        }
+        return column + " IN (" + String.join(", ", placeholders) + ")";
+    }
+
+    private static String nextParam(int[] paramCounter) {
+        return "p" + paramCounter[0]++;
     }
 
     private static EntityField fieldByName(EntityModel model, String name) {

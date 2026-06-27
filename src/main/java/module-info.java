@@ -14,6 +14,7 @@ module io.github.connellite.microorm {
     exports io.github.connellite.microorm.sql;
     exports io.github.connellite.microorm.type;
     exports io.github.connellite.microorm.relation;
+    exports io.github.connellite.microorm.query;
     exports io.github.connellite.microorm.util;
     exports io.github.connellite.microorm.dynamic;
     exports io.github.connellite.microorm.dynamic.schema;
@@ -29,6 +30,7 @@ module io.github.connellite.microorm {
     opens io.github.connellite.microorm.session to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.sql to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.relation to io.github.connellite.ExtraLib;
+    opens io.github.connellite.microorm.query to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.type to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.util to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.dynamic to io.github.connellite.ExtraLib;

@@ -10,6 +10,7 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
+import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
@@ -278,6 +279,24 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         SessionLazyContext context = lazyLoadContext();
         return SqlExecutor.queryEntitiesStream(
                 connection, sql.selectWhere(m, filters), m, dialect, dialect.valueMapper(), context, registry);
+    }
+
+    /** Materializes rows matching an {@link EntityQuery}; closes the underlying JDBC resources. */
+    public <T> List<T> selectRows(EntityQuery<T> query) {
+        try (Stream<T> rows = streamRows(query)) {
+            return rows.toList();
+        }
+    }
+
+    /**
+     * Lazy entity-query stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
+     */
+    public <T> Stream<T> streamRows(EntityQuery<T> query) {
+        Objects.requireNonNull(query, "query cannot be null");
+        EntityModel m = registry.get(query.entityType());
+        SessionLazyContext context = lazyLoadContext();
+        return SqlExecutor.queryEntitiesStream(
+                connection, sql.select(m, query), m, dialect, dialect.valueMapper(), context, registry);
     }
 
     /** Materializes custom-query rows; closes the underlying JDBC resources. */
