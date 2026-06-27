@@ -15,13 +15,19 @@ import java.sql.SQLException;
 /** PostgreSQL — unquoted identifiers folded to lower case; UUID stored natively. */
 public final class PostgresDialect extends AbstractDialect {
 
-    public static final PostgresDialect INSTANCE = new PostgresDialect();
-
     private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.NATIVE);
     private final SqlGenerator sqlGenerator = new PostgresSqlGenerator(this);
     private final SchemaManager schemaManager = new PostgresSchemaManager(this);
 
     private PostgresDialect() {
+    }
+
+    public static PostgresDialect getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final PostgresDialect INSTANCE = new PostgresDialect();
     }
 
     @Override

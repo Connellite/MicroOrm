@@ -37,7 +37,7 @@ public final class EntityModelRegistry {
 
     /** Uses {@link IdentityPhysicalNamingStrategy} (default MicroOrm naming). */
     public EntityModelRegistry() {
-        this(IdentityPhysicalNamingStrategy.INSTANCE);
+        this(IdentityPhysicalNamingStrategy.getInstance());
     }
 
     /** Creates a registry with the given physical naming strategy (for example {@link SpringPhysicalNamingStrategy}). */

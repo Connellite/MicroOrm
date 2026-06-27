@@ -15,13 +15,19 @@ import java.sql.SQLException;
 /** Microsoft SQL Server — bracket-quoted identifiers; UUID stored as binary. */
 public final class MssqlDialect extends AbstractDialect {
 
-    public static final MssqlDialect INSTANCE = new MssqlDialect();
-
     private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY);
     private final SqlGenerator sqlGenerator = new MssqlSqlGenerator(this);
     private final SchemaManager schemaManager = new MssqlSchemaManager(this);
 
     private MssqlDialect() {
+    }
+
+    public static MssqlDialect getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final MssqlDialect INSTANCE = new MssqlDialect();
     }
 
     @Override

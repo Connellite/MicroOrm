@@ -14,13 +14,19 @@ import java.sql.SQLException;
 /** Oracle Database — unquoted identifiers upper-cased; booleans mapped to NUMBER(1). */
 public final class OracleDialect extends AbstractDialect {
 
-    public static final OracleDialect INSTANCE = new OracleDialect();
-
     private final JdbcValueMapper valueMapper = new OracleJdbcValueMapper();
     private final SqlGenerator sqlGenerator = new OracleSqlGenerator(this);
     private final SchemaManager schemaManager = new OracleSchemaManager(this);
 
     private OracleDialect() {
+    }
+
+    public static OracleDialect getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final OracleDialect INSTANCE = new OracleDialect();
     }
 
     @Override

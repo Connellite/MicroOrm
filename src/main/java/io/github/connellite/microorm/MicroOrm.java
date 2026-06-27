@@ -30,7 +30,7 @@ public final class MicroOrm {
 
     /** Creates a registry with Spring Boot-style snake_case physical names. */
     public static EntityModelRegistry springNamingRegistry() {
-        return new EntityModelRegistry(SpringPhysicalNamingStrategy.INSTANCE);
+        return new EntityModelRegistry(SpringPhysicalNamingStrategy.getInstance());
     }
 
     /**
@@ -46,61 +46,61 @@ public final class MicroOrm {
     /** SQLite with a single JDBC connection (typical tests); connection is not closed by {@link Session#close()}. */
     public static MicroOrm sqlite(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new MicroOrm(SqliteDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(SqliteDialect.getInstance(), new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
     /** SQLite backed by a {@link DataSource} (pool-friendly; connection released on {@link Session#close()}). */
     public static MicroOrm sqlite(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new MicroOrm(SqliteDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(SqliteDialect.getInstance(), new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
     /** PostgreSQL with a single JDBC connection; connection is not closed by {@link Session#close()}. */
     public static MicroOrm postgres(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new MicroOrm(PostgresDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(PostgresDialect.getInstance(), new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
     /** PostgreSQL backed by a {@link DataSource} (pool-friendly; connection released on {@link Session#close()}). */
     public static MicroOrm postgres(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new MicroOrm(PostgresDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(PostgresDialect.getInstance(), new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
     /** MySQL with a single JDBC connection; connection is not closed by {@link Session#close()}. */
     public static MicroOrm mysql(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new MicroOrm(MysqlDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(MysqlDialect.getInstance(), new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
     /** MySQL backed by a {@link DataSource}. */
     public static MicroOrm mysql(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new MicroOrm(MysqlDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(MysqlDialect.getInstance(), new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
     /** Microsoft SQL Server with a single JDBC connection. */
     public static MicroOrm mssql(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new MicroOrm(MssqlDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(MssqlDialect.getInstance(), new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
     /** Microsoft SQL Server backed by a {@link DataSource}. */
     public static MicroOrm mssql(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new MicroOrm(MssqlDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(MssqlDialect.getInstance(), new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
     /** Oracle with a single JDBC connection. */
     public static MicroOrm oracle(Connection connection) {
         Objects.requireNonNull(connection, "connection");
-        return new MicroOrm(OracleDialect.INSTANCE, new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
+        return new MicroOrm(OracleDialect.getInstance(), new KeepOpenConnectionProvider(connection), new EntityModelRegistry());
     }
 
     /** Oracle backed by a {@link DataSource}. */
     public static MicroOrm oracle(DataSource dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        return new MicroOrm(OracleDialect.INSTANCE, new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
+        return new MicroOrm(OracleDialect.getInstance(), new DataSourceConnectionProvider(dataSource), new EntityModelRegistry());
     }
 
     /** Registers entity classes and returns {@code this} for chaining. */

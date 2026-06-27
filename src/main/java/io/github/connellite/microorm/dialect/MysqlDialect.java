@@ -15,13 +15,19 @@ import java.sql.SQLException;
 /** MySQL / MariaDB — unquoted identifiers lower-cased; UUID stored as binary. */
 public final class MysqlDialect extends AbstractDialect {
 
-    public static final MysqlDialect INSTANCE = new MysqlDialect();
-
     private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY);
     private final SqlGenerator sqlGenerator = new MysqlSqlGenerator(this);
     private final SchemaManager schemaManager = new MysqlSchemaManager(this);
 
     private MysqlDialect() {
+    }
+
+    public static MysqlDialect getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final MysqlDialect INSTANCE = new MysqlDialect();
     }
 
     @Override

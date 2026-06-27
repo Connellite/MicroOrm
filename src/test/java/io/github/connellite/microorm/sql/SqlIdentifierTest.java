@@ -35,25 +35,25 @@ class SqlIdentifierTest {
 
     @Test
     void dialectRendersUnquotedAndQuotedNames() {
-        assertEquals("WRITE_DOCUMENTS", OracleDialect.INSTANCE.sqlName(SqlIdentifier.unquoted("write_documents")));
-        assertEquals("\"size\"", OracleDialect.INSTANCE.sqlName(SqlIdentifier.parse("`size`")));
+        assertEquals("WRITE_DOCUMENTS", OracleDialect.getInstance().sqlName(SqlIdentifier.unquoted("write_documents")));
+        assertEquals("\"size\"", OracleDialect.getInstance().sqlName(SqlIdentifier.parse("`size`")));
 
-        assertEquals("write_documents", PostgresDialect.INSTANCE.sqlName(SqlIdentifier.unquoted("write_documents")));
-        assertEquals("\"size\"", PostgresDialect.INSTANCE.sqlName(SqlIdentifier.parse("`size`")));
+        assertEquals("write_documents", PostgresDialect.getInstance().sqlName(SqlIdentifier.unquoted("write_documents")));
+        assertEquals("\"size\"", PostgresDialect.getInstance().sqlName(SqlIdentifier.parse("`size`")));
 
-        assertEquals("write_documents", MysqlDialect.INSTANCE.sqlName(SqlIdentifier.unquoted("write_documents")));
-        assertEquals("`size`", MysqlDialect.INSTANCE.sqlName(SqlIdentifier.parse("`size`")));
+        assertEquals("write_documents", MysqlDialect.getInstance().sqlName(SqlIdentifier.unquoted("write_documents")));
+        assertEquals("`size`", MysqlDialect.getInstance().sqlName(SqlIdentifier.parse("`size`")));
 
-        assertEquals("write_documents", SqliteDialect.INSTANCE.sqlName(SqlIdentifier.unquoted("write_documents")));
-        assertEquals("\"size\"", SqliteDialect.INSTANCE.sqlName(SqlIdentifier.parse("`size`")));
+        assertEquals("write_documents", SqliteDialect.getInstance().sqlName(SqlIdentifier.unquoted("write_documents")));
+        assertEquals("\"size\"", SqliteDialect.getInstance().sqlName(SqlIdentifier.parse("`size`")));
     }
 
     @Test
     void jdbcColumnLabelsFollowCatalogCase() {
-        assertEquals("ID", OracleDialect.INSTANCE.jdbcColumnLabel(SqlIdentifier.unquoted("id")));
-        assertEquals("size", OracleDialect.INSTANCE.jdbcColumnLabel(SqlIdentifier.parse("`size`")));
+        assertEquals("ID", OracleDialect.getInstance().jdbcColumnLabel(SqlIdentifier.unquoted("id")));
+        assertEquals("size", OracleDialect.getInstance().jdbcColumnLabel(SqlIdentifier.parse("`size`")));
 
-        assertEquals("id", PostgresDialect.INSTANCE.jdbcColumnLabel(SqlIdentifier.unquoted("id")));
-        assertEquals("size", PostgresDialect.INSTANCE.jdbcColumnLabel(SqlIdentifier.parse("`size`")));
+        assertEquals("id", PostgresDialect.getInstance().jdbcColumnLabel(SqlIdentifier.unquoted("id")));
+        assertEquals("size", PostgresDialect.getInstance().jdbcColumnLabel(SqlIdentifier.parse("`size`")));
     }
 }

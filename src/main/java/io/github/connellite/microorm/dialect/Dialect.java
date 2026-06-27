@@ -11,7 +11,7 @@ import java.sql.SQLException;
 /**
  * Database-specific identifier quoting, DDL, DML SQL generation, and JDBC value mapping.
  * Obtain a singleton from {@link io.github.connellite.microorm.MicroOrm} factory methods
- * ({@code SqliteDialect.INSTANCE}, etc.) or pass to {@link io.github.connellite.microorm.MicroOrm#MicroOrm}.
+ * ({@code SqliteDialect.getInstance()}, etc.) or pass to {@link io.github.connellite.microorm.MicroOrm#MicroOrm}.
  */
 public interface Dialect {
 

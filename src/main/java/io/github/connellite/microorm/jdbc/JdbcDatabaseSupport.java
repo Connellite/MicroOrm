@@ -34,7 +34,7 @@ final class JdbcDatabaseSupport {
     }
 
     static String[] oracleGeneratedKeyColumnNames(EntityModel model) {
-        return new String[] {OracleDialect.INSTANCE.jdbcColumnLabel(model.primaryKey().columnIdentifier())};
+        return new String[] {OracleDialect.getInstance().jdbcColumnLabel(model.primaryKey().columnIdentifier())};
     }
 
     private static String productName(Connection connection) {

@@ -11,9 +11,15 @@ import java.util.Locale;
  */
 public final class IdentityPhysicalNamingStrategy implements PhysicalNamingStrategy {
 
-    public static final IdentityPhysicalNamingStrategy INSTANCE = new IdentityPhysicalNamingStrategy();
-
     private IdentityPhysicalNamingStrategy() {
+    }
+
+    public static IdentityPhysicalNamingStrategy getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final IdentityPhysicalNamingStrategy INSTANCE = new IdentityPhysicalNamingStrategy();
     }
 
     @Override

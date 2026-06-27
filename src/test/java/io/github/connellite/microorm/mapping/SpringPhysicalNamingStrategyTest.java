@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SpringPhysicalNamingStrategyTest {
 
-    private final SpringPhysicalNamingStrategy strategy = SpringPhysicalNamingStrategy.INSTANCE;
+    private final SpringPhysicalNamingStrategy strategy = SpringPhysicalNamingStrategy.getInstance();
 
     @Test
     void convertsPascalCaseTableNamesToSnakeCase() {

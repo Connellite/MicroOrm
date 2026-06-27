@@ -9,9 +9,15 @@ import io.github.connellite.util.StringUtils;
  */
 public final class SpringPhysicalNamingStrategy implements PhysicalNamingStrategy {
 
-    public static final SpringPhysicalNamingStrategy INSTANCE = new SpringPhysicalNamingStrategy();
-
     private SpringPhysicalNamingStrategy() {
+    }
+
+    public static SpringPhysicalNamingStrategy getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final SpringPhysicalNamingStrategy INSTANCE = new SpringPhysicalNamingStrategy();
     }
 
     @Override

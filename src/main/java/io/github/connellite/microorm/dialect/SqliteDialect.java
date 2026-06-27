@@ -15,13 +15,19 @@ import java.sql.SQLException;
 /** SQLite 3 — unquoted identifiers are case-insensitive; backticks request quoted SQL. */
 public final class SqliteDialect extends AbstractDialect {
 
-    public static final SqliteDialect INSTANCE = new SqliteDialect();
-
     private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.STRING);
     private final SqlGenerator sqlGenerator = new SqliteSqlGenerator(this);
     private final SchemaManager schemaManager = new SqliteSchemaManager(this);
 
     private SqliteDialect() {
+    }
+
+    public static SqliteDialect getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        private static final SqliteDialect INSTANCE = new SqliteDialect();
     }
 
     @Override
