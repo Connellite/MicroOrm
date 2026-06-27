@@ -6,7 +6,7 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 
-/** Metadata for a {@link io.github.connellite.microorm.annotation.OneToMany} {@link io.github.connellite.microorm.relation.LazyCollection} field. */
+/** Metadata for a {@link io.github.connellite.microorm.annotation.OneToMany} collection wrapper field. */
 public final class OneToManyField {
 
     private final Field javaField;

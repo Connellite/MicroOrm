@@ -10,8 +10,8 @@ import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.annotation.Transient;
-import io.github.connellite.microorm.relation.LazyCollection;
-import io.github.connellite.microorm.relation.LazyRef;
+import io.github.connellite.microorm.relation.EntityCollection;
+import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
@@ -89,11 +89,11 @@ public final class EntityModelRegistry {
                 continue;
             }
             f.trySetAccessible();
-            if (LazyRef.class.isAssignableFrom(f.getType())) {
+            if (isManyToOneRef(f)) {
                 manyToOneRelations.add(buildManyToOne(entityClass, f));
                 continue;
             }
-            if (LazyCollection.class.isAssignableFrom(f.getType())) {
+            if (isOneToManyCollection(f)) {
                 oneToManyRelations.add(buildOneToMany(entityClass, f));
                 continue;
             }
@@ -143,10 +143,10 @@ public final class EntityModelRegistry {
 
     private ManyToOneField buildManyToOne(Class<?> entityClass, Field field) {
         if (field.getAnnotation(ManyToOne.class) == null) {
-            throw new MicroOrmException("LazyRef field requires @ManyToOne on "
+            throw new MicroOrmException("Relation reference field requires @ManyToOne on "
                     + entityClass.getName() + "." + field.getName());
         }
-        Class<?> targetType = resolveLazyRefTarget(entityClass, field);
+        Class<?> targetType = resolveRefTarget(entityClass, field);
         requireEntity(targetType);
         JoinColumn joinColumn = field.getAnnotation(JoinColumn.class);
         SqlIdentifier column = joinColumn != null && !joinColumn.name().isBlank()
@@ -169,7 +169,7 @@ public final class EntityModelRegistry {
     private static OneToManyField buildOneToMany(Class<?> entityClass, Field field) {
         OneToMany oneToMany = field.getAnnotation(OneToMany.class);
         if (oneToMany == null) {
-            throw new MicroOrmException("LazyCollection field requires @OneToMany on "
+            throw new MicroOrmException("Relation collection field requires @OneToMany on "
                     + entityClass.getName() + "." + field.getName());
         }
         String mappedBy = oneToMany.mappedBy();
@@ -177,7 +177,7 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("@OneToMany.mappedBy is required on "
                     + entityClass.getName() + "." + field.getName());
         }
-        Class<?> childType = resolveLazyCollectionTarget(entityClass, field);
+        Class<?> childType = resolveCollectionTarget(entityClass, field);
         requireEntity(childType);
         validateInverseManyToOne(childType, mappedBy, entityClass);
         return new OneToManyField(field, childType, mappedBy);
@@ -194,33 +194,41 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("mappedBy field must have @ManyToOne on "
                     + childClass.getName() + "." + mappedByField);
         }
-        if (!LazyRef.class.isAssignableFrom(inverse.getType())) {
-            throw new MicroOrmException("mappedBy field must be LazyRef on "
+        if (!isManyToOneRef(inverse)) {
+            throw new MicroOrmException("mappedBy field must be LazyRef or EagerRef on "
                     + childClass.getName() + "." + mappedByField);
         }
-        Class<?> inverseTarget = resolveLazyRefTarget(childClass, inverse);
+        Class<?> inverseTarget = resolveRefTarget(childClass, inverse);
         if (inverseTarget != ownerClass) {
             throw new MicroOrmException("mappedBy @ManyToOne must reference " + ownerClass.getName()
                     + " on " + childClass.getName() + "." + mappedByField);
         }
     }
 
-    private static Class<?> resolveLazyRefTarget(Class<?> entityClass, Field field) {
+    private static Class<?> resolveRefTarget(Class<?> entityClass, Field field) {
         List<Class<?>> typeArgs = ReflectionUtil.getAllGenericParameterClasses(field);
         if (typeArgs.isEmpty()) {
-            throw new MicroOrmException("LazyRef field requires a type argument on "
+            throw new MicroOrmException("Relation reference field requires a type argument on "
                     + entityClass.getName() + "." + field.getName());
         }
         return typeArgs.get(0);
     }
 
-    private static Class<?> resolveLazyCollectionTarget(Class<?> entityClass, Field field) {
+    private static Class<?> resolveCollectionTarget(Class<?> entityClass, Field field) {
         List<Class<?>> typeArgs = ReflectionUtil.getAllGenericParameterClasses(field);
         if (typeArgs.isEmpty()) {
-            throw new MicroOrmException("LazyCollection field requires a type argument on "
+            throw new MicroOrmException("Relation collection field requires a type argument on "
                     + entityClass.getName() + "." + field.getName());
         }
         return typeArgs.get(0);
+    }
+
+    private static boolean isManyToOneRef(Field field) {
+        return EntityRef.class.isAssignableFrom(field.getType());
+    }
+
+    private static boolean isOneToManyCollection(Field field) {
+        return EntityCollection.class.isAssignableFrom(field.getType());
     }
 
     private static void requireEntity(Class<?> type) {

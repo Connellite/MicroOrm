@@ -3,11 +3,11 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.jdbc.EntityHydrator;
-import io.github.connellite.microorm.relation.LazyRef;
+import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
 /**
- * Resolves {@link io.github.connellite.microorm.relation.LazyRef} values to JDBC join-column parameters
+ * Resolves relation reference values to JDBC join-column parameters
  * during insert, update, and relation graph persistence.
  */
 public final class RelationValues {
@@ -36,7 +36,7 @@ public final class RelationValues {
             EntityModelRegistry registry,
             Dialect dialect,
             Boolean deferIfUnresolved) {
-        LazyRef<?> ref = LazyRef.get(relation, entity);
+        EntityRef<?> ref = EntityRef.get(relation, entity);
         if (ref == null) {
             if (!relation.nullable()) {
                 throw new MicroOrmException("Required @ManyToOne '" + relation.javaField().getName()
@@ -61,10 +61,10 @@ public final class RelationValues {
     }
 
     /**
-     * Primary key or explicit foreign key held by a {@link io.github.connellite.microorm.relation.LazyRef},
+     * Primary key or explicit foreign key held by a relation reference wrapper,
      * without loading the target row from the database.
      */
-    public static Object resolveRawForeignKey(LazyRef<?> ref, ManyToOneField relation, EntityModelRegistry registry) {
+    public static Object resolveRawForeignKey(EntityRef<?> ref, ManyToOneField relation, EntityModelRegistry registry) {
         if (ref.foreignKey() != null) {
             return ref.foreignKey();
         }

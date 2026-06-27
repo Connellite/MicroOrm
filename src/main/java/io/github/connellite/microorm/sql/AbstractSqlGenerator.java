@@ -15,7 +15,7 @@ import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.query.FieldCriterion;
 import io.github.connellite.microorm.query.NotCriterion;
 import io.github.connellite.microorm.query.Order;
-import io.github.connellite.microorm.relation.LazyRef;
+import io.github.connellite.microorm.relation.EntityRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -167,7 +167,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             ManyToOneField relation,
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred) {
-        LazyRef<?> ref = LazyRef.get(relation, entity);
+        EntityRef<?> ref = EntityRef.get(relation, entity);
         if (ref == null) {
             if (!relation.nullable()) {
                 throw new MicroOrmException("Required @ManyToOne '" + relation.javaField().getName()
@@ -199,7 +199,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             Object entity,
             ManyToOneField relation,
             EntityModelRegistry registry) {
-        LazyRef<?> ref = LazyRef.get(relation, entity);
+        EntityRef<?> ref = EntityRef.get(relation, entity);
         if (ref == null) {
             return null;
         }

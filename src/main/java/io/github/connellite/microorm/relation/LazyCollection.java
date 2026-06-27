@@ -14,7 +14,7 @@ import java.util.Objects;
  * <p>
  * For writes use {@link #of(List)}, {@link #empty()}, or {@link #builder()} before insert/update.
  */
-public final class LazyCollection<T> {
+public final class LazyCollection<T> implements EntityCollection<T> {
 
     private final LazyLoadContext context;
     private final OneToManyField relation;

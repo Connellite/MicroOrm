@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Immutable metadata for one {@link io.github.connellite.microorm.annotation.Entity} class:
- * table name, columns, primary key, and lazy association descriptors.
+ * table name, columns, primary key, and association descriptors.
  *
  * @param entityClass         mapped Java type
  * @param tableIdentifier     physical table name (with quoting hint)

@@ -12,7 +12,7 @@ import java.util.Objects;
  * For writes use {@link #to(Object)} to reference a managed or new entity, or {@link #toId(Class, Object)}
  * to reference an existing row by primary key without loading it.
  */
-public final class LazyRef<T> {
+public final class LazyRef<T> implements EntityRef<T> {
 
     private final LazyLoadContext context;
     private final Class<T> targetType;

@@ -8,7 +8,7 @@ import java.lang.reflect.Field;
 
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
-/** Metadata for a {@link io.github.connellite.microorm.annotation.ManyToOne} {@link io.github.connellite.microorm.relation.LazyRef} field. */
+/** Metadata for a {@link io.github.connellite.microorm.annotation.ManyToOne} reference wrapper field. */
 public final class ManyToOneField {
 
     private final Field javaField;

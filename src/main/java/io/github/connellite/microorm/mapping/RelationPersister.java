@@ -1,6 +1,9 @@
 package io.github.connellite.microorm.mapping;
 
-import io.github.connellite.microorm.relation.LazyCollection;
+import io.github.connellite.microorm.relation.EagerCollection;
+import io.github.connellite.microorm.relation.EagerRef;
+import io.github.connellite.microorm.relation.EntityCollection;
+import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.session.RelationPersistSession;
 
@@ -12,7 +15,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Persists entity graphs with {@link LazyRef} / {@link LazyCollection}.
+ * Persists entity graphs with lazy or eager relation wrappers.
  * <p>
  * Flush order follows Hibernate's {@code ActionQueue} (inserts, then updates, then collection sync, then deletes)
  * so foreign-key constraints stay valid without disabling them:
@@ -71,7 +74,7 @@ public final class RelationPersister {
         EntityModel model = session.registry().get(entity.getClass());
 
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            LazyRef<?> ref = LazyRef.get(relation, entity);
+            EntityRef<?> ref = EntityRef.get(relation, entity);
             if (ref == null) {
                 continue;
             }
@@ -106,7 +109,7 @@ public final class RelationPersister {
         Object ownerPk = session.pkValue(owner, ownerModel);
 
         for (OneToManyField relation : ownerModel.oneToManyRelations()) {
-            LazyCollection<?> collection = LazyCollection.get(relation, owner);
+            EntityCollection<?> collection = EntityCollection.get(relation, owner);
             if (collection == null || !collection.isMaterialized()) {
                 continue;
             }
@@ -114,7 +117,7 @@ public final class RelationPersister {
             ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
             Set<Object> desiredChildPks = new HashSet<>();
             for (Object child : collection.elementsOrEmpty()) {
-                LazyRef.set(inverse, child, LazyRef.to(owner));
+                setRefToOwner(inverse, child, owner);
                 if (!inserted.contains(child)) {
                     persistInsert(session, child, inProgress, inserted, deferred);
                 } else {
@@ -135,5 +138,13 @@ public final class RelationPersister {
     }
 
     public record DeferredFkUpdate(Object entity, EntityModel model, ManyToOneField relation) {
+    }
+
+    private static void setRefToOwner(ManyToOneField inverse, Object child, Object owner) {
+        if (EagerRef.class.isAssignableFrom(inverse.javaField().getType())) {
+            EntityRef.set(inverse, child, EagerRef.to(owner));
+        } else {
+            EntityRef.set(inverse, child, LazyRef.to(owner));
+        }
     }
 }

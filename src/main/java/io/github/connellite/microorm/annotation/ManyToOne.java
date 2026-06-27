@@ -6,8 +6,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Lazy many-to-one association. Field type must be {@link io.github.connellite.microorm.relation.LazyRef}
- * with a type argument pointing at the target {@link Entity}. Pair with {@link JoinColumn} for the FK column.
+ * Many-to-one association. Field type must be {@link io.github.connellite.microorm.relation.LazyRef}
+ * or {@link io.github.connellite.microorm.relation.EagerRef} with a type argument pointing at the
+ * target {@link Entity}. Pair with {@link JoinColumn} for the FK column.
  */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)

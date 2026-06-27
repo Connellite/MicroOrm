@@ -6,7 +6,7 @@ import io.github.connellite.microorm.mapping.OneToManyField;
 import java.util.List;
 
 /**
- * Session-scoped loader for lazy {@link LazyRef} and {@link LazyCollection} associations.
+ * Session-scoped loader for relation associations.
  * Implemented by {@link io.github.connellite.microorm.session.SessionLazyContext}; not intended
  * for application code — passed internally when hydrating entities.
  */
@@ -16,14 +16,14 @@ public interface LazyLoadContext {
     void ensureOpen();
 
     /**
-     * Loads a single entity by primary key (used by {@link LazyRef#get()}).
+     * Loads a single entity by primary key (used by {@link LazyRef#get()} and eager hydration).
      *
      * @return the row, or {@code null} when no row matches
      */
     <T> T loadById(Class<T> type, Object id);
 
     /**
-     * Loads all child entities for a {@link LazyCollection} (inverse side of {@code mappedBy}).
+     * Loads all child entities for a collection relation (inverse side of {@code mappedBy}).
      */
     <T> List<T> loadCollection(OneToManyField relation, Object ownerId);
 

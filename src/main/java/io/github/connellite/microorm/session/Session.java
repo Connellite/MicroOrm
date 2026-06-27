@@ -113,8 +113,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     }
 
     /**
-     * Inserts one entity row. When the entity has {@link io.github.connellite.microorm.relation.LazyRef} /
-     * {@link io.github.connellite.microorm.relation.LazyCollection} fields, persists the object graph in dependency order.
+     * Inserts one entity row. When the entity has relation wrapper fields, persists the object graph in dependency order.
      * Auto-increment and UUID primary keys are filled on the entity when applicable.
      */
     public <T> T insertRow(T entity) {
@@ -255,8 +254,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     /**
      * Lazy row stream; must be closed (try-with-resources) to release JDBC resources.
      * Hydrated entities receive a session-scoped {@link io.github.connellite.microorm.relation.LazyLoadContext}
-     * so {@link io.github.connellite.microorm.relation.LazyRef#get()} and
-     * {@link io.github.connellite.microorm.relation.LazyCollection#get()} work until {@link #close()}.
+     * so lazy relation wrappers can load related rows until {@link #close()}.
      * Prefer {@link #selectRows(Class)} when the full result fits in memory.
      */
     public <T> Stream<T> streamRows(Class<T> type) {
