@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.schema;
 
+import io.github.connellite.collections.CaseInsensitiveHashMap;
+import io.github.connellite.collections.DelegatingNullSkippingMap;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.util.SqlDebugLog;
@@ -12,7 +14,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -50,14 +52,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         }
         try (Statement st = connection.createStatement()) {
             for (EntityField f : model.fields()) {
-                if (existingColumns.contains(normalize(dialect.catalogName(f.columnIdentifier())))) {
+                if (existingColumns.contains(dialect.catalogName(f.columnIdentifier()))) {
                     continue;
                 }
                 validateAddColumn(model, f);
                 executeSql(st, "ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + columnDefinition(f, false));
             }
             for (ManyToOneField relation : model.manyToOneRelations()) {
-                if (existingColumns.contains(normalize(dialect.catalogName(relation.joinColumnIdentifier())))) {
+                if (existingColumns.contains(dialect.catalogName(relation.joinColumnIdentifier()))) {
                     continue;
                 }
                 validateAddJoinColumn(model, relation);
@@ -127,17 +129,17 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     }
 
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        Set<String> columns = new HashSet<>();
+        Set<String> columns = caseInsensitiveNullSkippingSet();
         String table = dialect.catalogName(model.tableIdentifier());
         try (ResultSet rs = connection.getMetaData().getColumns(null, null, table, null)) {
             while (rs.next()) {
-                columns.add(normalize(rs.getString("COLUMN_NAME")));
+                columns.add(rs.getString("COLUMN_NAME"));
             }
         }
         if (columns.isEmpty()) {
             try (ResultSet rs = connection.getMetaData().getColumns(null, null, table.toUpperCase(Locale.ROOT), null)) {
                 while (rs.next()) {
-                    columns.add(normalize(rs.getString("COLUMN_NAME")));
+                    columns.add(rs.getString("COLUMN_NAME"));
                 }
             }
         }
@@ -172,15 +174,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     }
 
     private boolean findIndex(Connection connection, String tableName, String indexName) throws SQLException {
+        Set<String> indexes = caseInsensitiveNullSkippingSet();
         try (ResultSet rs = connection.getMetaData().getIndexInfo(null, null, tableName, false, false)) {
             while (rs.next()) {
-                String name = rs.getString("INDEX_NAME");
-                if (name != null && normalize(name).equals(normalize(indexName))) {
-                    return true;
-                }
+                indexes.add(rs.getString("INDEX_NAME"));
             }
         }
-        return false;
+        return indexes.contains(indexName);
     }
 
     protected String createIndexDdl(EntityModel model, EntityField field) {
@@ -219,8 +219,8 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         return INDEX_NAME_SANITIZER.matcher("idx_" + model.tableName() + "_" + field.columnName()).replaceAll("_");
     }
 
-    protected String normalize(String identifier) {
-        return identifier == null ? "" : identifier.toLowerCase(Locale.ROOT);
+    protected Set<String> caseInsensitiveNullSkippingSet() {
+        return Collections.newSetFromMap(new DelegatingNullSkippingMap<>(new CaseInsensitiveHashMap<>()));
     }
 
     protected abstract String autoIncrementPrimaryKeyDefinition(EntityField field);

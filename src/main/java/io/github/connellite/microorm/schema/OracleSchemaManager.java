@@ -9,7 +9,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,7 +24,7 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
         if (!tableExists(connection, table)) {
             return Set.of();
         }
-        Set<String> columns = new HashSet<>();
+        Set<String> columns = caseInsensitiveNullSkippingSet();
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT column_name
                 FROM all_tab_columns
@@ -35,7 +34,7 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
             ps.setString(1, table);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    columns.add(normalize(rs.getString("column_name")));
+                    columns.add(rs.getString("column_name"));
                 }
             }
         }

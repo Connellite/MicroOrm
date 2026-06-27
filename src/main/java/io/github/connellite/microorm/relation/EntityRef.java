@@ -4,43 +4,70 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
 /**
- * Common contract for many-to-one relation wrappers.
+ * Base class for many-to-one relation wrappers.
  *
  * @param <T> target entity type
  */
-public interface EntityRef<T> {
+public abstract class EntityRef<T> {
+
+    private final Class<T> targetType;
+    private final Object foreignKey;
+    private T loaded;
+
+    protected EntityRef(Class<T> targetType, Object foreignKey, T loaded) {
+        this.targetType = targetType;
+        this.foreignKey = foreignKey;
+        this.loaded = loaded;
+    }
+
+    protected final void attach(T entity) {
+        loaded = entity;
+    }
 
     /**
      * Returns the related entity. Lazy implementations may load it on first access; eager implementations
      * return the already materialized entity.
      */
-    T get();
+    public abstract T get();
 
     /** Returns the in-memory entity without triggering a lazy load. */
-    T attachedEntity();
+    public T attachedEntity() {
+        return loaded;
+    }
 
     /** {@code true} when the target entity is already available in memory. */
-    boolean isLoaded();
+    public boolean isLoaded() {
+        return loaded != null;
+    }
 
     /** {@code true} when this reference points at a foreign key or an attached entity. */
-    boolean isSet();
+    public boolean isSet() {
+        return foreignKey != null || loaded != null;
+    }
 
     /** {@code true} when this reference has neither a foreign key nor an attached entity. */
-    boolean isNull();
+    public boolean isNull() {
+        return !isSet();
+    }
 
     /** Raw join-column value when known without reading the target entity primary key. */
-    Object foreignKey();
+    public Object foreignKey() {
+        return foreignKey;
+    }
 
     /** Target entity class declared on the owning relation field. */
-    Class<T> targetType();
+    public Class<T> targetType() {
+        return targetType;
+    }
 
     /** Reads a relation reference wrapper from a mapped entity field. */
-    static EntityRef<?> get(ManyToOneField field, Object owner) {
-        return (EntityRef<?>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
+    @SuppressWarnings("unchecked")
+    public static <T> EntityRef<T> get(ManyToOneField field, Object owner) {
+        return (EntityRef<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
     }
 
     /** Sets a relation reference wrapper on a mapped entity field. */
-    static void set(ManyToOneField field, Object owner, EntityRef<?> value) {
+    public static void set(ManyToOneField field, Object owner, EntityRef<?> value) {
         MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
     }
 }

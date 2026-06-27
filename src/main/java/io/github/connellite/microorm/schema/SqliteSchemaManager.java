@@ -9,7 +9,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashSet;
 import java.util.Set;
 
 public final class SqliteSchemaManager extends AbstractSchemaManager {
@@ -60,11 +59,11 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        Set<String> columns = new HashSet<>();
+        Set<String> columns = caseInsensitiveNullSkippingSet();
         try (Statement st = connection.createStatement();
              ResultSet rs = st.executeQuery("PRAGMA table_info(" + dialect.sqlName(model.tableIdentifier()) + ")")) {
             while (rs.next()) {
-                columns.add(normalize(rs.getString("name")));
+                columns.add(rs.getString("name"));
             }
         }
         return columns;

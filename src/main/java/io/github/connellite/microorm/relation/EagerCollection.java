@@ -1,7 +1,6 @@
 package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.mapping.OneToManyField;
-import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,14 +13,10 @@ import java.util.Objects;
  * <p>
  * For writes use {@link #of(List)}, {@link #empty()}, or {@link #builder()} before insert/update.
  */
-public final class EagerCollection<T> implements EntityCollection<T> {
-
-    private final Object ownerId;
-    private final List<T> elements;
+public final class EagerCollection<T> extends EntityCollection<T> {
 
     private EagerCollection(Object ownerId, List<T> elements) {
-        this.ownerId = ownerId;
-        this.elements = List.copyOf(Objects.requireNonNull(elements, "elements"));
+        super(ownerId, elements, true);
     }
 
     /** Creates a materialized collection for insert/update. */
@@ -41,41 +36,19 @@ public final class EagerCollection<T> implements EntityCollection<T> {
 
     /** Sets an {@link EagerCollection} on an entity field (VarHandle helper for mapped collection fields). */
     public static <T> void set(OneToManyField field, Object owner, EagerCollection<T> value) {
-        MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
+        EntityCollection.set(field, owner, value);
     }
 
     /** Reads an {@link EagerCollection} from an entity field (VarHandle helper for mapped collection fields). */
     @SuppressWarnings("unchecked")
     public static <T> EagerCollection<T> get(OneToManyField field, Object owner) {
-        return (EagerCollection<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
+        return (EagerCollection<T>) EntityCollection.get(field, owner);
     }
 
     /** Returns all child entities already materialized in memory. */
+    @Override
     public List<T> get() {
-        return elements;
-    }
-
-    /** Returns elements already in memory. Never loads from the database. */
-    public List<T> elementsOrEmpty() {
-        return elements;
-    }
-
-    /** Always {@code true}: eager collections are materialized at construction time. */
-    public boolean isMaterialized() {
-        return true;
-    }
-
-    /** Always {@code true}: eager collections never defer loading. */
-    public boolean isLoaded() {
-        return true;
-    }
-
-    /**
-     * Primary key of the owning entity used to query children during eager hydration ({@code null} for
-     * collections built only for persist).
-     */
-    public Object ownerId() {
-        return ownerId;
+        return elementsOrEmpty();
     }
 
     /** Starts a mutable builder for assembling a collection before persist. */

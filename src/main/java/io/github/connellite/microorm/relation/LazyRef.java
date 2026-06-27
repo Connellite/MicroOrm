@@ -1,6 +1,5 @@
 package io.github.connellite.microorm.relation;
 
-import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 
 import java.util.Objects;
@@ -12,18 +11,13 @@ import java.util.Objects;
  * For writes use {@link #to(Object)} to reference a managed or new entity, or {@link #toId(Class, Object)}
  * to reference an existing row by primary key without loading it.
  */
-public final class LazyRef<T> implements EntityRef<T> {
+public final class LazyRef<T> extends EntityRef<T> {
 
     private final LazyLoadContext context;
-    private final Class<T> targetType;
-    private final Object foreignKey;
-    private T loaded;
 
     private LazyRef(LazyLoadContext context, Class<T> targetType, Object foreignKey, T loaded) {
+        super(targetType, foreignKey, loaded);
         this.context = context;
-        this.targetType = targetType;
-        this.foreignKey = foreignKey;
-        this.loaded = loaded;
     }
 
     /**
@@ -58,13 +52,13 @@ public final class LazyRef<T> implements EntityRef<T> {
 
     /** Sets a {@link LazyRef} on an entity field (VarHandle helper for mapped {@code LazyRef} fields). */
     public static <T> void set(ManyToOneField field, Object owner, LazyRef<T> value) {
-        MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
+        EntityRef.set(field, owner, value);
     }
 
     /** Reads a {@link LazyRef} from an entity field (VarHandle helper for mapped {@code LazyRef} fields). */
     @SuppressWarnings("unchecked")
     public static <T> LazyRef<T> get(ManyToOneField field, Object owner) {
-        return (LazyRef<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
+        return (LazyRef<T>) EntityRef.get(field, owner);
     }
 
     /**
@@ -72,59 +66,17 @@ public final class LazyRef<T> implements EntityRef<T> {
      * {@link #of(LazyLoadContext, Class, Object)} or {@link #toId(Class, Object)}.
      * Returns {@code null} when {@link #isNull()} without querying the database.
      */
+    @Override
     public T get() {
-        if (loaded != null) {
-            return loaded;
+        T attached = attachedEntity();
+        if (attached != null) {
+            return attached;
         }
-        if (foreignKey == null) {
+        if (foreignKey() == null) {
             return null;
         }
         LazyLoadContext.ensureOpen(context);
-        loaded = context.loadById(targetType, foreignKey);
-        return loaded;
-    }
-
-    /**
-     * Returns the entity already held in memory (attached for persist or loaded by a prior {@link #get()}).
-     * Never loads from the database. {@code null} if only a foreign key is stored.
-     */
-    public T attachedEntity() {
-        return loaded;
-    }
-
-    /** {@code true} after {@link #get()} or {@link #to(Object)} has populated the in-memory entity. */
-    public boolean isLoaded() {
-        return loaded != null;
-    }
-
-    /**
-     * {@code true} when this reference points at something: a join-column value, an attached entity,
-     * or a row loaded by {@link #get()}. {@code false} when {@link #isNull()}.
-     */
-    public boolean isSet() {
-        return foreignKey != null || loaded != null;
-    }
-
-    /**
-     * {@code true} when the join column is unset / SQL {@code NULL}: no foreign key and no attached entity.
-     * Does not load from the database. Equivalent to {@code !}{@link #isSet()}.
-     */
-    public boolean isNull() {
-        return !isSet();
-    }
-
-    /**
-     * Raw join-column value (numeric id, UUID, etc.) when known without loading the target row.
-     * {@code null} for SQL {@code NULL} or when only {@link #to(Object)} was used — use
-     * {@link #attachedEntity()} or {@link io.github.connellite.microorm.mapping.RelationValues#resolveRawForeignKey}
-     * for the primary key in that case.
-     */
-    public Object foreignKey() {
-        return foreignKey;
-    }
-
-    /** Target entity class declared on the owning {@link io.github.connellite.microorm.annotation.ManyToOne} field. */
-    public Class<T> targetType() {
-        return targetType;
+        attach(context.loadById(targetType(), foreignKey()));
+        return attachedEntity();
     }
 }

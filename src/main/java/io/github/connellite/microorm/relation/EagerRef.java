@@ -1,7 +1,6 @@
 package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.mapping.ManyToOneField;
-import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
 import java.util.Objects;
 
@@ -12,16 +11,10 @@ import java.util.Objects;
  * For writes use {@link #to(Object)} to reference a managed or new entity, or {@link #toId(Class, Object)}
  * to reference an existing row by primary key without loading it.
  */
-public final class EagerRef<T> implements EntityRef<T> {
-
-    private final Class<T> targetType;
-    private final Object foreignKey;
-    private final T loaded;
+public final class EagerRef<T> extends EntityRef<T> {
 
     private EagerRef(Class<T> targetType, Object foreignKey, T loaded) {
-        this.targetType = Objects.requireNonNull(targetType, "targetType");
-        this.foreignKey = foreignKey;
-        this.loaded = loaded;
+        super(Objects.requireNonNull(targetType, "targetType"), foreignKey, loaded);
     }
 
     /**
@@ -58,60 +51,21 @@ public final class EagerRef<T> implements EntityRef<T> {
 
     /** Sets an {@link EagerRef} on an entity field (VarHandle helper for mapped {@code EagerRef} fields). */
     public static <T> void set(ManyToOneField field, Object owner, EagerRef<T> value) {
-        MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
+        EntityRef.set(field, owner, value);
     }
 
     /** Reads an {@link EagerRef} from an entity field (VarHandle helper for mapped {@code EagerRef} fields). */
     @SuppressWarnings("unchecked")
     public static <T> EagerRef<T> get(ManyToOneField field, Object owner) {
-        return (EagerRef<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
+        return (EagerRef<T>) EntityRef.get(field, owner);
     }
 
     /**
      * Returns the related entity already materialized in memory, or {@code null} for SQL {@code NULL}
      * / id-only references created with {@link #toId(Class, Object)}.
      */
+    @Override
     public T get() {
-        return loaded;
-    }
-
-    /**
-     * Returns the entity already held in memory. Never loads from the database.
-     */
-    public T attachedEntity() {
-        return loaded;
-    }
-
-    /** {@code true} when this reference holds a materialized entity. */
-    public boolean isLoaded() {
-        return loaded != null;
-    }
-
-    /**
-     * {@code true} when this reference points at something: a join-column value or an attached entity.
-     * {@code false} when {@link #isNull()}.
-     */
-    public boolean isSet() {
-        return foreignKey != null || loaded != null;
-    }
-
-    /**
-     * {@code true} when the join column is unset / SQL {@code NULL}: no foreign key and no attached entity.
-     */
-    public boolean isNull() {
-        return !isSet();
-    }
-
-    /**
-     * Raw join-column value (numeric id, UUID, etc.) when known without reading the target entity primary key.
-     * {@code null} for SQL {@code NULL} or when only {@link #to(Object)} was used.
-     */
-    public Object foreignKey() {
-        return foreignKey;
-    }
-
-    /** Target entity class declared on the owning {@link io.github.connellite.microorm.annotation.ManyToOne} field. */
-    public Class<T> targetType() {
-        return targetType;
+        return attachedEntity();
     }
 }
