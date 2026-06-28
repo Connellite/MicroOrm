@@ -20,18 +20,20 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        String table = dialect.catalogName(model.tableIdentifier());
-        if (!tableExists(connection, table)) {
+        String owner = owner(model);
+        String table = model.catalogTableName(dialect);
+        if (!tableExists(connection, owner, table)) {
             return Set.of();
         }
         Set<String> columns = caseInsensitiveNullSkippingSet();
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT column_name
                 FROM all_tab_columns
-                WHERE owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+                WHERE owner = COALESCE(?, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))
                   AND table_name = ?
                 """)) {
-            ps.setString(1, table);
+            ps.setString(1, owner);
+            ps.setString(2, table);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     columns.add(rs.getString("column_name"));
@@ -41,15 +43,16 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
         return columns;
     }
 
-    private boolean tableExists(Connection connection, String tableName) throws SQLException {
+    private boolean tableExists(Connection connection, String owner, String tableName) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT 1
                 FROM all_objects
-                WHERE owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+                WHERE owner = COALESCE(?, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))
                   AND object_name = ?
                   AND object_type = 'TABLE'
                 """)) {
-            ps.setString(1, tableName);
+            ps.setString(1, owner);
+            ps.setString(2, tableName);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
@@ -59,19 +62,25 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
     @Override
     protected boolean indexExists(Connection connection, EntityModel model, EntityField field) throws SQLException {
         String indexName = indexName(model, field);
+        String owner = owner(model);
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT 1
                 FROM all_indexes
-                WHERE owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+                WHERE owner = COALESCE(?, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))
                   AND table_name = ?
                   AND index_name = ?
                 """)) {
-            ps.setString(1, dialect.catalogName(model.tableIdentifier()));
-            ps.setString(2, dialect.catalogName(SqlIdentifier.unquoted(indexName)));
+            ps.setString(1, owner);
+            ps.setString(2, model.catalogTableName(dialect));
+            ps.setString(3, dialect.catalogName(SqlIdentifier.unquoted(indexName)));
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
         }
+    }
+
+    private String owner(EntityModel model) {
+        return model.catalogSchemaName(dialect);
     }
 
     @Override

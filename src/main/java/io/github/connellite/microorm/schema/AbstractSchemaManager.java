@@ -56,14 +56,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                     continue;
                 }
                 validateAddColumn(model, f);
-                executeSql(st, "ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + columnDefinition(f, false));
+                executeSql(st, "ALTER TABLE " + model.sqlTableName(dialect) + " ADD " + columnDefinition(f, false));
             }
             for (ManyToOneField relation : model.manyToOneRelations()) {
                 if (existingColumns.contains(dialect.catalogName(relation.joinColumnIdentifier()))) {
                     continue;
                 }
                 validateAddJoinColumn(model, relation);
-                executeSql(st, "ALTER TABLE " + dialect.sqlName(model.tableIdentifier()) + " ADD " + joinColumnDefinition(relation));
+                executeSql(st, "ALTER TABLE " + model.sqlTableName(dialect) + " ADD " + joinColumnDefinition(relation));
             }
         }
         createIndexes(connection, model);
@@ -87,7 +87,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         for (ManyToOneField relation : model.manyToOneRelations()) {
             columns.add(joinColumnDefinition(relation));
         }
-        return "CREATE TABLE " + dialect.sqlName(model.tableIdentifier()) + " (" + columns + ")";
+        return "CREATE TABLE " + model.sqlTableName(dialect) + " (" + columns + ")";
     }
 
     protected String joinColumnDefinition(ManyToOneField relation) {
@@ -130,14 +130,16 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
         Set<String> columns = caseInsensitiveNullSkippingSet();
-        String table = dialect.catalogName(model.tableIdentifier());
-        try (ResultSet rs = connection.getMetaData().getColumns(null, null, table, null)) {
+        String catalog = metadataCatalog(model);
+        String schema = metadataSchema(model);
+        String table = model.catalogTableName(dialect);
+        try (ResultSet rs = connection.getMetaData().getColumns(catalog, schema, table, null)) {
             while (rs.next()) {
                 columns.add(rs.getString("COLUMN_NAME"));
             }
         }
         if (columns.isEmpty()) {
-            try (ResultSet rs = connection.getMetaData().getColumns(null, null, table.toUpperCase(Locale.ROOT), null)) {
+            try (ResultSet rs = connection.getMetaData().getColumns(catalog, schema, table.toUpperCase(Locale.ROOT), null)) {
                 while (rs.next()) {
                     columns.add(rs.getString("COLUMN_NAME"));
                 }
@@ -167,15 +169,23 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected boolean indexExists(Connection connection, EntityModel model, EntityField field) throws SQLException {
         String indexName = indexName(model, field);
-        if (findIndex(connection, dialect.catalogName(model.tableIdentifier()), indexName)) {
+        String catalog = metadataCatalog(model);
+        String schema = metadataSchema(model);
+        String table = model.catalogTableName(dialect);
+        if (findIndex(connection, catalog, schema, table, indexName)) {
             return true;
         }
-        return findIndex(connection, dialect.catalogName(model.tableIdentifier()).toUpperCase(Locale.ROOT), indexName);
+        return findIndex(connection, catalog, schema, table.toUpperCase(Locale.ROOT), indexName);
     }
 
-    private boolean findIndex(Connection connection, String tableName, String indexName) throws SQLException {
+    private boolean findIndex(
+            Connection connection,
+            String catalogName,
+            String schemaName,
+            String tableName,
+            String indexName) throws SQLException {
         Set<String> indexes = caseInsensitiveNullSkippingSet();
-        try (ResultSet rs = connection.getMetaData().getIndexInfo(null, null, tableName, false, false)) {
+        try (ResultSet rs = connection.getMetaData().getIndexInfo(catalogName, schemaName, tableName, false, false)) {
             while (rs.next()) {
                 indexes.add(rs.getString("INDEX_NAME"));
             }
@@ -183,14 +193,22 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         return indexes.contains(indexName);
     }
 
+    protected String metadataCatalog(EntityModel model) {
+        return null;
+    }
+
+    protected String metadataSchema(EntityModel model) {
+        return model.catalogSchemaName(dialect);
+    }
+
     protected String createIndexDdl(EntityModel model, EntityField field) {
         String indexName = indexName(model, field);
         return "CREATE INDEX " + dialect.sqlName(SqlIdentifier.unquoted(indexName))
-                + " ON " + dialect.sqlName(model.tableIdentifier()) + " (" + dialect.sqlName(field.columnIdentifier()) + ")";
+                + " ON " + model.sqlTableName(dialect) + " (" + dialect.sqlName(field.columnIdentifier()) + ")";
     }
 
     protected String dropTableDdl(EntityModel model) {
-        return "DROP TABLE " + dialect.sqlName(model.tableIdentifier());
+        return "DROP TABLE " + model.sqlTableName(dialect);
     }
 
     protected void validateAddJoinColumn(EntityModel model, io.github.connellite.microorm.mapping.ManyToOneField relation) {

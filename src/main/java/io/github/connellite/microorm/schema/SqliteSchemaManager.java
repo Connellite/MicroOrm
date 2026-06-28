@@ -24,13 +24,17 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected String dropTableDdl(EntityModel model) {
-        return "DROP TABLE IF EXISTS " + dialect.sqlName(model.tableIdentifier());
+        return "DROP TABLE IF EXISTS " + model.sqlTableName(dialect);
     }
 
     @Override
     protected String createIndexDdl(EntityModel model, EntityField field) {
         String indexName = indexName(model, field);
-        return "CREATE INDEX IF NOT EXISTS " + dialect.sqlName(SqlIdentifier.unquoted(indexName))
+        String indexSql = dialect.sqlName(SqlIdentifier.unquoted(indexName));
+        if (model.hasSchema()) {
+            indexSql = dialect.sqlName(model.schemaIdentifier()) + "." + indexSql;
+        }
+        return "CREATE INDEX IF NOT EXISTS " + indexSql
                 + " ON " + dialect.sqlName(model.tableIdentifier()) + " (" + dialect.sqlName(field.columnIdentifier()) + ")";
     }
 
@@ -61,11 +65,19 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
         Set<String> columns = caseInsensitiveNullSkippingSet();
         try (Statement st = connection.createStatement();
-             ResultSet rs = st.executeQuery("PRAGMA table_info(" + dialect.sqlName(model.tableIdentifier()) + ")")) {
+             ResultSet rs = st.executeQuery(pragmaTableInfo(model))) {
             while (rs.next()) {
                 columns.add(rs.getString("name"));
             }
         }
         return columns;
+    }
+
+    private String pragmaTableInfo(EntityModel model) {
+        if (!model.hasSchema()) {
+            return "PRAGMA table_info(" + dialect.sqlName(model.tableIdentifier()) + ")";
+        }
+        return "PRAGMA " + dialect.sqlName(model.schemaIdentifier())
+                + ".table_info(" + dialect.sqlName(model.tableIdentifier()) + ")";
     }
 }

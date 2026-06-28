@@ -69,7 +69,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             colQuoted.add(dialect.sqlName(relation.joinColumnIdentifier()));
             slots.add(":" + relation.joinColumn());
         }
-        return "INSERT INTO " + dialect.sqlName(model.tableIdentifier()) + " ("
+        return "INSERT INTO " + model.sqlTableName(dialect) + " ("
                 + String.join(", ", colQuoted) + ") VALUES (" + String.join(", ", slots) + ")";
     }
 
@@ -144,7 +144,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         }
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
-        String sql = "UPDATE " + dialect.sqlName(model.tableIdentifier()) + " SET " + String.join(", ", sets)
+        String sql = "UPDATE " + model.sqlTableName(dialect) + " SET " + String.join(", ", sets)
                 + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(sql, params);
     }
@@ -159,7 +159,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         params.put(relation.joinColumn(), joinColumnJdbcValue(entity, relation, registry));
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
-        String sql = "UPDATE " + dialect.sqlName(model.tableIdentifier())
+        String sql = "UPDATE " + model.sqlTableName(dialect)
                 + " SET " + dialect.sqlName(relation.joinColumnIdentifier()) + " = :" + relation.joinColumn()
                 + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(sql, params);
@@ -228,7 +228,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
         return BoundStatement.of(
-                "DELETE FROM " + dialect.sqlName(model.tableIdentifier()) + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName,
+                "DELETE FROM " + model.sqlTableName(dialect) + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName,
                 params);
     }
 
@@ -247,7 +247,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
         p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
-        String sql = "SELECT 1 FROM " + dialect.sqlName(model.tableIdentifier())
+        String sql = "SELECT 1 FROM " + model.sqlTableName(dialect)
                 + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(limitOne(sql), p);
     }
@@ -370,13 +370,13 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
     private String selectAllSql(EntityModel model, boolean distinct) {
         List<String> cols = new ArrayList<>();
         for (EntityField f : model.fields()) {
-            cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(f.columnIdentifier()));
+            cols.add(model.sqlTableName(dialect) + "." + dialect.sqlName(f.columnIdentifier()));
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(relation.joinColumnIdentifier()));
+            cols.add(model.sqlTableName(dialect) + "." + dialect.sqlName(relation.joinColumnIdentifier()));
         }
         return "SELECT " + (distinct ? "DISTINCT " : "")
-                + String.join(", ", cols) + " FROM " + dialect.sqlName(model.tableIdentifier());
+                + String.join(", ", cols) + " FROM " + model.sqlTableName(dialect);
     }
 
     private String renderCriterion(
@@ -513,12 +513,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModel targetModel,
             String alias,
             JoinType joinType) {
-        String sql = joinType.sql() + " " + dialect.sqlName(targetModel.tableIdentifier()) + " " + alias;
+        String sql = joinType.sql() + " " + targetModel.sqlTableName(dialect) + " " + alias;
         if (joinType == JoinType.CROSS) {
             return sql;
         }
         return sql + " ON "
-                + dialect.sqlName(rootModel.tableIdentifier()) + "." + dialect.sqlName(relation.joinColumnIdentifier())
+                + rootModel.sqlTableName(dialect) + "." + dialect.sqlName(relation.joinColumnIdentifier())
                 + " = " + alias + "." + dialect.sqlName(targetModel.primaryKey().columnIdentifier());
     }
 
@@ -528,12 +528,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModel childModel,
             String alias,
             JoinType joinType) {
-        String sql = joinType.sql() + " " + dialect.sqlName(childModel.tableIdentifier()) + " " + alias;
+        String sql = joinType.sql() + " " + childModel.sqlTableName(dialect) + " " + alias;
         if (joinType == JoinType.CROSS) {
             return sql;
         }
         return sql + " ON "
-                + dialect.sqlName(rootModel.tableIdentifier()) + "." + dialect.sqlName(rootModel.primaryKey().columnIdentifier())
+                + rootModel.sqlTableName(dialect) + "." + dialect.sqlName(rootModel.primaryKey().columnIdentifier())
                 + " = " + alias + "." + dialect.sqlName(inverse.joinColumnIdentifier());
     }
 
@@ -541,7 +541,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         String[] parts = path.split("\\.", -1);
         if (parts.length == 1) {
             EntityField field = fieldByName(model, path);
-            return new ColumnRef(field, dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(field.columnIdentifier()));
+            return new ColumnRef(field, model.sqlTableName(dialect) + "." + dialect.sqlName(field.columnIdentifier()));
         }
         if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
             throw new MicroOrmException("Invalid joined field path '" + path + "'. Use relation.field");

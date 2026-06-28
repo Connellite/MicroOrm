@@ -68,7 +68,13 @@ public final class EntityModelRegistry {
         SqlIdentifier table = entityAnn.name().isBlank()
                 ? toPhysicalTable(SqlIdentifier.unquoted(entityClass.getSimpleName()))
                 : toPhysicalTable(SqlIdentifier.parse(entityAnn.name()));
+        SqlIdentifier schema = entityAnn.schema().isBlank()
+                ? null
+                : SqlIdentifier.parse(entityAnn.schema());
         SqlGenerator.validateIdentifier(table.text(), "table");
+        if (schema != null) {
+            SqlGenerator.validateIdentifier(schema.text(), "schema");
+        }
         try {
             ReflectionUtil.getConstructor(entityClass);
         } catch (NoSuchMethodException e) {
@@ -136,7 +142,7 @@ public final class EntityModelRegistry {
         if (pk == null) {
             throw new MicroOrmException("Missing @Id on " + entityClass.getName());
         }
-        EntityModel model = new EntityModel(entityClass, table, fields, pk, manyToOneRelations, oneToManyRelations);
+        EntityModel model = new EntityModel(entityClass, table, schema, fields, pk, manyToOneRelations, oneToManyRelations);
         SqlGenerator.validateColumnNames(model);
         return model;
     }

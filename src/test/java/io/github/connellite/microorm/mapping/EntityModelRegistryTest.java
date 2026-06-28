@@ -36,6 +36,24 @@ class EntityModelRegistryTest {
         private UUID id;
     }
 
+    @Entity(name = "schema_items", schema = "app")
+    static class SchemaItem {
+        @Id
+        private long id;
+    }
+
+    @Entity(name = "quoted_schema_items", schema = "`AppSchema`")
+    static class QuotedSchemaItem {
+        @Id
+        private long id;
+    }
+
+    @Entity(name = "bad_schema_items", schema = "bad-schema")
+    static class InvalidSchemaName {
+        @Id
+        private long id;
+    }
+
     @Entity(name = "dup_id")
     static class DuplicateId {
         @Id
@@ -158,6 +176,25 @@ class EntityModelRegistryTest {
     }
 
     @Test
+    void registerBuildsModelWithSchema() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(SchemaItem.class);
+
+        assertEquals("app", model.schemaName());
+        assertEquals("schema_items", model.tableName());
+        assertTrue(model.hasSchema());
+    }
+
+    @Test
+    void backtickSchemaNameRequestsQuotedIdentifier() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(QuotedSchemaItem.class);
+
+        assertEquals("AppSchema", model.schemaName());
+        assertTrue(model.schemaIdentifier().quoted());
+    }
+
+    @Test
     void defaultTableNameIsLowercaseSimpleName() {
         EntityModelRegistry registry = new EntityModelRegistry();
         EntityModel model = registry.register(DefaultTable.class);
@@ -200,6 +237,12 @@ class EntityModelRegistryTest {
     void rejectsInvalidTableName() {
         EntityModelRegistry registry = new EntityModelRegistry();
         assertThrows(MicroOrmException.class, () -> registry.register(InvalidTableName.class));
+    }
+
+    @Test
+    void rejectsInvalidSchemaName() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        assertThrows(MicroOrmException.class, () -> registry.register(InvalidSchemaName.class));
     }
 
     @Test

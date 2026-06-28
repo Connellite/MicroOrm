@@ -216,7 +216,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     /** Deletes all rows from the entity table (table definition is kept). */
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
-        String q = "DELETE FROM " + dialect.sqlName(m.tableIdentifier());
+        String q = "DELETE FROM " + m.sqlTableName(dialect);
         return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, java.util.Map.of()));
     }
 
@@ -399,7 +399,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
         EntityModel ownerModel = registry.get(inverse.targetEntityClass());
         Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
-        execute(Query.of("DELETE FROM " + dialect.sqlName(childModel.tableIdentifier())
+        execute(Query.of("DELETE FROM " + childModel.sqlTableName(dialect)
                         + " WHERE " + dialect.sqlName(inverse.joinColumnIdentifier()) + " = :ownerId")
                 .set("ownerId", jdbcOwnerPk));
     }

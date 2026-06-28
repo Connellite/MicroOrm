@@ -45,6 +45,16 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
 
     @Override
     protected String dropTableDdl(EntityModel model) {
-        return "DROP TABLE IF EXISTS " + dialect.sqlName(model.tableIdentifier());
+        return "DROP TABLE IF EXISTS " + model.sqlTableName(dialect);
+    }
+
+    @Override
+    protected String metadataCatalog(EntityModel model) {
+        return model.catalogSchemaName(dialect);
+    }
+
+    @Override
+    protected String metadataSchema(EntityModel model) {
+        return null;
     }
 }

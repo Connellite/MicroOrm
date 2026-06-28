@@ -36,6 +36,14 @@ class EntityQueryTest {
         private String description;
     }
 
+    @Entity(name = "schema_query_items", schema = "app")
+    public static class SchemaItem {
+        @Id
+        private long id;
+
+        private String name;
+    }
+
     @Entity(name = "entity_query_customers")
     public static class Customer {
         @Id
@@ -72,6 +80,7 @@ class EntityQueryTest {
     }
 
     private final EntityModel model = new EntityModelRegistry().register(Item.class);
+    private final EntityModel schemaModel = new EntityModelRegistry().register(SchemaItem.class);
     private final EntityModelRegistry registry = new EntityModelRegistry();
     private final EntityModel orderModel = registry.register(OrderEntity.class);
 
@@ -100,6 +109,19 @@ class EntityQueryTest {
                 statement.sql());
         assertEquals("A%", statement.parameters().get("p1"));
         assertEquals(true, statement.parameters().get("p2"));
+    }
+
+    @Test
+    void rendersSchemaQualifiedTableNames() {
+        BoundStatement select = SqliteDialect.getInstance().sqlGenerator().selectAll(schemaModel);
+        String insert = SqliteDialect.getInstance().sqlGenerator().insertSql(schemaModel, false);
+
+        assertEquals(
+                "SELECT app.schema_query_items.id, app.schema_query_items.name FROM app.schema_query_items",
+                select.sql());
+        assertEquals(
+                "INSERT INTO app.schema_query_items (id, name) VALUES (:id, :name)",
+                insert);
     }
 
     @Test
