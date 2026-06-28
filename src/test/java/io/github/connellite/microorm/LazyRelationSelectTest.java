@@ -7,6 +7,7 @@ import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.relation.LazyCollection;
 import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.session.Session;
@@ -223,6 +224,34 @@ class LazyRelationSelectTest {
             Order loaded = session.selectRow(Order.class, order.id);
             assertEquals("New", loaded.getTitle());
             assertEquals(CUSTOMER_ID, loaded.getCustomer().get().getId());
+        }
+    }
+
+    @Test
+    void entityQueryManyToOneJoinFiltersRows() throws SQLException {
+        try (Session session = orm.openSession()) {
+            EntityQuery<Order> query = EntityQuery.of(Order.class)
+                    .join("customer")
+                    .where(EntityQuery.field("customer.name").eq("Acme"));
+
+            List<Order> rows = session.selectRows(query);
+
+            assertEquals(1, rows.size());
+            assertEquals(ORDER_ID, rows.get(0).getId());
+        }
+    }
+
+    @Test
+    void entityQueryOneToManyJoinFiltersRows() throws SQLException {
+        try (Session session = orm.openSession()) {
+            EntityQuery<Order> query = EntityQuery.of(Order.class)
+                    .leftJoin("lines")
+                    .where(EntityQuery.field("lines.sku").in(List.of("WIDGET", "GADGET")));
+
+            List<Order> rows = session.selectRows(query);
+
+            assertEquals(1, rows.size());
+            assertEquals(ORDER_ID, rows.get(0).getId());
         }
     }
 

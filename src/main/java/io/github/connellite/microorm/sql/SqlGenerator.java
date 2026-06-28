@@ -3,6 +3,7 @@ package io.github.connellite.microorm.sql;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.query.EntityQuery;
 
@@ -44,6 +45,8 @@ public interface SqlGenerator {
     BoundStatement selectWhere(EntityModel model, Map<String, ?> filters);
 
     BoundStatement select(EntityModel model, EntityQuery<?> query);
+
+    BoundStatement select(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry);
 
     BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
 

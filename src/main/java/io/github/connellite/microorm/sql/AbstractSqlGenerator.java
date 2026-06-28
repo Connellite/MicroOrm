@@ -7,12 +7,15 @@ import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
 import io.github.connellite.microorm.query.CompositeCriterion;
 import io.github.connellite.microorm.query.Criterion;
 import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.query.FieldCriterion;
+import io.github.connellite.microorm.query.Join;
+import io.github.connellite.microorm.query.JoinType;
 import io.github.connellite.microorm.query.NotCriterion;
 import io.github.connellite.microorm.query.Order;
 import io.github.connellite.microorm.relation.EntityRef;
@@ -275,6 +278,14 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
 
     @Override
     public BoundStatement select(EntityModel model, EntityQuery<?> query) {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        registry.register(model.entityClass());
+        registerJoinTargets(model, registry);
+        return select(model, query, registry);
+    }
+
+    @Override
+    public BoundStatement select(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry) {
         if (query == null) {
             return selectAll(model);
         }
@@ -284,16 +295,20 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         }
         Map<String, Object> params = new LinkedHashMap<>();
         Map<String, Collection<?>> collectionParams = new LinkedHashMap<>();
+        JoinContext joinContext = buildJoinContext(model, query, registry);
         int[] paramCounter = {1};
-        String sql = selectAllSql(model);
+        String sql = selectAllSql(model, joinContext.hasOneToManyJoin());
+        if (!joinContext.sql().isEmpty()) {
+            sql += " " + joinContext.sql();
+        }
         if (query.criterion() != null) {
-            sql += " WHERE " + renderCriterion(model, query.criterion(), params, collectionParams, paramCounter);
+            sql += " WHERE " + renderCriterion(model, joinContext, query.criterion(), params, collectionParams, paramCounter);
         }
         if (!query.orders().isEmpty()) {
             List<String> orderSql = new ArrayList<>();
             for (Order order : query.orders()) {
-                EntityField field = fieldByName(model, order.fieldName());
-                orderSql.add(dialect.sqlName(field.columnIdentifier()) + " " + order.direction().name());
+                ColumnRef column = resolveColumn(model, joinContext, order.fieldName());
+                orderSql.add(column.sql() + " " + order.direction().name());
             }
             sql += " ORDER BY " + String.join(", ", orderSql);
         }
@@ -349,6 +364,10 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
     }
 
     private String selectAllSql(EntityModel model) {
+        return selectAllSql(model, false);
+    }
+
+    private String selectAllSql(EntityModel model, boolean distinct) {
         List<String> cols = new ArrayList<>();
         for (EntityField f : model.fields()) {
             cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(f.columnIdentifier()));
@@ -356,50 +375,52 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         for (ManyToOneField relation : model.manyToOneRelations()) {
             cols.add(dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(relation.joinColumnIdentifier()));
         }
-        return "SELECT " + String.join(", ", cols) + " FROM " + dialect.sqlName(model.tableIdentifier());
+        return "SELECT " + (distinct ? "DISTINCT " : "")
+                + String.join(", ", cols) + " FROM " + dialect.sqlName(model.tableIdentifier());
     }
 
     private String renderCriterion(
             EntityModel model,
+            JoinContext joinContext,
             Criterion criterion,
             Map<String, Object> params,
             Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
         if (criterion instanceof FieldCriterion fieldCriterion) {
-            return renderFieldCriterion(model, fieldCriterion, params, collectionParams, paramCounter);
+            return renderFieldCriterion(model, joinContext, fieldCriterion, params, collectionParams, paramCounter);
         }
         if (criterion instanceof CompositeCriterion composite) {
             String separator = " " + composite.operator().name() + " ";
             List<String> rendered = new ArrayList<>();
             for (Criterion child : composite.criteria()) {
-                rendered.add(renderCriterion(model, child, params, collectionParams, paramCounter));
+                rendered.add(renderCriterion(model, joinContext, child, params, collectionParams, paramCounter));
             }
             return "(" + String.join(separator, rendered) + ")";
         }
         if (criterion instanceof NotCriterion notCriterion) {
-            return "NOT (" + renderCriterion(model, notCriterion.criterion(), params, collectionParams, paramCounter) + ")";
+            return "NOT (" + renderCriterion(model, joinContext, notCriterion.criterion(), params, collectionParams, paramCounter) + ")";
         }
         throw new MicroOrmException("Unsupported criterion type: " + criterion.getClass().getName());
     }
 
     private String renderFieldCriterion(
             EntityModel model,
+            JoinContext joinContext,
             FieldCriterion criterion,
             Map<String, Object> params,
             Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
-        EntityField field = fieldByName(model, criterion.fieldName());
-        String column = dialect.sqlName(field.columnIdentifier());
+        ColumnRef column = resolveColumn(model, joinContext, criterion.fieldName());
         return switch (criterion.kind()) {
-            case COMPARISON -> renderComparison(field, column, criterion, params, paramCounter);
-            case IN -> renderIn(field, column, criterion, collectionParams, paramCounter);
+            case COMPARISON -> renderComparison(column.field(), column.sql(), criterion, params, paramCounter);
+            case IN -> renderIn(column.field(), column.sql(), criterion, collectionParams, paramCounter);
             case LIKE -> {
                 String param = nextParam(paramCounter);
-                params.put(param, dialect.valueMapper().toJdbcValue(field, criterion.value()));
-                yield column + " LIKE :" + param;
+                params.put(param, dialect.valueMapper().toJdbcValue(column.field(), criterion.value()));
+                yield column.sql() + " LIKE :" + param;
             }
-            case IS_NULL -> column + " IS NULL";
-            case IS_NOT_NULL -> column + " IS NOT NULL";
+            case IS_NULL -> column.sql() + " IS NULL";
+            case IS_NOT_NULL -> column.sql() + " IS NOT NULL";
         };
     }
 
@@ -439,6 +460,125 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
 
     private static String nextParam(int[] paramCounter) {
         return "p" + paramCounter[0]++;
+    }
+
+    private static void registerJoinTargets(EntityModel model, EntityModelRegistry registry) {
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            registry.register(relation.targetEntityClass());
+        }
+        for (OneToManyField relation : model.oneToManyRelations()) {
+            registry.register(relation.targetEntityClass());
+        }
+    }
+
+    private JoinContext buildJoinContext(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry) {
+        if (query.joins().isEmpty()) {
+            return new JoinContext(Map.of(), "", false);
+        }
+        Map<String, JoinBinding> bindings = new LinkedHashMap<>();
+        List<String> sql = new ArrayList<>();
+        boolean hasOneToManyJoin = false;
+        int index = 1;
+        for (Join join : query.joins()) {
+            if (bindings.containsKey(join.relationName())) {
+                throw new MicroOrmException("Duplicate join for relation '" + join.relationName()
+                        + "' on " + model.entityClass().getName());
+            }
+            String alias = "j" + index++;
+            ManyToOneField manyToOne = findManyToOne(model, join.relationName());
+            if (manyToOne != null) {
+                EntityModel targetModel = registry.get(manyToOne.targetEntityClass());
+                bindings.put(join.relationName(), new JoinBinding(alias, targetModel));
+                sql.add(renderManyToOneJoin(model, manyToOne, targetModel, alias, join.type()));
+                continue;
+            }
+            OneToManyField oneToMany = findOneToMany(model, join.relationName());
+            if (oneToMany != null) {
+                EntityModel childModel = registry.get(oneToMany.targetEntityClass());
+                ManyToOneField inverse = childModel.manyToOneByFieldName(oneToMany.mappedBy());
+                bindings.put(join.relationName(), new JoinBinding(alias, childModel));
+                sql.add(renderOneToManyJoin(model, inverse, childModel, alias, join.type()));
+                hasOneToManyJoin = true;
+                continue;
+            }
+            throw new MicroOrmException("Unknown relation '" + join.relationName()
+                    + "' on " + model.entityClass().getName());
+        }
+        return new JoinContext(bindings, String.join(" ", sql), hasOneToManyJoin);
+    }
+
+    private String renderManyToOneJoin(
+            EntityModel rootModel,
+            ManyToOneField relation,
+            EntityModel targetModel,
+            String alias,
+            JoinType joinType) {
+        String sql = joinType.sql() + " " + dialect.sqlName(targetModel.tableIdentifier()) + " " + alias;
+        if (joinType == JoinType.CROSS) {
+            return sql;
+        }
+        return sql + " ON "
+                + dialect.sqlName(rootModel.tableIdentifier()) + "." + dialect.sqlName(relation.joinColumnIdentifier())
+                + " = " + alias + "." + dialect.sqlName(targetModel.primaryKey().columnIdentifier());
+    }
+
+    private String renderOneToManyJoin(
+            EntityModel rootModel,
+            ManyToOneField inverse,
+            EntityModel childModel,
+            String alias,
+            JoinType joinType) {
+        String sql = joinType.sql() + " " + dialect.sqlName(childModel.tableIdentifier()) + " " + alias;
+        if (joinType == JoinType.CROSS) {
+            return sql;
+        }
+        return sql + " ON "
+                + dialect.sqlName(rootModel.tableIdentifier()) + "." + dialect.sqlName(rootModel.primaryKey().columnIdentifier())
+                + " = " + alias + "." + dialect.sqlName(inverse.joinColumnIdentifier());
+    }
+
+    private ColumnRef resolveColumn(EntityModel model, JoinContext joinContext, String path) {
+        String[] parts = path.split("\\.", -1);
+        if (parts.length == 1) {
+            EntityField field = fieldByName(model, path);
+            return new ColumnRef(field, dialect.sqlName(model.tableIdentifier()) + "." + dialect.sqlName(field.columnIdentifier()));
+        }
+        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
+            throw new MicroOrmException("Invalid joined field path '" + path + "'. Use relation.field");
+        }
+        JoinBinding binding = joinContext.bindings().get(parts[0]);
+        if (binding == null) {
+            throw new MicroOrmException("Field path '" + path + "' requires join('" + parts[0] + "')");
+        }
+        EntityField field = fieldByName(binding.model(), parts[1]);
+        return new ColumnRef(field, binding.alias() + "." + dialect.sqlName(field.columnIdentifier()));
+    }
+
+    private static ManyToOneField findManyToOne(EntityModel model, String relationName) {
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (relation.javaField().getName().equals(relationName)) {
+                return relation;
+            }
+        }
+        return null;
+    }
+
+    private static OneToManyField findOneToMany(EntityModel model, String relationName) {
+        for (OneToManyField relation : model.oneToManyRelations()) {
+            if (relation.javaField().getName().equals(relationName)) {
+                return relation;
+            }
+        }
+        return null;
+    }
+
+    private record JoinContext(Map<String, JoinBinding> bindings, String sql, boolean hasOneToManyJoin) {
+    }
+
+    private record JoinBinding(String alias, EntityModel model) {
+    }
+
+    private record ColumnRef(EntityField field, String sql) {
     }
 
     private static EntityField fieldByName(EntityModel model, String name) {

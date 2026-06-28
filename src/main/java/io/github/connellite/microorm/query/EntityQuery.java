@@ -10,8 +10,9 @@ import java.util.OptionalInt;
  * Fluent, named-parameter query builder for selecting mapped entities.
  * <p>
  * {@code EntityQuery} intentionally covers the lightweight ORM use case: one root entity,
- * composable {@code WHERE} predicates, {@code ORDER BY}, and optional {@code LIMIT}/{@code OFFSET}.
- * For joins, projections, and database-specific SQL, use {@link io.github.connellite.microorm.sql.Query}.
+ * relation joins for filtering/sorting, composable {@code WHERE} predicates, {@code ORDER BY},
+ * and optional {@code LIMIT}/{@code OFFSET}. For projections and database-specific SQL, use
+ * {@link io.github.connellite.microorm.sql.Query}.
  *
  * <pre>{@code
  * EntityQuery<User> query = EntityQuery.of(User.class)
@@ -19,6 +20,10 @@ import java.util.OptionalInt;
  *         .and(EntityQuery.field("enabled").eq(true))
  *         .orderBy(EntityQuery.field("name").asc())
  *         .limit(20);
+ *
+ * EntityQuery<Order> joined = EntityQuery.of(Order.class)
+ *         .leftJoin("customer")
+ *         .where(EntityQuery.field("customer.name").eq("Acme"));
  *
  * List<User> users = session.selectRows(query);
  * }</pre>
@@ -29,6 +34,7 @@ public final class EntityQuery<T> {
 
     private final Class<T> entityType;
     private Criterion criterion;
+    private final List<Join> joins = new ArrayList<>();
     private final List<Order> orders = new ArrayList<>();
     private Integer limit;
     private Integer offset;
@@ -69,6 +75,11 @@ public final class EntityQuery<T> {
     /** Optional root {@code WHERE} criterion. */
     public Criterion criterion() {
         return criterion;
+    }
+
+    /** Immutable join declaration list. */
+    public List<Join> joins() {
+        return List.copyOf(joins);
     }
 
     /** Immutable sort order list. */
@@ -118,6 +129,69 @@ public final class EntityQuery<T> {
     public EntityQuery<T> or(Criterion criterion) {
         Objects.requireNonNull(criterion, "criterion");
         this.criterion = this.criterion == null ? criterion : this.criterion.or(criterion);
+        return this;
+    }
+
+    /**
+     * Adds a SQL {@code INNER JOIN} for a root relation field.
+     *
+     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @return this query for chaining
+     */
+    public EntityQuery<T> join(String relationName) {
+        return join(relationName, JoinType.INNER);
+    }
+
+    /**
+     * Adds a SQL {@code LEFT JOIN} for a root relation field.
+     *
+     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @return this query for chaining
+     */
+    public EntityQuery<T> leftJoin(String relationName) {
+        return join(relationName, JoinType.LEFT);
+    }
+
+    /**
+     * Adds a SQL {@code RIGHT JOIN} for a root relation field.
+     *
+     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @return this query for chaining
+     */
+    public EntityQuery<T> rightJoin(String relationName) {
+        return join(relationName, JoinType.RIGHT);
+    }
+
+    /**
+     * Adds a SQL {@code FULL JOIN} for a root relation field.
+     *
+     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @return this query for chaining
+     */
+    public EntityQuery<T> fullJoin(String relationName) {
+        return join(relationName, JoinType.FULL);
+    }
+
+    /**
+     * Adds a SQL {@code CROSS JOIN} for a root relation field. Cross joins intentionally omit
+     * the relation {@code ON} predicate and should be used sparingly.
+     *
+     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @return this query for chaining
+     */
+    public EntityQuery<T> crossJoin(String relationName) {
+        return join(relationName, JoinType.CROSS);
+    }
+
+    /**
+     * Adds a join for a root relation field.
+     *
+     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param type SQL join type
+     * @return this query for chaining
+     */
+    public EntityQuery<T> join(String relationName, JoinType type) {
+        joins.add(new Join(relationName, type));
         return this;
     }
 

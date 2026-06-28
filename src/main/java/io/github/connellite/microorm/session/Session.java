@@ -294,7 +294,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityModel m = registry.get(query.entityType());
         SessionLazyContext context = lazyLoadContext();
         return SqlExecutor.queryEntitiesStream(
-                connection, sql.select(m, query), m, dialect, dialect.valueMapper(), context, registry);
+                connection, sql.select(m, query, registry), m, dialect, dialect.valueMapper(), context, registry);
     }
 
     /** Materializes custom-query rows; closes the underlying JDBC resources. */

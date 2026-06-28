@@ -5,10 +5,11 @@ import java.util.Collection;
 /**
  * Reference to a mapped entity field used to build criteria and sort orders.
  * <p>
- * The name may be either the Java field name or the physical column name. It is resolved
- * against the registered entity model when the query is executed.
+ * The name may be either the Java field name or the physical column name. Joined fields use
+ * {@code relation.field} and require a matching {@link EntityQuery#join(String)} declaration.
+ * The path is resolved against the registered entity model when the query is executed.
  *
- * @param name Java field name or mapped column name
+ * @param name Java field name, mapped column name, or joined path
  */
 public record FieldPath(String name) {
 

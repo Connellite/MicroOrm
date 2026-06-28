@@ -2,8 +2,10 @@ package io.github.connellite.microorm.relation;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -48,5 +50,66 @@ class LazyRefTest {
         LazyRef<Customer> byId = LazyRef.toId(Customer.class, 1L);
         assertTrue(unset.isNull() == !unset.isSet());
         assertTrue(byId.isNull() == !byId.isSet());
+    }
+
+    @Test
+    void eagerRefReturnsAttachedEntityWithoutLoading() {
+        Customer customer = new Customer();
+        EagerRef<Customer> ref = EagerRef.to(customer);
+
+        assertSame(customer, ref.get());
+        assertSame(customer, ref.attachedEntity());
+        assertTrue(ref.isLoaded());
+        assertTrue(ref.isSet());
+        assertNull(ref.foreignKey());
+        assertSame(Customer.class, ref.targetType());
+    }
+
+    @Test
+    void eagerRefCanRepresentIdOnlyReference() {
+        UUID id = UUID.randomUUID();
+        EagerRef<Customer> ref = EagerRef.toId(Customer.class, id);
+
+        assertNull(ref.get());
+        assertFalse(ref.isLoaded());
+        assertTrue(ref.isSet());
+        assertSame(id, ref.foreignKey());
+    }
+
+    @Test
+    void eagerCollectionIsAlwaysMaterialized() {
+        Customer first = new Customer();
+        Customer second = new Customer();
+        EagerCollection<Customer> collection = EagerCollection.of(10L, List.of(first, second));
+
+        assertEquals(List.of(first, second), collection.get());
+        assertEquals(List.of(first, second), collection.elementsOrEmpty());
+        assertEquals(10L, collection.ownerId());
+        assertTrue(collection.isMaterialized());
+        assertTrue(collection.isLoaded());
+    }
+
+    @Test
+    void eagerCollectionBuilderBuildsImmutableMaterializedCollection() {
+        Customer customer = new Customer();
+        EagerCollection<Customer> collection = EagerCollection.<Customer>builder()
+                .add(customer)
+                .build();
+
+        assertEquals(List.of(customer), collection.get());
+        assertTrue(collection.isLoaded());
+    }
+
+    @Test
+    void lazyCollectionBuilderBuildsMaterializedPersistCollection() {
+        Customer customer = new Customer();
+        LazyCollection<Customer> collection = LazyCollection.<Customer>builder()
+                .add(customer)
+                .build();
+
+        assertEquals(List.of(customer), collection.get());
+        assertTrue(collection.isMaterialized());
+        assertFalse(collection.isLoaded());
+        assertNull(collection.ownerId());
     }
 }
