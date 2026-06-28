@@ -4,7 +4,11 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
 /**
- * Base class for many-to-one relation wrappers.
+ * Base class for many-to-one relation wrappers declared on {@code @ManyToOne} fields.
+ * <p>
+ * Concrete types are {@link LazyRef} (loads the target on first {@link #get()} while the owning
+ * {@link io.github.connellite.microorm.session.Session} is open) and {@link EagerRef} (target row
+ * materialized when the owner is hydrated).
  *
  * @param <T> target entity type
  */

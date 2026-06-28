@@ -2,6 +2,8 @@ package io.github.connellite.microorm.query;
 
 /**
  * Join declaration for a root entity relation.
+ * <p>
+ * When {@code type} is {@code null}, {@link JoinType#INNER} is used.
  *
  * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
  * @param type SQL join type

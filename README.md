@@ -2,13 +2,16 @@
 
 Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https://github.com/connellite/ExtraLib).
 
-**Status:** alpha (`1.0.0-alpha.1`) — core CRUD and multi-database support are stable; API may still evolve.
+**Status:** alpha (`1.0.0-alpha.1`) — core CRUD, relations, and multi-database support are stable; API may still evolve.
 
 ## Features
 
 - Annotation mapping: `@Entity`, `@Column`, `@Id`, `@Transient`
-- CRUD, batch insert, filtered select, streaming reads, custom `Query`
+- CRUD, batch insert, map-based filtered select, streaming reads, custom `Query`
+- **`EntityQuery`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, and relation joins
+- **Associations**: `@ManyToOne` / `@OneToMany` with lazy (`LazyRef`, `LazyCollection`) or eager (`EagerRef`, `EagerCollection`) loading
 - Schema helpers: `createEntity`, `syncEntity` (add nullable columns), `dropEntity`
+- **Dynamic tables**: runtime-defined schema and Map-based CRUD without entity classes
 - Dialects: SQLite, PostgreSQL, MySQL, MSSQL, Oracle
 - Spring-friendly: works with `TransactionAwareDataSourceProxy` without a compile-time Spring dependency
 - Named parameters only — values are never concatenated into SQL
@@ -25,6 +28,14 @@ public class User {
     private String name;
 
     public User() {}
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 }
 
 try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) {
@@ -33,16 +44,100 @@ try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) 
         session.createEntity(User.class);
 
         User user = new User();
-        user.name = "Ada";
+        user.setName("Ada");
         session.insertRow(user);
 
-        User loaded = session.selectRow(User.class, user.id);
+        User loaded = session.selectRow(User.class, user.getId());
         return loaded;
     });
 }
 ```
 
 Use `MicroOrm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool. Prefer `orm.withSession(...)` so pooled connections are always released.
+
+## EntityQuery
+
+`EntityQuery` builds named-parameter SQL for a single root entity. Use it when you need composable predicates, sorting, pagination, or joins — without writing raw SQL.
+
+```java
+EntityQuery<User> query = EntityQuery.of(User.class)
+        .where(EntityQuery.field("name").like("Ada%"))
+        .and(EntityQuery.field("enabled").eq(true))
+        .orderBy(EntityQuery.field("name").asc())
+        .limit(20);
+
+List<User> users = session.selectRows(query);
+```
+
+Join a relation and filter on joined fields with dotted paths:
+
+```java
+EntityQuery<Order> query = EntityQuery.of(Order.class)
+        .leftJoin("customer")
+        .where(EntityQuery.field("customer.name").eq("Acme"))
+        .orderBy(EntityQuery.field("title").desc());
+
+List<Order> orders = session.selectRows(query);
+```
+
+Supported join types: inner (default), left, right, full, and cross. For database-specific SQL or projections, use `Query` instead.
+
+## Relations
+
+Map associations with wrapper field types and `@JoinColumn` on the owning side:
+
+```java
+@Entity(name = "orders")
+public class Order {
+    @Id
+    private UUID id;
+
+    @ManyToOne
+    @JoinColumn(name = "customer_id")
+    private LazyRef<Customer> customer;
+
+    @OneToMany(mappedBy = "order")
+    private LazyCollection<OrderItem> lines;
+}
+
+@Entity(name = "order_items")
+public class OrderItem {
+    @Id
+    private long id;
+
+    @ManyToOne
+    @JoinColumn(name = "order_id")
+    private LazyRef<Order> order;
+}
+```
+
+- **`LazyRef` / `LazyCollection`** — load related rows on first `get()` while the session is open
+- **`EagerRef` / `EagerCollection`** — materialize related rows when the owner is hydrated
+
+For writes, attach entities with `LazyRef.to(entity)` or reference existing rows with `LazyRef.toId(Customer.class, id)`. Collections can be built with `LazyCollection.builder()` before insert/update.
+
+Relation graphs (including cyclic references) are persisted through `session.insertRow` / `updateRow`.
+
+## Dynamic tables
+
+When entity classes are not needed, describe tables in code and use `DynamicSession`:
+
+```java
+DynamicTable docs = DynamicTable.builder("docs")
+        .table("documents")
+        .column("id", LogicalType.UUID, c -> c.primaryKey().notNull())
+        .column("name", LogicalType.STRING, Column.Builder::notNull)
+        .build();
+
+orm.dynamicRegistry().register(docs);
+orm.withDynamicSession(session -> {
+    session.createTable(docs);
+    session.insertRow(docs, Map.of("id", UUID.randomUUID(), "name", "alpha"));
+    return session.selectRows(docs, Map.of("name", "alpha"));
+});
+```
+
+See `io.github.connellite.microorm.dynamic` in the Javadoc for details.
 
 ## Requirements
 
@@ -85,11 +180,13 @@ Entity classes on the classpath (unnamed module) do not need the `add-reads` fla
 ## Limitations (alpha)
 
 - Single-column primary keys only (numeric or UUID)
-- No relationships, migrations framework, or entity inheritance
+- Associations: `@ManyToOne` and `@OneToMany` only (no `@OneToOne`, `@ManyToMany`, or embeddables)
+- No migrations framework or entity inheritance
 - `Session` is not thread-safe — one session per thread
 - Supported field types: numeric primitives/wrappers, `boolean`, `String`, `UUID`, `float`/`double`
 - Numeric `0` is treated as unset for `@Id(autoIncrement = true)` inserts and PK lookups
 - Entity inheritance is not supported (mapped superclass fields are rejected at registration)
+- `EntityQuery` covers one root entity with relation joins; no subqueries or projections
 
 ## License
 

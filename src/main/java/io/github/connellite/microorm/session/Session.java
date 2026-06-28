@@ -30,6 +30,10 @@ import java.util.stream.Stream;
 /**
  * Unit of work over a single JDBC {@link Connection}. Not thread-safe — use one session per thread.
  * <p>
+ * Provides entity CRUD, schema helpers, map-based filtered selects, {@link EntityQuery} execution,
+ * custom {@link Query} reads, and lazy or eager association loading through
+ * {@link io.github.connellite.microorm.relation} wrappers.
+ * <p>
  * DML ({@code insert}, {@code update}, {@code delete}, {@code select}) throws {@link MicroOrmException}
  * on failure; DDL ({@code createEntity}, {@code syncEntity}, {@code dropEntity}) declares {@link SQLException}.
  */

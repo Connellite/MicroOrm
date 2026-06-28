@@ -4,7 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Criterion that combines child expressions with SQL {@code AND} or {@code OR}. */
+/**
+ * Criterion that combines child expressions with SQL {@code AND} or {@code OR}.
+ *
+ * @param operator logical operator between children
+ * @param criteria child expressions (at least two)
+ */
 public record CompositeCriterion(CompositeOperator operator, List<Criterion> criteria) implements Criterion {
 
     public CompositeCriterion {

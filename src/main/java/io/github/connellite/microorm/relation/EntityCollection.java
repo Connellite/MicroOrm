@@ -6,7 +6,11 @@ import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import java.util.List;
 
 /**
- * Base class for one-to-many relation wrappers.
+ * Base class for one-to-many relation wrappers declared on {@code @OneToMany} fields.
+ * <p>
+ * Concrete types are {@link LazyCollection} (loads children on first {@link #get()} while the owning
+ * {@link io.github.connellite.microorm.session.Session} is open) and {@link EagerCollection}
+ * (child rows materialized when the owner is hydrated).
  *
  * @param <T> child entity type
  */

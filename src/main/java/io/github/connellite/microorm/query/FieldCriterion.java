@@ -6,6 +6,12 @@ import java.util.Objects;
 
 /**
  * Predicate that compares one mapped entity field with a value, collection, or SQL {@code NULL}.
+ *
+ * @param fieldName mapped Java field name or physical column name
+ * @param kind predicate shape rendered to SQL
+ * @param operator comparison operator for {@link CriterionKind#COMPARISON}; {@code null} otherwise
+ * @param value scalar or pattern value; {@code null} for {@code IS NULL}, {@code IS NOT NULL}, and {@code IN}
+ * @param values collection values for {@link CriterionKind#IN}; empty otherwise
  */
 public record FieldCriterion(
         String fieldName,
