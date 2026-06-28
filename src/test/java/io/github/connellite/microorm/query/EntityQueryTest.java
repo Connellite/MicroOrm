@@ -65,11 +65,29 @@ class EntityQueryTest {
         assertEquals(
                 "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
                         + "entity_query_items.description FROM entity_query_items "
-                        + "WHERE (name IN (:p1, :p2) AND description IS NOT NULL AND NOT (enabled = :p3))",
+                        + "WHERE (name IN (:p1) AND description IS NOT NULL AND NOT (enabled = :p2))",
                 statement.sql());
-        assertEquals("a", statement.parameters().get("p1"));
-        assertEquals("b", statement.parameters().get("p2"));
-        assertEquals(false, statement.parameters().get("p3"));
+        assertEquals(List.of("a", "b"), statement.collectionParameters().get("p1"));
+        assertEquals(false, statement.parameters().get("p2"));
+    }
+
+    @Test
+    void rendersMultipleCollectionParameters() {
+        EntityQuery<Item> query = EntityQuery.of(Item.class)
+                .where(EntityQuery.field("name").in(List.of("a", "b"))
+                        .or(EntityQuery.field("description").in(List.of("first", "second"))))
+                .and(EntityQuery.field("enabled").eq(true));
+
+        BoundStatement statement = SqliteDialect.getInstance().sqlGenerator().select(model, query);
+
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE ((name IN (:p1) OR description IN (:p2)) AND enabled = :p3)",
+                statement.sql());
+        assertEquals(List.of("a", "b"), statement.collectionParameters().get("p1"));
+        assertEquals(List.of("first", "second"), statement.collectionParameters().get("p2"));
+        assertEquals(true, statement.parameters().get("p3"));
     }
 
     @Test

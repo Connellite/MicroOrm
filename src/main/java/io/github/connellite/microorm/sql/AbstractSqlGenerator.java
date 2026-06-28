@@ -18,6 +18,7 @@ import io.github.connellite.microorm.query.Order;
 import io.github.connellite.microorm.relation.EntityRef;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -282,10 +283,11 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
                     + " does not match model " + model.entityClass().getName());
         }
         Map<String, Object> params = new LinkedHashMap<>();
+        Map<String, Collection<?>> collectionParams = new LinkedHashMap<>();
         int[] paramCounter = {1};
         String sql = selectAllSql(model);
         if (query.criterion() != null) {
-            sql += " WHERE " + renderCriterion(model, query.criterion(), params, paramCounter);
+            sql += " WHERE " + renderCriterion(model, query.criterion(), params, collectionParams, paramCounter);
         }
         if (!query.orders().isEmpty()) {
             List<String> orderSql = new ArrayList<>();
@@ -299,7 +301,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
                 sql,
                 query.limit().isPresent() ? query.limit().getAsInt() : null,
                 query.offset().isPresent() ? query.offset().getAsInt() : null,
-                !query.orders().isEmpty()), params);
+                !query.orders().isEmpty()), params, collectionParams);
     }
 
     @Override
@@ -361,20 +363,21 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModel model,
             Criterion criterion,
             Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
         if (criterion instanceof FieldCriterion fieldCriterion) {
-            return renderFieldCriterion(model, fieldCriterion, params, paramCounter);
+            return renderFieldCriterion(model, fieldCriterion, params, collectionParams, paramCounter);
         }
         if (criterion instanceof CompositeCriterion composite) {
             String separator = " " + composite.operator().name() + " ";
             List<String> rendered = new ArrayList<>();
             for (Criterion child : composite.criteria()) {
-                rendered.add(renderCriterion(model, child, params, paramCounter));
+                rendered.add(renderCriterion(model, child, params, collectionParams, paramCounter));
             }
             return "(" + String.join(separator, rendered) + ")";
         }
         if (criterion instanceof NotCriterion notCriterion) {
-            return "NOT (" + renderCriterion(model, notCriterion.criterion(), params, paramCounter) + ")";
+            return "NOT (" + renderCriterion(model, notCriterion.criterion(), params, collectionParams, paramCounter) + ")";
         }
         throw new MicroOrmException("Unsupported criterion type: " + criterion.getClass().getName());
     }
@@ -383,12 +386,13 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityModel model,
             FieldCriterion criterion,
             Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
         EntityField field = fieldByName(model, criterion.fieldName());
         String column = dialect.sqlName(field.columnIdentifier());
         return switch (criterion.kind()) {
             case COMPARISON -> renderComparison(field, column, criterion, params, paramCounter);
-            case IN -> renderIn(field, column, criterion, params, paramCounter);
+            case IN -> renderIn(field, column, criterion, collectionParams, paramCounter);
             case LIKE -> {
                 String param = nextParam(paramCounter);
                 params.put(param, dialect.valueMapper().toJdbcValue(field, criterion.value()));
@@ -419,18 +423,18 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
             EntityField field,
             String column,
             FieldCriterion criterion,
-            Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
-        List<String> placeholders = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
         for (Object value : criterion.values()) {
             if (value == null) {
                 throw new MicroOrmException("IN criterion does not support null values for field: " + criterion.fieldName());
             }
-            String param = nextParam(paramCounter);
-            placeholders.add(":" + param);
-            params.put(param, dialect.valueMapper().toJdbcValue(field, value));
+            values.add(dialect.valueMapper().toJdbcValue(field, value));
         }
-        return column + " IN (" + String.join(", ", placeholders) + ")";
+        String param = nextParam(paramCounter);
+        collectionParams.put(param, values);
+        return column + " IN (:" + param + ")";
     }
 
     private static String nextParam(int[] paramCounter) {

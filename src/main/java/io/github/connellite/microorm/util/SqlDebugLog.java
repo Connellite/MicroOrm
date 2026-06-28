@@ -30,7 +30,7 @@ public final class SqlDebugLog {
         if (!LOG.isDebugEnabled()) {
             return;
         }
-        LOG.debug(() -> format(operation, statement.sql(), statement.parameters(), Map.of()));
+        LOG.debug(() -> format(operation, statement.sql(), statement.parameters(), statement.collectionParameters()));
     }
 
     /** Logs a custom {@link Query} under the given operation label. */

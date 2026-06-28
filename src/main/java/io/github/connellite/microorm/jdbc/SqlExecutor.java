@@ -305,12 +305,16 @@ public final class SqlExecutor {
     }
 
     private static NamedPreparedStatement prepare(Connection connection, BoundStatement stmt) throws SQLException {
-        return NamedQuery.of(stmt.sql()).setAll(stmt.parameters()).prepare(connection);
+        NamedQuery namedQuery = NamedQuery.of(stmt.sql()).setAll(stmt.parameters());
+        for (Map.Entry<String, Collection<?>> entry : stmt.collectionParameters().entrySet()) {
+            namedQuery.setCollection(entry.getKey(), entry.getValue());
+        }
+        return namedQuery.prepare(connection);
     }
 
     private static NamedPreparedStatement prepare(Connection connection, Query query) throws SQLException {
         NamedQuery namedQuery = NamedQuery.of(query.sql()).setAll(query.parameters());
-        for (Map.Entry<String, java.util.Collection<?>> entry : query.collectionParameters().entrySet()) {
+        for (Map.Entry<String, Collection<?>> entry : query.collectionParameters().entrySet()) {
             namedQuery.setCollection(entry.getKey(), entry.getValue());
         }
         return namedQuery.prepare(connection);
