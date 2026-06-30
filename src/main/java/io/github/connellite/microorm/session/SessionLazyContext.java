@@ -9,6 +9,8 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.sql.SqlGenerator;
+import io.github.connellite.microorm.util.Logger;
+import io.github.connellite.microorm.util.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -52,6 +54,7 @@ final class SessionLazyContext implements LazyLoadContext {
     @Override
     public <T> T loadById(Class<T> type, Object id) {
         ensureOpen();
+        LogHolder.logger.trace(() -> "Lazy loading " + type.getName() + " by id " + id);
         return session.selectRow(type, id, this);
     }
 
@@ -59,6 +62,8 @@ final class SessionLazyContext implements LazyLoadContext {
     @SuppressWarnings("unchecked")
     public <T> List<T> loadCollection(OneToManyField relation, Object ownerId) {
         ensureOpen();
+        LogHolder.logger.trace(() -> "Lazy loading collection " + relation.javaField().getName()
+                + " for owner id " + ownerId);
         EntityModel childModel = registry.get(relation.targetEntityClass());
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
         EntityModel ownerModel = registry.get(inverse.targetEntityClass());
@@ -73,5 +78,9 @@ final class SessionLazyContext implements LazyLoadContext {
                 registry)) {
             return (List<T>) rows.toList();
         }
+    }
+
+    private static class LogHolder {
+        private static final Logger logger = LoggerFactory.getLogger(SessionLazyContext.class);
     }
 }

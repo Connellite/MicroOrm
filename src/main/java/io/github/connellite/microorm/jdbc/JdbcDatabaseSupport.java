@@ -2,6 +2,8 @@ package io.github.connellite.microorm.jdbc;
 
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.util.Logger;
+import io.github.connellite.microorm.util.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -42,7 +44,12 @@ final class JdbcDatabaseSupport {
             String product = connection.getMetaData().getDatabaseProductName();
             return product == null ? null : product.toLowerCase(Locale.ROOT);
         } catch (SQLException e) {
+            LogHolder.logger.error(() -> "Unable to read JDBC database product name", e);
             return null;
         }
+    }
+
+    private static class LogHolder {
+        private static final Logger logger = LoggerFactory.getLogger(JdbcDatabaseSupport.class);
     }
 }

@@ -14,7 +14,8 @@ import io.github.connellite.microorm.dynamic.DynamicValueBinder;
 import io.github.connellite.microorm.dynamic.MapRowMapper;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
-import io.github.connellite.microorm.util.SqlDebugLog;
+import io.github.connellite.microorm.util.Logger;
+import io.github.connellite.microorm.util.LoggerFactory;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
 import java.sql.Connection;
@@ -23,6 +24,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -33,7 +35,7 @@ public final class SqlExecutor {
     }
 
     public static int executeUpdate(Connection connection, BoundStatement stmt) {
-        SqlDebugLog.boundStatement("update", stmt);
+        LogHolder.logger.debug(() -> formatSql("update", stmt));
         try (NamedPreparedStatement nps = prepare(connection, stmt)) {
             return nps.executeUpdate();
         } catch (SQLException e) {
@@ -42,7 +44,7 @@ public final class SqlExecutor {
     }
 
     public static int executeUpdate(Connection connection, Query query) {
-        SqlDebugLog.query("update", query);
+        LogHolder.logger.debug(() -> formatSql("update", query));
         try (NamedPreparedStatement nps = prepare(connection, query)) {
             return nps.executeUpdate();
         } catch (SQLException e) {
@@ -51,7 +53,7 @@ public final class SqlExecutor {
     }
 
     public static boolean queryExists(Connection connection, BoundStatement stmt) {
-        SqlDebugLog.boundStatement("exists", stmt);
+        LogHolder.logger.debug(() -> formatSql("exists", stmt));
         try (NamedPreparedStatement nps = prepare(connection, stmt);
              ResultSet rs = nps.executeQuery()) {
             return rs.next();
@@ -64,7 +66,7 @@ public final class SqlExecutor {
      * Insert and apply generated keys to {@code entity} when the statement requests generated keys.
      */
     public static int executeInsertReturning(Connection connection, BoundStatement stmt, EntityModel model, Object entity) {
-        SqlDebugLog.boundStatement("insert", stmt);
+        LogHolder.logger.debug(() -> formatSql("insert", stmt));
         try (NamedPreparedStatement nps = prepareInsertReturning(connection, stmt.sql(), model)) {
             nps.setAll(stmt.parameters());
             int n = nps.executeUpdate();
@@ -92,7 +94,7 @@ public final class SqlExecutor {
         if (rows == null || rows.isEmpty()) {
             return 0;
         }
-        SqlDebugLog.batch("batch insert", sql, rows.size());
+        LogHolder.logger.debug(() -> "batch insert (" + rows.size() + " rows): " + sql);
         if (model.primaryKey().autoIncrement()
                 && (!JdbcDatabaseSupport.supportsBatchGeneratedKeys(connection)
                 || JdbcDatabaseSupport.isSqlite(connection))) {
@@ -125,7 +127,7 @@ public final class SqlExecutor {
             EntityModel model,
             List<?> entities) {
         int total = 0;
-        SqlDebugLog.batch("sequential insert", sql, rows.size());
+        LogHolder.logger.debug(() -> "sequential insert (" + rows.size() + " rows): " + sql);
         for (int i = 0; i < rows.size(); i++) {
             try (NamedPreparedStatement nps = prepareInsertReturning(connection, sql, model)) {
                 nps.setAll(rows.get(i));
@@ -224,7 +226,7 @@ public final class SqlExecutor {
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
         try {
-            SqlDebugLog.boundStatement("select", stmt);
+            LogHolder.logger.debug(() -> formatSql("select", stmt));
             NamedPreparedStatement nps = prepare(connection, stmt);
             ResultSet rs = nps.executeQuery();
             return ResultSetEntityStream.stream(nps, rs, model, null, dialect, valueMapper, lazyContext, registry);
@@ -254,7 +256,7 @@ public final class SqlExecutor {
             LazyLoadContext lazyContext,
             EntityModelRegistry registry) {
         try {
-            SqlDebugLog.query("select", query);
+            LogHolder.logger.debug(() -> formatSql("select", query));
             NamedPreparedStatement nps = prepare(connection, query);
             ResultSet rs = nps.executeQuery();
             Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);
@@ -283,7 +285,7 @@ public final class SqlExecutor {
             DynamicTable table,
             Dialect dialect,
             DynamicValueBinder binder) {
-        SqlDebugLog.boundStatement("dynamic-select", stmt);
+        LogHolder.logger.debug(() -> formatSql("dynamic-select", stmt));
         try (NamedPreparedStatement nps = prepare(connection, stmt);
              ResultSet rs = nps.executeQuery()) {
             List<Map<String, Object>> rows = new ArrayList<>();
@@ -318,5 +320,30 @@ public final class SqlExecutor {
             namedQuery.setCollection(entry.getKey(), entry.getValue());
         }
         return namedQuery.prepare(connection);
+    }
+
+    private static String formatSql(String operation, BoundStatement stmt) {
+        return formatSql(operation, stmt.sql(), stmt.parameters(), stmt.collectionParameters());
+    }
+
+    private static String formatSql(String operation, Query query) {
+        return formatSql(operation, query.sql(), query.parameters(), query.collectionParameters());
+    }
+
+    private static String formatSql(
+            String operation,
+            String sql,
+            Map<String, Object> parameters,
+            Map<String, Collection<?>> collectionParameters) {
+        Map<String, Object> merged = new LinkedHashMap<>(parameters);
+        merged.putAll(collectionParameters);
+        if (merged.isEmpty()) {
+            return operation + ": " + sql;
+        }
+        return operation + ": " + sql + " | params=" + merged;
+    }
+
+    private static class LogHolder {
+        private static final Logger logger = LoggerFactory.getLogger(SqlExecutor.class);
     }
 }

@@ -4,7 +4,8 @@ import io.github.connellite.collections.CaseInsensitiveHashMap;
 import io.github.connellite.collections.DelegatingNullSkippingMap;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
-import io.github.connellite.microorm.util.SqlDebugLog;
+import io.github.connellite.microorm.util.Logger;
+import io.github.connellite.microorm.util.LoggerFactory;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;
@@ -139,6 +140,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             }
         }
         if (columns.isEmpty()) {
+            LogHolder.logger.trace(() -> "No columns found for table " + table + ", retrying with uppercase name");
             try (ResultSet rs = connection.getMetaData().getColumns(catalog, schema, table.toUpperCase(Locale.ROOT), null)) {
                 while (rs.next()) {
                     columns.add(rs.getString("COLUMN_NAME"));
@@ -163,7 +165,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     }
 
     private static void executeSql(Statement statement, String sql) throws SQLException {
-        SqlDebugLog.sql("schema", sql);
+        LogHolder.logger.debug(() -> "schema: " + sql);
         statement.execute(sql);
     }
 
@@ -175,6 +177,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         if (findIndex(connection, catalog, schema, table, indexName)) {
             return true;
         }
+        LogHolder.logger.trace(() -> "Index not found for table " + table + ", retrying with uppercase name");
         return findIndex(connection, catalog, schema, table.toUpperCase(Locale.ROOT), indexName);
     }
 
@@ -242,4 +245,8 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     }
 
     protected abstract String autoIncrementPrimaryKeyDefinition(EntityField field);
+
+    private static class LogHolder {
+        private static final Logger logger = LoggerFactory.getLogger(AbstractSchemaManager.class);
+    }
 }

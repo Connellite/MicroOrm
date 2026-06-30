@@ -1,6 +1,5 @@
 package io.github.connellite.microorm.util;
 
-import java.lang.reflect.Method;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 
@@ -25,7 +24,9 @@ public final class LoggerFactory {
     private LoggerFactory() {
     }
 
-    /** Creates a {@link Logger} for the given class (SLF4J when on the classpath, otherwise JUL). */
+    /**
+     * Creates a {@link Logger} for the given class (SLF4J when on the classpath, otherwise JUL).
+     */
     public static Logger getLogger(Class<?> hostClass) {
         if (USE_SLF4J) {
             return new Slf4jLogger(hostClass);
@@ -36,7 +37,7 @@ public final class LoggerFactory {
     private record JdkLogger(java.util.logging.Logger logger) implements Logger {
 
         private JdkLogger(Class<?> logger) {
-            this(java.util.logging.Logger.getLogger(logger.getName()));
+            this(java.util.logging.Logger.getLogger(logger.getCanonicalName()));
         }
 
         @Override
@@ -80,93 +81,49 @@ public final class LoggerFactory {
         }
     }
 
-    private static final class Slf4jLogger implements Logger {
+    private record Slf4jLogger(org.slf4j.Logger logger) implements Logger {
 
-        private final Object logger;
-        private final Method isDebugEnabled;
-        private final Method isTraceEnabled;
-        private final Method isInfoEnabled;
-        private final Method isWarnEnabled;
-        private final Method isErrorEnabled;
-        private final Method debug;
-        private final Method trace;
-        private final Method info;
-        private final Method warn;
-        private final Method error;
-
-        private Slf4jLogger(Class<?> hostClass) {
-            try {
-                Class<?> loggerClass = Class.forName("org.slf4j.Logger");
-                Class<?> factoryClass = Class.forName("org.slf4j.LoggerFactory");
-                logger = factoryClass.getMethod("getLogger", Class.class).invoke(null, hostClass);
-                isDebugEnabled = loggerClass.getMethod("isDebugEnabled");
-                isTraceEnabled = loggerClass.getMethod("isTraceEnabled");
-                isInfoEnabled = loggerClass.getMethod("isInfoEnabled");
-                isWarnEnabled = loggerClass.getMethod("isWarnEnabled");
-                isErrorEnabled = loggerClass.getMethod("isErrorEnabled");
-                debug = loggerClass.getMethod("debug", String.class);
-                trace = loggerClass.getMethod("trace", String.class);
-                info = loggerClass.getMethod("info", String.class);
-                warn = loggerClass.getMethod("warn", String.class);
-                error = loggerClass.getMethod("error", String.class, Throwable.class);
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("SLF4J is present but LoggerFactory could not be used", e);
-            }
+        private Slf4jLogger(Class<?> logger) {
+            this(org.slf4j.LoggerFactory.getLogger(logger));
         }
 
         @Override
         public boolean isDebugEnabled() {
-            return invokeBoolean(isDebugEnabled);
+            return logger.isDebugEnabled();
         }
 
         @Override
         public void debug(Supplier<String> message) {
-            if (isDebugEnabled()) {
-                invokeVoid(debug, message.get());
+            if (logger.isDebugEnabled()) {
+                logger.debug(message.get());
             }
         }
 
         @Override
         public void trace(Supplier<String> message) {
-            if (invokeBoolean(isTraceEnabled)) {
-                invokeVoid(trace, message.get());
+            if (logger.isTraceEnabled()) {
+                logger.trace(message.get());
             }
         }
 
         @Override
         public void info(Supplier<String> message) {
-            if (invokeBoolean(isInfoEnabled)) {
-                invokeVoid(info, message.get());
+            if (logger.isInfoEnabled()) {
+                logger.info(message.get());
             }
         }
 
         @Override
         public void warn(Supplier<String> message) {
-            if (invokeBoolean(isWarnEnabled)) {
-                invokeVoid(warn, message.get());
+            if (logger.isWarnEnabled()) {
+                logger.warn(message.get());
             }
         }
 
         @Override
         public void error(Supplier<String> message, Throwable throwable) {
-            if (invokeBoolean(isErrorEnabled)) {
-                invokeVoid(error, message.get(), throwable);
-            }
-        }
-
-        private boolean invokeBoolean(Method method) {
-            try {
-                return (boolean) method.invoke(logger);
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("SLF4J call failed: " + method.getName(), e);
-            }
-        }
-
-        private void invokeVoid(Method method, Object... args) {
-            try {
-                method.invoke(logger, args);
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("SLF4J call failed: " + method.getName(), e);
+            if (logger.isErrorEnabled()) {
+                logger.error(message.get(), throwable);
             }
         }
     }

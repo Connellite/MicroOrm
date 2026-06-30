@@ -6,7 +6,8 @@ import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.sql.SqlIdentifier;
-import io.github.connellite.microorm.util.SqlDebugLog;
+import io.github.connellite.microorm.util.Logger;
+import io.github.connellite.microorm.util.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -125,6 +126,7 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
             }
         }
         if (columns.isEmpty()) {
+            LogHolder.logger.trace(() -> "No columns found for table " + tableName + ", retrying with uppercase name");
             try (ResultSet rs = connection.getMetaData().getColumns(null, null, tableName.toUpperCase(Locale.ROOT), null)) {
                 while (rs.next()) {
                     columns.add(normalize(rs.getString("COLUMN_NAME")));
@@ -153,7 +155,9 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
         if (findIndex(connection, dialect.catalogName(table.tableIdentifier()), indexName)) {
             return true;
         }
-        return findIndex(connection, dialect.catalogName(table.tableIdentifier()).toUpperCase(Locale.ROOT), indexName);
+        String upperTable = dialect.catalogName(table.tableIdentifier()).toUpperCase(Locale.ROOT);
+        LogHolder.logger.trace(() -> "Index not found for table " + table.tableName() + ", retrying with uppercase name");
+        return findIndex(connection, upperTable, indexName);
     }
 
     protected String createIndexDdl(DynamicTable table, Column column) {
@@ -202,7 +206,11 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
     }
 
     private static void executeSql(Statement statement, String sql) throws SQLException {
-        SqlDebugLog.sql("dynamic-schema", sql);
+        LogHolder.logger.debug(() -> "dynamic-schema: " + sql);
         statement.execute(sql);
+    }
+
+    private static class LogHolder {
+        private static final Logger logger = LoggerFactory.getLogger(AbstractDynamicSchemaManager.class);
     }
 }

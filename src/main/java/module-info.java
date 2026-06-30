@@ -4,6 +4,7 @@
 module io.github.connellite.microorm {
     requires io.github.connellite.ExtraLib;
     requires java.sql;
+    requires static org.slf4j;
 
     exports io.github.connellite.microorm;
     exports io.github.connellite.microorm.annotation;
