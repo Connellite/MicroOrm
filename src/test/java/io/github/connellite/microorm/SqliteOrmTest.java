@@ -381,6 +381,26 @@ class SqliteOrmTest {
     }
 
     @Test
+    void rejectsSecondActiveStreamOnSameSession() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
+            try (Session s = orm.openSession()) {
+                s.dropEntity(Widget.class);
+                s.createEntity(Widget.class);
+                s.insertRows(List.of(newWidget("a"), newWidget("b")));
+
+                try (var first = s.streamRows(Widget.class)) {
+                    assertThrows(MicroOrmException.class, () -> s.streamRows(Widget.class));
+                }
+
+                try (var second = s.streamRows(Widget.class)) {
+                    assertEquals(2, second.count());
+                }
+            }
+        }
+    }
+
+    @Test
     void repeatedCreateEntityPreservesExistingData() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);

@@ -359,6 +359,10 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         return sql;
     }
 
+    protected boolean supportsJoinType(JoinType joinType) {
+        return true;
+    }
+
     protected final Dialect dialect() {
         return dialect;
     }
@@ -480,6 +484,10 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         boolean hasOneToManyJoin = false;
         int index = 1;
         for (Join join : query.joins()) {
+            if (!supportsJoinType(join.type())) {
+                throw new MicroOrmException(
+                        join.type() + " join is not supported by " + dialect.getClass().getSimpleName());
+            }
             if (bindings.containsKey(join.relationName())) {
                 throw new MicroOrmException("Duplicate join for relation '" + join.relationName()
                         + "' on " + model.entityClass().getName());

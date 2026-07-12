@@ -6,7 +6,9 @@ import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.dialect.MssqlDialect;
+import io.github.connellite.microorm.dialect.MysqlDialect;
 import io.github.connellite.microorm.dialect.OracleDialect;
+import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModel;
@@ -197,21 +199,23 @@ class EntityQueryTest {
     }
 
     @Test
-    void rendersRightFullAndCrossJoins() {
-        assertTrue(SqliteDialect.getInstance().sqlGenerator()
-                .select(orderModel, EntityQuery.of(OrderEntity.class).rightJoin("customer"), registry)
-                .sql()
-                .contains("RIGHT JOIN entity_query_customers j1 ON entity_query_orders.customer_id = j1.id"));
-
-        assertTrue(SqliteDialect.getInstance().sqlGenerator()
-                .select(orderModel, EntityQuery.of(OrderEntity.class).fullJoin("lines"), registry)
-                .sql()
-                .contains("FULL JOIN entity_query_lines j1 ON entity_query_orders.id = j1.order_id"));
-
+    void rendersSupportedDialectJoinsAndRejectsUnsupportedJoins() {
         assertTrue(SqliteDialect.getInstance().sqlGenerator()
                 .select(orderModel, EntityQuery.of(OrderEntity.class).crossJoin("customer"), registry)
                 .sql()
                 .contains("CROSS JOIN entity_query_customers j1"));
+
+        assertThrows(MicroOrmException.class, () -> SqliteDialect.getInstance().sqlGenerator()
+                .select(orderModel, EntityQuery.of(OrderEntity.class).rightJoin("customer"), registry));
+        assertThrows(MicroOrmException.class, () -> SqliteDialect.getInstance().sqlGenerator()
+                .select(orderModel, EntityQuery.of(OrderEntity.class).fullJoin("lines"), registry));
+        assertThrows(MicroOrmException.class, () -> MysqlDialect.getInstance().sqlGenerator()
+                .select(orderModel, EntityQuery.of(OrderEntity.class).fullJoin("lines"), registry));
+
+        assertTrue(MysqlDialect.getInstance().sqlGenerator()
+                .select(orderModel, EntityQuery.of(OrderEntity.class).rightJoin("customer"), registry)
+                .sql()
+                .contains("RIGHT JOIN entity_query_customers j1 ON entity_query_orders.customer_id = j1.id"));
     }
 
     @Test
@@ -233,6 +237,14 @@ class EntityQueryTest {
         EntityQuery<Item> mssqlOffset = EntityQuery.of(Item.class).offset(2);
         assertTrue(MssqlDialect.getInstance().sqlGenerator().select(model, mssqlOffset).sql()
                 .endsWith("ORDER BY (SELECT 1) OFFSET 2 ROWS"));
+
+        EntityQuery<Item> postgresOffset = EntityQuery.of(Item.class).offset(2);
+        assertTrue(PostgresDialect.getInstance().sqlGenerator().select(model, postgresOffset).sql()
+                .endsWith("OFFSET 2"));
+
+        EntityQuery<Item> mysqlOffset = EntityQuery.of(Item.class).offset(2);
+        assertTrue(MysqlDialect.getInstance().sqlGenerator().select(model, mysqlOffset).sql()
+                .endsWith("LIMIT 18446744073709551615 OFFSET 2"));
 
         EntityQuery<Item> oraclePaged = EntityQuery.of(Item.class)
                 .orderBy(EntityQuery.field("id").asc())

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -45,6 +46,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     private final SqlGenerator sql;
     private final Dialect dialect;
     private SessionLazyContext lazyContext;
+    private boolean activeStream;
 
     /** Internal constructor — use {@link io.github.connellite.microorm.MicroOrm#openSession()}. */
     public Session(
@@ -262,10 +264,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
      * Prefer {@link #selectRows(Class)} when the full result fits in memory.
      */
     public <T> Stream<T> streamRows(Class<T> type) {
-        EntityModel m = registry.get(type);
-        SessionLazyContext context = lazyLoadContext();
-        return SqlExecutor.queryEntitiesStream(
-                connection, sql.selectAll(m), m, dialect, dialect.valueMapper(), context, registry);
+        return openStream(() -> {
+            EntityModel m = registry.get(type);
+            SessionLazyContext context = lazyLoadContext();
+            return SqlExecutor.queryEntitiesStream(
+                    connection, sql.selectAll(m), m, dialect, dialect.valueMapper(), context, registry);
+        });
     }
 
     /** Materializes filtered rows; closes the underlying JDBC resources. */
@@ -277,10 +281,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     /** Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
     public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
-        EntityModel m = registry.get(type);
-        SessionLazyContext context = lazyLoadContext();
-        return SqlExecutor.queryEntitiesStream(
-                connection, sql.selectWhere(m, filters), m, dialect, dialect.valueMapper(), context, registry);
+        return openStream(() -> {
+            EntityModel m = registry.get(type);
+            SessionLazyContext context = lazyLoadContext();
+            return SqlExecutor.queryEntitiesStream(
+                    connection, sql.selectWhere(m, filters), m, dialect, dialect.valueMapper(), context, registry);
+        });
     }
 
     /** Materializes rows matching an {@link EntityQuery}; closes the underlying JDBC resources. */
@@ -295,10 +301,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
      */
     public <T> Stream<T> streamRows(EntityQuery<T> query) {
         Objects.requireNonNull(query, "query cannot be null");
-        EntityModel m = registry.get(query.entityType());
-        SessionLazyContext context = lazyLoadContext();
-        return SqlExecutor.queryEntitiesStream(
-                connection, sql.select(m, query, registry), m, dialect, dialect.valueMapper(), context, registry);
+        return openStream(() -> {
+            EntityModel m = registry.get(query.entityType());
+            SessionLazyContext context = lazyLoadContext();
+            return SqlExecutor.queryEntitiesStream(
+                    connection, sql.select(m, query, registry), m, dialect, dialect.valueMapper(), context, registry);
+        });
     }
 
     /** Materializes custom-query rows; closes the underlying JDBC resources. */
@@ -310,10 +318,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     /** Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
-        EntityModel m = registry.get(type);
-        SessionLazyContext context = lazyLoadContext();
-        return SqlExecutor.queryEntitiesStream(
-                connection, query, m, dialect, dialect.valueMapper(), context, registry);
+        return openStream(() -> {
+            EntityModel m = registry.get(type);
+            SessionLazyContext context = lazyLoadContext();
+            return SqlExecutor.queryEntitiesStream(
+                    connection, query, m, dialect, dialect.valueMapper(), context, registry);
+        });
     }
 
     /**
@@ -331,6 +341,19 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             lazyContext = new SessionLazyContext(this, connection, registry, dialect);
         }
         return lazyContext;
+    }
+
+    private <T> Stream<T> openStream(Supplier<Stream<T>> streamFactory) {
+        if (activeStream) {
+            throw new MicroOrmException("Session already has an active stream; close it before opening another stream");
+        }
+        activeStream = true;
+        try {
+            return streamFactory.get().onClose(() -> activeStream = false);
+        } catch (RuntimeException e) {
+            activeStream = false;
+            throw e;
+        }
     }
 
     @Override
