@@ -2,7 +2,7 @@
 
 Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https://github.com/connellite/ExtraLib).
 
-**Status:** alpha (`1.0.0-alpha.1`) — core CRUD, relations, and multi-database support are stable; API may still evolve.
+**Status:** alpha  — core CRUD, relations, and multi-database support are stable; API may still evolve.
 
 ## Features
 
@@ -144,6 +144,42 @@ See `io.github.connellite.microorm.dynamic` in the Javadoc for details.
 - Java 17+
 - JDBC driver for your database
 - Maven dependency on `io.github.connellite:ExtraLib:1.4`
+
+## Install from JitPack
+
+MicroOrm can be consumed from [JitPack](https://jitpack.io/) by adding the JitPack repository and depending on a Git tag, commit hash, or branch snapshot.
+
+Maven:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>com.github.connellite</groupId>
+        <artifactId>MicroOrm</artifactId>
+        <version>1.0.0-alpha.2</version>
+    </dependency>
+</dependencies>
+```
+
+Gradle:
+
+```groovy
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.connellite:MicroOrm:1.0.0-alpha.2'
+}
+```
 
 ## Build and test
 
