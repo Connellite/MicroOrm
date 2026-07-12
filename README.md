@@ -131,9 +131,9 @@ DynamicTable docs = DynamicTable.builder("docs")
 
 orm.dynamicRegistry().register(docs);
 orm.withDynamicSession(session -> {
-    session.createTable(docs);
-    session.insertRow(docs, Map.of("id", UUID.randomUUID(), "name", "alpha"));
-    return session.selectRows(docs, Map.of("name", "alpha"));
+    session.createTable("docs");
+    session.insert("docs", Map.of("id", UUID.randomUUID(), "name", "alpha"));
+    return session.select("docs", Map.of("name", "alpha"));
 });
 ```
 

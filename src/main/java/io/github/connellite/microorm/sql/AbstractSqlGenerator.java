@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public abstract class AbstractSqlGenerator implements SqlGenerator {
+public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlGenerator {
 
     private final Dialect dialect;
 
@@ -73,9 +73,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
                 + String.join(", ", colQuoted) + ") VALUES (" + String.join(", ", slots) + ")";
     }
 
-    public record RelationInsertParts(String sql, Map<String, Object> parameters) {
-    }
-
+    @Override
     public RelationInsertParts buildRelationInsert(
             EntityModel model,
             Object entity,
@@ -118,11 +116,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         return update(model, entity, null, null);
     }
 
+    @Override
     public BoundStatement update(
             EntityModel model,
             Object entity,
             EntityModelRegistry registry,
-            List<io.github.connellite.microorm.mapping.RelationPersister.DeferredFkUpdate> deferred) {
+            List<RelationPersister.DeferredFkUpdate> deferred) {
         EntityField pk = model.primaryKey();
         Map<String, Object> params = new LinkedHashMap<>();
         List<String> sets = new ArrayList<>();
@@ -149,6 +148,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator {
         return BoundStatement.of(sql, params);
     }
 
+    @Override
     public BoundStatement updateJoinColumn(
             EntityModel model,
             Object entity,

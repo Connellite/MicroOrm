@@ -14,7 +14,7 @@ import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
-import io.github.connellite.microorm.sql.AbstractSqlGenerator;
+import io.github.connellite.microorm.sql.RelationSqlGenerator;
 import io.github.connellite.microorm.connection.ConnectionProvider;
 import io.github.connellite.microorm.connection.SpringJdbcSupport;
 
@@ -385,9 +385,8 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     public void insertEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
-        AbstractSqlGenerator generator = (AbstractSqlGenerator) sql;
-        AbstractSqlGenerator.RelationInsertParts parts =
-                generator.buildRelationInsert(model, entity, omitPk, registry, deferred);
+        RelationSqlGenerator.RelationInsertParts parts =
+                relationSql().buildRelationInsert(model, entity, omitPk, registry, deferred);
         BoundStatement bs = BoundStatement.of(parts.sql(), parts.parameters());
         SqlExecutor.executeInsertReturning(connection, bs, model, entity);
     }
@@ -400,14 +399,20 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     @Override
     public int updateEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
         EntityHydrator.requirePkSet(entity, model.primaryKey());
-        AbstractSqlGenerator generator = (AbstractSqlGenerator) sql;
-        return SqlExecutor.executeUpdate(connection, generator.update(model, entity, registry, deferred));
+        return SqlExecutor.executeUpdate(connection, relationSql().update(model, entity, registry, deferred));
     }
 
     @Override
     public void updateJoinColumn(Object entity, EntityModel model, ManyToOneField relation) {
-        AbstractSqlGenerator generator = (AbstractSqlGenerator) sql;
-        SqlExecutor.executeUpdate(connection, generator.updateJoinColumn(model, entity, relation, registry));
+        SqlExecutor.executeUpdate(connection, relationSql().updateJoinColumn(model, entity, relation, registry));
+    }
+
+    private RelationSqlGenerator relationSql() {
+        if (sql instanceof RelationSqlGenerator relationSql) {
+            return relationSql;
+        }
+        throw new MicroOrmException(
+                "SqlGenerator " + sql.getClass().getName() + " does not support relation persistence");
     }
 
     @Override
@@ -436,6 +441,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
         EntityModel ownerModel = registry.get(inverse.targetEntityClass());
         Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
+        Set<Object> normalizedRetainedChildPks = retainedChildPks.stream()
+                .map(pk -> normalizePk(childModel, pk))
+                .collect(java.util.stream.Collectors.toSet());
         try (Stream<?> rows = SqlExecutor.queryEntitiesStream(
                 connection,
                 sql.selectByJoinColumn(childModel, inverse.joinColumn(), jdbcOwnerPk),
@@ -445,12 +453,21 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 lazyLoadContext(),
                 registry)) {
             rows.forEach(existing -> {
-                Object childPk = EntityHydrator.getFieldValue(existing, childModel.primaryKey());
-                if (!retainedChildPks.contains(childPk)) {
+                Object childPk = normalizePk(childModel, EntityHydrator.getFieldValue(existing, childModel.primaryKey()));
+                if (!normalizedRetainedChildPks.contains(childPk)) {
                     deleteEntityRow(existing, childModel);
                 }
             });
         }
+    }
+
+    private Object normalizePk(EntityModel model, Object value) {
+        if (value == null) {
+            return null;
+        }
+        EntityField pk = model.primaryKey();
+        Object jdbcValue = dialect.valueMapper().toJdbcValue(pk, value);
+        return dialect.valueMapper().fromJdbcValue(pk, jdbcValue);
     }
 
     /**
