@@ -4,6 +4,7 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
+import io.github.connellite.microorm.type.UuidStorage;
 
 /** PostgreSQL DDL for runtime tables. */
 public final class PostgresDynamicSchemaManager extends AbstractDynamicSchemaManager {
@@ -25,12 +26,23 @@ public final class PostgresDynamicSchemaManager extends AbstractDynamicSchemaMan
             case INT -> "INTEGER";
             case LONG -> "BIGINT";
             case BOOL -> "BOOLEAN";
-            case UUID -> "UUID";
+            case UUID -> uuidType();
             case DECIMAL -> "NUMERIC(19,4)";
             case DOUBLE -> "DOUBLE PRECISION";
             case DATETIME -> "TIMESTAMP";
             case DATE -> "DATE";
         };
+    }
+
+    private String uuidType() {
+        UuidStorage storage = dialect.valueMapper().uuidStorage();
+        if (storage == UuidStorage.BINARY || storage == UuidStorage.MICROSOFT_GUID) {
+            return "BYTEA";
+        }
+        if (storage == UuidStorage.STRING) {
+            return "TEXT";
+        }
+        return "UUID";
     }
 
     @Override

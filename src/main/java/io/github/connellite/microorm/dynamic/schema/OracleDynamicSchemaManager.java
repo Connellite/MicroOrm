@@ -5,6 +5,7 @@ import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -56,12 +57,16 @@ public final class OracleDynamicSchemaManager extends AbstractDynamicSchemaManag
             case INT -> "NUMBER(10)";
             case LONG -> "NUMBER(19)";
             case BOOL -> "NUMBER(1)";
-            case UUID -> "RAW(16)";
+            case UUID -> uuidType();
             case DECIMAL -> "NUMBER(19,4)";
             case DOUBLE -> "BINARY_DOUBLE";
             case DATETIME -> "TIMESTAMP";
             case DATE -> "DATE";
         };
+    }
+
+    private String uuidType() {
+        return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "VARCHAR2(36)" : "RAW(16)";
     }
 
     @Override

@@ -3,6 +3,7 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.util.UUID;
 
@@ -33,7 +34,7 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
             return "VARCHAR(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
-            return "BINARY(16)";
+            return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
         }
         throw new IllegalArgumentException("Unsupported field type for MySQL DDL: " + t.getName());
     }

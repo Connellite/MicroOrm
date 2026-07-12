@@ -5,6 +5,7 @@ import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -52,11 +53,17 @@ public final class SqliteDynamicSchemaManager extends AbstractDynamicSchemaManag
     @Override
     protected String baseTypeForLogical(LogicalType type, int length) {
         return switch (type) {
-            case STRING, TEXT, UUID -> "TEXT";
+            case STRING, TEXT -> "TEXT";
+            case UUID -> uuidType();
             case INT, LONG, BOOL -> "INTEGER";
             case DECIMAL, DOUBLE -> "REAL";
             case DATETIME, DATE -> "TEXT";
         };
+    }
+
+    private String uuidType() {
+        UuidStorage storage = dialect.valueMapper().uuidStorage();
+        return storage == UuidStorage.BINARY || storage == UuidStorage.MICROSOFT_GUID ? "BLOB" : "TEXT";
     }
 
     @Override

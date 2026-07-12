@@ -2,8 +2,8 @@ package io.github.connellite.microorm.dynamic.schema;
 
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.Column;
-import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
+import io.github.connellite.microorm.type.UuidStorage;
 
 /** Microsoft SQL Server DDL for runtime tables. */
 public final class MssqlDynamicSchemaManager extends AbstractDynamicSchemaManager {
@@ -20,12 +20,23 @@ public final class MssqlDynamicSchemaManager extends AbstractDynamicSchemaManage
             case INT -> "INT";
             case LONG -> "BIGINT";
             case BOOL -> "BIT";
-            case UUID -> "BINARY(16)";
+            case UUID -> uuidType();
             case DECIMAL -> "DECIMAL(19,4)";
             case DOUBLE -> "FLOAT";
             case DATETIME -> "DATETIME2";
             case DATE -> "DATE";
         };
+    }
+
+    private String uuidType() {
+        UuidStorage storage = dialect.valueMapper().uuidStorage();
+        if (storage == UuidStorage.MICROSOFT_GUID || storage == UuidStorage.NATIVE) {
+            return "UNIQUEIDENTIFIER";
+        }
+        if (storage == UuidStorage.STRING) {
+            return "NVARCHAR(36)";
+        }
+        return "BINARY(16)";
     }
 
     @Override

@@ -4,6 +4,7 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -50,8 +51,12 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
         if (t == double.class || t == Double.class || t == float.class || t == Float.class) {
             return "REAL";
         }
-        if (t == String.class || t == java.util.UUID.class) {
+        if (t == String.class) {
             return "TEXT";
+        }
+        if (t == java.util.UUID.class) {
+            UuidStorage storage = dialect.valueMapper().uuidStorage();
+            return storage == UuidStorage.BINARY || storage == UuidStorage.MICROSOFT_GUID ? "BLOB" : "TEXT";
         }
         throw new IllegalArgumentException("Unsupported field type for SQLite DDL: " + t.getName());
     }

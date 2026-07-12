@@ -4,6 +4,7 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
+import io.github.connellite.microorm.type.UuidStorage;
 
 /** MySQL / MariaDB DDL for runtime tables. */
 public final class MysqlDynamicSchemaManager extends AbstractDynamicSchemaManager {
@@ -25,12 +26,16 @@ public final class MysqlDynamicSchemaManager extends AbstractDynamicSchemaManage
             case INT -> "INT";
             case LONG -> "BIGINT";
             case BOOL -> "BOOLEAN";
-            case UUID -> "BINARY(16)";
+            case UUID -> uuidType();
             case DECIMAL -> "DECIMAL(19,4)";
             case DOUBLE -> "DOUBLE";
             case DATETIME -> "DATETIME";
             case DATE -> "DATE";
         };
+    }
+
+    private String uuidType() {
+        return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
     }
 
     @Override

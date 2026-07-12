@@ -2,6 +2,7 @@ package io.github.connellite.microorm.schema;
 
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.util.UUID;
 
@@ -32,6 +33,13 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
             return "NVARCHAR(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
+            UuidStorage storage = dialect.valueMapper().uuidStorage();
+            if (storage == UuidStorage.MICROSOFT_GUID || storage == UuidStorage.NATIVE) {
+                return "UNIQUEIDENTIFIER";
+            }
+            if (storage == UuidStorage.STRING) {
+                return "NVARCHAR(36)";
+            }
             return "BINARY(16)";
         }
         throw new IllegalArgumentException("Unsupported field type for MSSQL DDL: " + t.getName());

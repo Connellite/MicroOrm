@@ -21,6 +21,11 @@ public final class DefaultJdbcValueMapper implements JdbcValueMapper {
     }
 
     @Override
+    public UuidStorage uuidStorage() {
+        return uuidStorage;
+    }
+
+    @Override
     public Object toJdbcValue(EntityField field, Object value) {
         if (value == null) {
             return null;
@@ -30,6 +35,7 @@ public final class DefaultJdbcValueMapper implements JdbcValueMapper {
             return switch (uuidStorage) {
                 case NATIVE -> uuid;
                 case BINARY -> UuidUtil.uuid2binary(uuid);
+                case MICROSOFT_GUID -> UuidUtil.uuid2MicrosoftGuidBinary(uuid);
                 case STRING -> uuid.toString();
             };
         }
@@ -43,6 +49,9 @@ public final class DefaultJdbcValueMapper implements JdbcValueMapper {
         }
         if (field.javaType() == UUID.class && uuidStorage == UuidStorage.BINARY && value instanceof byte[] bytes) {
             return UuidUtil.binary2Uuid(bytes);
+        }
+        if (field.javaType() == UUID.class && uuidStorage == UuidStorage.MICROSOFT_GUID && value instanceof byte[] bytes) {
+            return UuidUtil.microsoftGuidBinary2Uuid(bytes);
         }
         return coerce(value, field.javaType(), field);
     }

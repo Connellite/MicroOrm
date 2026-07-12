@@ -26,4 +26,9 @@ public final class OracleJdbcValueMapper implements JdbcValueMapper {
         }
         return delegate.fromJdbcValue(field, value);
     }
+
+    @Override
+    public UuidStorage uuidStorage() {
+        return delegate.uuidStorage();
+    }
 }

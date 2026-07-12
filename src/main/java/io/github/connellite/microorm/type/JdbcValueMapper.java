@@ -14,4 +14,9 @@ public interface JdbcValueMapper {
 
     /** Converts a JDBC value read from a {@link java.sql.ResultSet} to the field's Java type. */
     Object fromJdbcValue(EntityField field, Object value);
+
+    /** UUID storage strategy expected by this mapper, or {@code null} when it is not declared. */
+    default UuidStorage uuidStorage() {
+        return null;
+    }
 }

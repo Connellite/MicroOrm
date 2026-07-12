@@ -3,6 +3,7 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.util.UUID;
 
@@ -33,6 +34,13 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
             return length > 0 ? "VARCHAR(" + length + ")" : "TEXT";
         }
         if (t == UUID.class) {
+            UuidStorage storage = dialect.valueMapper().uuidStorage();
+            if (storage == UuidStorage.BINARY || storage == UuidStorage.MICROSOFT_GUID) {
+                return "BYTEA";
+            }
+            if (storage == UuidStorage.STRING) {
+                return "TEXT";
+            }
             return "UUID";
         }
         throw new IllegalArgumentException("Unsupported field type for PostgreSQL DDL: " + t.getName());

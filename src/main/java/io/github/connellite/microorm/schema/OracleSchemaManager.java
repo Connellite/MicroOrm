@@ -4,6 +4,7 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.UuidStorage;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -104,7 +105,7 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
             return "VARCHAR2(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
-            return "RAW(16)";
+            return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "VARCHAR2(36)" : "RAW(16)";
         }
         throw new IllegalArgumentException("Unsupported field type for Oracle DDL: " + t.getName());
     }
