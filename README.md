@@ -163,7 +163,7 @@ Maven:
     <dependency>
         <groupId>com.github.connellite</groupId>
         <artifactId>MicroOrm</artifactId>
-        <version>1.0.0-alpha.2</version>
+        <version>1.0.0-alpha.3</version>
     </dependency>
 </dependencies>
 ```
