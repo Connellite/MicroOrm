@@ -105,7 +105,11 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
             return "VARCHAR2(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
-            return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "VARCHAR2(36)" : "RAW(16)";
+            UuidStorage storage = dialect.valueMapper().uuidStorage();
+            if (storage == UuidStorage.MICROSOFT_GUID) {
+                throw new IllegalArgumentException("MICROSOFT_GUID UUID storage is supported only by MSSQL DDL");
+            }
+            return storage == UuidStorage.STRING ? "VARCHAR2(36)" : "RAW(16)";
         }
         throw new IllegalArgumentException("Unsupported field type for Oracle DDL: " + t.getName());
     }

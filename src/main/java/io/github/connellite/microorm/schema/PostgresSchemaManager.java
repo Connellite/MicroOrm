@@ -35,7 +35,10 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
         }
         if (t == UUID.class) {
             UuidStorage storage = dialect.valueMapper().uuidStorage();
-            if (storage == UuidStorage.BINARY || storage == UuidStorage.MICROSOFT_GUID) {
+            if (storage == UuidStorage.MICROSOFT_GUID) {
+                throw new IllegalArgumentException("MICROSOFT_GUID UUID storage is supported only by MSSQL DDL");
+            }
+            if (storage == UuidStorage.BINARY) {
                 return "BYTEA";
             }
             if (storage == UuidStorage.STRING) {

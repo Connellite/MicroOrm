@@ -35,7 +35,11 @@ public final class MysqlDynamicSchemaManager extends AbstractDynamicSchemaManage
     }
 
     private String uuidType() {
-        return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
+        UuidStorage storage = dialect.valueMapper().uuidStorage();
+        if (storage == UuidStorage.MICROSOFT_GUID) {
+            throw new IllegalArgumentException("MICROSOFT_GUID UUID storage is supported only by MSSQL DDL");
+        }
+        return storage == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
     }
 
     @Override

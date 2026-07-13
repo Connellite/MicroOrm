@@ -34,7 +34,11 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
             return "VARCHAR(" + (length > 0 ? length : 255) + ")";
         }
         if (t == UUID.class) {
-            return dialect.valueMapper().uuidStorage() == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
+            UuidStorage storage = dialect.valueMapper().uuidStorage();
+            if (storage == UuidStorage.MICROSOFT_GUID) {
+                throw new IllegalArgumentException("MICROSOFT_GUID UUID storage is supported only by MSSQL DDL");
+            }
+            return storage == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
         }
         throw new IllegalArgumentException("Unsupported field type for MySQL DDL: " + t.getName());
     }

@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DynamicSchemaUuidStorageTest {
 
@@ -26,21 +27,24 @@ class DynamicSchemaUuidStorageTest {
     void sqliteUuidTypeFollowsUuidStorage() {
         assertEquals("TEXT", sqlite(UuidStorage.STRING).baseTypeForLogical(LogicalType.UUID, 0));
         assertEquals("BLOB", sqlite(UuidStorage.BINARY).baseTypeForLogical(LogicalType.UUID, 0));
-        assertEquals("BLOB", sqlite(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> sqlite(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
     }
 
     @Test
     void postgresUuidTypeFollowsUuidStorage() {
         assertEquals("UUID", postgres(UuidStorage.NATIVE).baseTypeForLogical(LogicalType.UUID, 0));
         assertEquals("BYTEA", postgres(UuidStorage.BINARY).baseTypeForLogical(LogicalType.UUID, 0));
-        assertEquals("BYTEA", postgres(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> postgres(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
         assertEquals("TEXT", postgres(UuidStorage.STRING).baseTypeForLogical(LogicalType.UUID, 0));
     }
 
     @Test
     void mysqlUuidTypeFollowsUuidStorage() {
         assertEquals("BINARY(16)", mysql(UuidStorage.BINARY).baseTypeForLogical(LogicalType.UUID, 0));
-        assertEquals("BINARY(16)", mysql(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> mysql(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
         assertEquals("CHAR(36)", mysql(UuidStorage.STRING).baseTypeForLogical(LogicalType.UUID, 0));
     }
 
@@ -55,7 +59,8 @@ class DynamicSchemaUuidStorageTest {
     @Test
     void oracleUuidTypeFollowsUuidStorage() {
         assertEquals("RAW(16)", oracle(UuidStorage.BINARY).baseTypeForLogical(LogicalType.UUID, 0));
-        assertEquals("RAW(16)", oracle(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> oracle(UuidStorage.MICROSOFT_GUID).baseTypeForLogical(LogicalType.UUID, 0));
         assertEquals("VARCHAR2(36)", oracle(UuidStorage.STRING).baseTypeForLogical(LogicalType.UUID, 0));
     }
 

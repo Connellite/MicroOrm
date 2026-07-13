@@ -63,7 +63,10 @@ public final class SqliteDynamicSchemaManager extends AbstractDynamicSchemaManag
 
     private String uuidType() {
         UuidStorage storage = dialect.valueMapper().uuidStorage();
-        return storage == UuidStorage.BINARY || storage == UuidStorage.MICROSOFT_GUID ? "BLOB" : "TEXT";
+        if (storage == UuidStorage.MICROSOFT_GUID) {
+            throw new IllegalArgumentException("MICROSOFT_GUID UUID storage is supported only by MSSQL DDL");
+        }
+        return storage == UuidStorage.BINARY ? "BLOB" : "TEXT";
     }
 
     @Override
