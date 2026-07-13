@@ -28,7 +28,7 @@ public final class MapRowMapper {
         Map<String, Object> row = new LinkedHashMap<>();
         for (Column column : table.columns()) {
             String label = dialect.jdbcColumnLabel(column.columnIdentifier());
-            Object value = rs.getObject(label);
+            Object value = binder.readJdbc(column, rs, label);
             if (value == null && rs.wasNull()) {
                 row.put(column.name(), null);
             } else {

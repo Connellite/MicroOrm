@@ -3,6 +3,8 @@ package io.github.connellite.microorm.dynamic;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Objects;
 
 /**
@@ -33,5 +35,10 @@ public final class DynamicValueBinder {
             return null;
         }
         return mapper.fromJdbcValue(ValueBinderFields.field(column.type()), value);
+    }
+
+    /** Reads a raw JDBC value for the column, allowing dialect mappers to normalize driver-specific objects. */
+    public Object readJdbc(Column column, ResultSet rs, String columnLabel) throws SQLException {
+        return mapper.readJdbcValue(ValueBinderFields.field(column.type()), rs, columnLabel);
     }
 }

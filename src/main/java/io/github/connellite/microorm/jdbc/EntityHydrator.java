@@ -100,7 +100,7 @@ public final class EntityHydrator {
             if (!hasColumn(availableColumns, dialect, f.columnIdentifier())) {
                 continue;
             }
-            Object raw = readColumn(rs, dialect, f.columnIdentifier());
+            Object raw = readColumn(rs, dialect, f.columnIdentifier(), f, valueMapper);
             if (raw == null || rs.wasNull()) {
                 setFieldValue(entity, f, null);
             } else {
@@ -127,11 +127,11 @@ public final class EntityHydrator {
             if (!hasColumn(availableColumns, dialect, relation.joinColumnIdentifier())) {
                 continue;
             }
-            Object raw = readColumn(rs, dialect, relation.joinColumnIdentifier());
+            EntityModel targetModel = registry.get(relation.targetEntityClass());
+            EntityField targetPk = targetModel.primaryKey();
+            Object raw = readColumn(rs, dialect, relation.joinColumnIdentifier(), targetPk, valueMapper);
             Object foreignKey = null;
             if (raw != null && !rs.wasNull()) {
-                EntityModel targetModel = registry.get(relation.targetEntityClass());
-                EntityField targetPk = targetModel.primaryKey();
                 foreignKey = coerceToTargetPk(raw, targetPk, valueMapper);
             }
             if (EagerRef.class.isAssignableFrom(relation.javaField().getType())) {
@@ -153,11 +153,17 @@ public final class EntityHydrator {
         }
     }
 
-    private static Object readColumn(ResultSet rs, Dialect dialect, SqlIdentifier identifier) throws SQLException {
-        if (dialect == null) {
-            return rs.getObject(identifier.text());
+    private static Object readColumn(
+            ResultSet rs,
+            Dialect dialect,
+            SqlIdentifier identifier,
+            EntityField field,
+            JdbcValueMapper valueMapper) throws SQLException {
+        String label = dialect == null ? identifier.text() : dialect.jdbcColumnLabel(identifier);
+        if (valueMapper == null) {
+            return rs.getObject(label);
         }
-        return rs.getObject(dialect.jdbcColumnLabel(identifier));
+        return valueMapper.readJdbcValue(field, rs, label);
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
