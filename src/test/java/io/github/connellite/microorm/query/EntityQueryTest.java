@@ -36,6 +36,33 @@ class EntityQueryTest {
         private boolean enabled;
 
         private String description;
+
+        public String getName() {
+            return name;
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+    }
+
+    static final class Item_ {
+        static final EntityQuery.Attribute<Item, String> NAME = EntityQuery.attribute("name");
+        static final EntityQuery.Attribute<Item, Boolean> ENABLED = EntityQuery.attribute("enabled");
+    }
+
+    static class AccessorNames {
+        public String getURL() {
+            return null;
+        }
+
+        public String getnMetaType() {
+            return null;
+        }
+
+        public String getNMetaType() {
+            return null;
+        }
     }
 
     @Entity(name = "schema_query_items", schema = "app")
@@ -111,6 +138,35 @@ class EntityQueryTest {
                 statement.sql());
         assertEquals("A%", statement.parameters().get("p1"));
         assertEquals(true, statement.parameters().get("p2"));
+    }
+
+    @Test
+    void createsFieldsFromGetterReferencesAndMetamodelAttributes() {
+        EntityQuery<Item> query = EntityQuery.of(Item.class)
+                .where(EntityQuery.field(Item::getName).eq("Ada"))
+                .and(EntityQuery.field(Item::isEnabled).eq(true))
+                .orderBy(EntityQuery.field(Item_.NAME).asc(), EntityQuery.field(Item_.ENABLED).desc());
+
+        BoundStatement statement = SqliteDialect.getInstance().sqlGenerator().select(model, query);
+
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE (entity_query_items.name = :p1 AND entity_query_items.enabled = :p2) "
+                        + "ORDER BY entity_query_items.name ASC, entity_query_items.enabled DESC",
+                statement.sql());
+        assertEquals("Ada", statement.parameters().get("p1"));
+        assertEquals(true, statement.parameters().get("p2"));
+    }
+
+    @Test
+    void getterFieldNamesFollowMyBatisPropertyNamerRules() {
+        assertEquals("URL", EntityQuery.field(AccessorNames::getURL).name());
+        assertEquals("nMetaType", EntityQuery.field(AccessorNames::getnMetaType).name());
+        assertEquals("NMetaType", EntityQuery.field(AccessorNames::getNMetaType).name());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> EntityQuery.field((EntityQuery.Getter<Item, String>) item -> item.getName()));
     }
 
     @Test
