@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.query;
 
 import io.github.connellite.collections.ConcurrentReferenceHashMap;
+import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.reflection.ReflectionUtil;
 
 import java.io.Serializable;
@@ -46,6 +47,7 @@ public final class EntityQuery<T> {
     private final List<Order> orders = new ArrayList<>();
     private Integer limit;
     private Integer offset;
+    private String projectionField;
     private static final ConcurrentMap<Class<?>, SerializedLambda> LAMBDA_CACHE = new ConcurrentReferenceHashMap<>(16, ConcurrentReferenceHashMap.ReferenceType.WEAK);
 
     private EntityQuery(Class<T> entityType) {
@@ -105,6 +107,26 @@ public final class EntityQuery<T> {
      */
     public static <T, R> Attribute<T, R> attribute(String name) {
         return new Attribute<>(name);
+    }
+
+    /** Creates an SQL {@code EXISTS (...)} criterion from a named-parameter subquery. */
+    public static Criterion exists(Query query) {
+        return ExistsCriterion.exists(query);
+    }
+
+    /** Creates an SQL {@code EXISTS (...)} criterion from an entity subquery. */
+    public static Criterion exists(EntityQuery<?> query) {
+        return ExistsCriterion.exists(query);
+    }
+
+    /** Creates an SQL {@code NOT EXISTS (...)} criterion from a named-parameter subquery. */
+    public static Criterion notExists(Query query) {
+        return ExistsCriterion.notExists(query);
+    }
+
+    /** Creates an SQL {@code NOT EXISTS (...)} criterion from an entity subquery. */
+    public static Criterion notExists(EntityQuery<?> query) {
+        return ExistsCriterion.notExists(query);
     }
 
     /**
@@ -167,6 +189,11 @@ public final class EntityQuery<T> {
         return offset == null ? OptionalInt.empty() : OptionalInt.of(offset);
     }
 
+    /** Optional single field projection used when this query is rendered as a scalar subquery. */
+    public String projectionField() {
+        return projectionField;
+    }
+
     /**
      * Replaces the current {@code WHERE} criterion.
      *
@@ -200,6 +227,34 @@ public final class EntityQuery<T> {
         Objects.requireNonNull(criterion, "criterion");
         this.criterion = this.criterion == null ? criterion : this.criterion.or(criterion);
         return this;
+    }
+
+    /**
+     * Selects one mapped field when this query is used as a scalar subquery, for example
+     * {@code field("id").eqAny(EntityQuery.of(Ref.class).select("itemId"))}.
+     */
+    public EntityQuery<T> select(String fieldName) {
+        this.projectionField = Objects.requireNonNull(fieldName, "fieldName");
+        if (fieldName.isBlank()) {
+            throw new IllegalArgumentException("fieldName cannot be blank");
+        }
+        return this;
+    }
+
+    /** Selects one mapped field when this query is used as a scalar subquery. */
+    public EntityQuery<T> select(FieldPath field) {
+        Objects.requireNonNull(field, "field");
+        return select(field.name());
+    }
+
+    /** Selects one mapped field when this query is used as a scalar subquery. */
+    public <R> EntityQuery<T> select(Getter<T, R> getter) {
+        return select(field(getter));
+    }
+
+    /** Selects one mapped field when this query is used as a scalar subquery. */
+    public EntityQuery<T> select(Attribute<T, ?> attribute) {
+        return select(field(attribute));
     }
 
     /**

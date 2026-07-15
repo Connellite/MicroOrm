@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -376,6 +377,49 @@ class SqliteOrmTest {
                 try (var rows = s.streamRows(query)) {
                     assertEquals(2, rows.count());
                 }
+            }
+        }
+    }
+
+    @Test
+    void sessionSingleResultHelpersHandleEmptySingleAndDuplicateRows() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
+            try (Session s = orm.openSession()) {
+                s.dropEntity(Widget.class);
+                s.createEntity(Widget.class);
+                Widget first = s.insertRow(newWidget("a"));
+                s.insertRow(newWidget("b"));
+                s.insertRow(newWidget("b"));
+
+                assertEquals("a", s.findById(Widget.class, first.getId()).orElseThrow().getName());
+                assertFalse(s.findById(Widget.class, UUID.randomUUID()).isPresent());
+
+                EntityQuery<Widget> oneByEntityQuery = EntityQuery.of(Widget.class)
+                        .where(EntityQuery.field("name").eq("a"));
+                assertEquals("a", s.selectOne(oneByEntityQuery).getName());
+                assertEquals("a", s.findOne(oneByEntityQuery).orElseThrow().getName());
+
+                EntityQuery<Widget> missingByEntityQuery = EntityQuery.of(Widget.class)
+                        .where(EntityQuery.field("name").eq("missing"));
+                assertFalse(s.findOne(missingByEntityQuery).isPresent());
+                assertThrows(MicroOrmException.class, () -> s.selectOne(missingByEntityQuery));
+
+                EntityQuery<Widget> duplicateByEntityQuery = EntityQuery.of(Widget.class)
+                        .where(EntityQuery.field("name").eq("b"));
+                assertThrows(MicroOrmException.class, () -> s.findOne(duplicateByEntityQuery));
+
+                Query oneByRawQuery = Query.of("SELECT id, name FROM widgets WHERE name = :name")
+                        .set("name", "a");
+                assertEquals("a", s.selectOne(Widget.class, oneByRawQuery).getName());
+
+                Query missingByRawQuery = Query.of("SELECT id, name FROM widgets WHERE name = :name")
+                        .set("name", "missing");
+                assertFalse(s.findOne(Widget.class, missingByRawQuery).isPresent());
+
+                Query duplicateByRawQuery = Query.of("SELECT id, name FROM widgets WHERE name = :name")
+                        .set("name", "b");
+                assertThrows(MicroOrmException.class, () -> s.selectOne(Widget.class, duplicateByRawQuery));
             }
         }
     }

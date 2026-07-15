@@ -23,6 +23,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -234,6 +235,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return selectRow(type, id, lazyLoadContext());
     }
 
+    /** Returns an {@link Optional} row by primary key. */
+    public <T> Optional<T> findById(Class<T> type, Object id) {
+        return Optional.ofNullable(selectRow(type, id));
+    }
+
     <T> T selectRow(Class<T> type, Object id, SessionLazyContext context) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
@@ -296,6 +302,16 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
+    /** Returns exactly one row matching an {@link EntityQuery}; throws when none or multiple rows match. */
+    public <T> T selectOne(EntityQuery<T> query) {
+        return singleResult(findAtMostTwo(query), true);
+    }
+
+    /** Returns zero or one row matching an {@link EntityQuery}; throws when multiple rows match. */
+    public <T> Optional<T> findOne(EntityQuery<T> query) {
+        return Optional.ofNullable(singleResult(findAtMostTwo(query), false));
+    }
+
     /**
      * Lazy entity-query stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
      */
@@ -316,6 +332,16 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
+    /** Returns exactly one row from a custom {@link Query}; throws when none or multiple rows match. */
+    public <T> T selectOne(Class<T> type, Query query) {
+        return singleResult(findAtMostTwo(type, query), true);
+    }
+
+    /** Returns zero or one row from a custom {@link Query}; throws when multiple rows match. */
+    public <T> Optional<T> findOne(Class<T> type, Query query) {
+        return Optional.ofNullable(singleResult(findAtMostTwo(type, query), false));
+    }
+
     /** Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
         return openStream(() -> {
@@ -334,6 +360,31 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     public int execute(Query query) {
         Objects.requireNonNull(query, "query cannot be null");
         return SqlExecutor.executeUpdate(connection, query);
+    }
+
+    private <T> List<T> findAtMostTwo(EntityQuery<T> query) {
+        try (Stream<T> rows = streamRows(query)) {
+            return rows.limit(2).toList();
+        }
+    }
+
+    private <T> List<T> findAtMostTwo(Class<T> type, Query query) {
+        try (Stream<T> rows = streamRows(type, query)) {
+            return rows.limit(2).toList();
+        }
+    }
+
+    private <T> T singleResult(List<T> rows, boolean requireOne) {
+        if (rows.size() > 1) {
+            throw new MicroOrmException("Expected at most one row, got " + rows.size());
+        }
+        if (rows.isEmpty()) {
+            if (requireOne) {
+                throw new MicroOrmException("Expected one row, got 0");
+            }
+            return null;
+        }
+        return rows.get(0);
     }
 
     private SessionLazyContext lazyLoadContext() {

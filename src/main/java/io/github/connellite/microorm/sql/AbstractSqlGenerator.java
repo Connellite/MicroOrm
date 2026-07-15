@@ -13,11 +13,13 @@ import io.github.connellite.microorm.mapping.RelationValues;
 import io.github.connellite.microorm.query.CompositeCriterion;
 import io.github.connellite.microorm.query.Criterion;
 import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.ExistsCriterion;
 import io.github.connellite.microorm.query.FieldCriterion;
 import io.github.connellite.microorm.query.Join;
 import io.github.connellite.microorm.query.JoinType;
 import io.github.connellite.microorm.query.NotCriterion;
 import io.github.connellite.microorm.query.Order;
+import io.github.connellite.microorm.query.QuantifiedSubqueryCriterion;
 import io.github.connellite.microorm.relation.EntityRef;
 
 import java.util.ArrayList;
@@ -302,7 +304,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             sql += " " + joinContext.sql();
         }
         if (query.criterion() != null) {
-            sql += " WHERE " + renderCriterion(model, joinContext, query.criterion(), params, collectionParams, paramCounter);
+            sql += " WHERE " + renderCriterion(model, registry, joinContext, query.criterion(), params, collectionParams, paramCounter);
         }
         if (!query.orders().isEmpty()) {
             List<String> orderSql = new ArrayList<>();
@@ -385,6 +387,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
 
     private String renderCriterion(
             EntityModel model,
+            EntityModelRegistry registry,
             JoinContext joinContext,
             Criterion criterion,
             Map<String, Object> params,
@@ -397,14 +400,80 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             String separator = " " + composite.operator().name() + " ";
             List<String> rendered = new ArrayList<>();
             for (Criterion child : composite.criteria()) {
-                rendered.add(renderCriterion(model, joinContext, child, params, collectionParams, paramCounter));
+                rendered.add(renderCriterion(model, registry, joinContext, child, params, collectionParams, paramCounter));
             }
             return "(" + String.join(separator, rendered) + ")";
         }
         if (criterion instanceof NotCriterion notCriterion) {
-            return "NOT (" + renderCriterion(model, joinContext, notCriterion.criterion(), params, collectionParams, paramCounter) + ")";
+            return "NOT (" + renderCriterion(
+                    model, registry, joinContext, notCriterion.criterion(), params, collectionParams, paramCounter) + ")";
+        }
+        if (criterion instanceof ExistsCriterion existsCriterion) {
+            String subquerySql;
+            if (existsCriterion.entityQuery() != null) {
+                subquerySql = renderEntitySubquery(existsCriterion.entityQuery(), registry, params, collectionParams, paramCounter, false);
+            } else {
+                mergeSubqueryParameters(existsCriterion.query(), params, collectionParams);
+                subquerySql = existsCriterion.query().sql();
+            }
+            return (existsCriterion.negated() ? "NOT EXISTS" : "EXISTS")
+                    + " (" + subquerySql + ")";
+        }
+        if (criterion instanceof QuantifiedSubqueryCriterion quantified) {
+            ColumnRef column = resolveColumn(model, joinContext, quantified.fieldName());
+            String subquerySql;
+            if (quantified.entityQuery() != null) {
+                subquerySql = renderEntitySubquery(quantified.entityQuery(), registry, params, collectionParams, paramCounter, true);
+            } else {
+                mergeSubqueryParameters(quantified.query(), params, collectionParams);
+                subquerySql = quantified.query().sql();
+            }
+            return column.sql() + " " + quantified.operator().sql() + " " + quantified.quantifier().name()
+                    + " (" + subquerySql + ")";
         }
         throw new MicroOrmException("Unsupported criterion type: " + criterion.getClass().getName());
+    }
+
+    private String renderEntitySubquery(
+            EntityQuery<?> query,
+            EntityModelRegistry registry,
+            Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams,
+            int[] paramCounter,
+            boolean requireProjection) {
+        EntityModel model = registry.register(query.entityType());
+        registerJoinTargets(model, registry);
+        JoinContext joinContext = buildJoinContext(model, query, registry);
+        String projectionSql;
+        if (requireProjection) {
+            if (query.projectionField() == null) {
+                throw new MicroOrmException("ANY/ALL entity subquery requires a single selected field");
+            }
+            projectionSql = resolveColumn(model, joinContext, query.projectionField()).sql();
+        } else {
+            projectionSql = "1";
+        }
+        String sql = "SELECT " + projectionSql + " FROM " + model.sqlTableName(dialect);
+        if (!joinContext.sql().isEmpty()) {
+            sql += " " + joinContext.sql();
+        }
+        if (query.criterion() != null) {
+            sql += " WHERE " + renderCriterion(
+                    model, registry, joinContext, query.criterion(), params, collectionParams, paramCounter);
+        }
+        if (!query.orders().isEmpty()) {
+            List<String> orderSql = new ArrayList<>();
+            for (Order order : query.orders()) {
+                ColumnRef column = resolveColumn(model, joinContext, order.fieldName());
+                orderSql.add(column.sql() + " " + order.direction().name());
+            }
+            sql += " ORDER BY " + String.join(", ", orderSql);
+        }
+        return applyLimitOffset(
+                sql,
+                query.limit().isPresent() ? query.limit().getAsInt() : null,
+                query.offset().isPresent() ? query.offset().getAsInt() : null,
+                !query.orders().isEmpty());
     }
 
     private String renderFieldCriterion(
@@ -417,12 +486,18 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         ColumnRef column = resolveColumn(model, joinContext, criterion.fieldName());
         return switch (criterion.kind()) {
             case COMPARISON -> renderComparison(column.field(), column.sql(), criterion, params, paramCounter);
-            case IN -> renderIn(column.field(), column.sql(), criterion, collectionParams, paramCounter);
+            case IN, NOT_IN -> renderIn(column.field(), column.sql(), criterion, collectionParams, paramCounter);
             case LIKE -> {
                 String param = nextParam(paramCounter);
                 params.put(param, dialect.valueMapper().toJdbcValue(column.field(), criterion.value()));
                 yield column.sql() + " LIKE :" + param;
             }
+            case NOT_LIKE -> {
+                String param = nextParam(paramCounter);
+                params.put(param, dialect.valueMapper().toJdbcValue(column.field(), criterion.value()));
+                yield column.sql() + " NOT LIKE :" + param;
+            }
+            case BETWEEN, NOT_BETWEEN -> renderBetween(column.field(), column.sql(), criterion, params, paramCounter);
             case IS_NULL -> column.sql() + " IS NULL";
             case IS_NOT_NULL -> column.sql() + " IS NOT NULL";
         };
@@ -459,11 +534,65 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
         String param = nextParam(paramCounter);
         collectionParams.put(param, values);
-        return column + " IN (:" + param + ")";
+        String operator = criterion.kind() == io.github.connellite.microorm.query.CriterionKind.NOT_IN ? "NOT IN" : "IN";
+        return column + " " + operator + " (:" + param + ")";
+    }
+
+    private String renderBetween(
+            EntityField field,
+            String column,
+            FieldCriterion criterion,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        if (criterion.values().size() != 2) {
+            throw new MicroOrmException("BETWEEN criterion requires exactly two bounds for field: " + criterion.fieldName());
+        }
+        String lowerParam = nextParam(paramCounter);
+        String upperParam = nextParam(paramCounter);
+        params.put(lowerParam, dialect.valueMapper().toJdbcValue(field, criterion.values().get(0)));
+        params.put(upperParam, dialect.valueMapper().toJdbcValue(field, criterion.values().get(1)));
+        String operator = criterion.kind() == io.github.connellite.microorm.query.CriterionKind.NOT_BETWEEN
+                ? "NOT BETWEEN"
+                : "BETWEEN";
+        return column + " " + operator + " :" + lowerParam + " AND :" + upperParam;
     }
 
     private static String nextParam(int[] paramCounter) {
         return "p" + paramCounter[0]++;
+    }
+
+    private static void mergeSubqueryParameters(
+            Query query,
+            Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams) {
+        for (Map.Entry<String, Object> entry : query.parameters().entrySet()) {
+            putUniqueSubqueryParameter(params, collectionParams, entry.getKey(), entry.getValue());
+        }
+        for (Map.Entry<String, Collection<?>> entry : query.collectionParameters().entrySet()) {
+            putUniqueSubqueryCollectionParameter(params, collectionParams, entry.getKey(), entry.getValue());
+        }
+    }
+
+    private static void putUniqueSubqueryParameter(
+            Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams,
+            String name,
+            Object value) {
+        if (params.containsKey(name) || collectionParams.containsKey(name)) {
+            throw new MicroOrmException("Subquery parameter conflicts with an existing parameter: " + name);
+        }
+        params.put(name, value);
+    }
+
+    private static void putUniqueSubqueryCollectionParameter(
+            Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams,
+            String name,
+            Collection<?> value) {
+        if (params.containsKey(name) || collectionParams.containsKey(name)) {
+            throw new MicroOrmException("Subquery parameter conflicts with an existing parameter: " + name);
+        }
+        collectionParams.put(name, value);
     }
 
     private static void registerJoinTargets(EntityModel model, EntityModelRegistry registry) {

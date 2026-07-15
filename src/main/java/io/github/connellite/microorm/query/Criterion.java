@@ -11,7 +11,8 @@ package io.github.connellite.microorm.query;
  *         .and(EntityQuery.field("enabled").eq(true));
  * }</pre>
  */
-public sealed interface Criterion permits FieldCriterion, CompositeCriterion, NotCriterion {
+public sealed interface Criterion
+        permits FieldCriterion, CompositeCriterion, NotCriterion, ExistsCriterion, QuantifiedSubqueryCriterion {
 
     /**
      * Combines this criterion and {@code other} with SQL {@code AND}.
