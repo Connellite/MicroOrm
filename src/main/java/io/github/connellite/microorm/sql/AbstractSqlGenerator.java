@@ -24,6 +24,7 @@ import io.github.connellite.microorm.relation.EntityRef;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred) {
         Map<String, Object> named = new LinkedHashMap<>();
-        Set<String> omitJoinColumns = new java.util.HashSet<>();
+        Set<String> omitJoinColumns = new HashSet<>();
         for (EntityField f : model.fields()) {
             if (omitPk && f.id()) {
                 continue;

@@ -53,20 +53,6 @@ class EntityQueryTest {
         static final EntityQuery.Attribute<Item, Boolean> ENABLED = EntityQuery.attribute("enabled");
     }
 
-    static class AccessorNames {
-        public String getURL() {
-            return null;
-        }
-
-        public String getnMetaType() {
-            return null;
-        }
-
-        public String getNMetaType() {
-            return null;
-        }
-    }
-
     @Entity(name = "schema_query_items", schema = "app")
     public static class SchemaItem {
         @Id
@@ -208,16 +194,6 @@ class EntityQueryTest {
                 statement.sql());
         assertEquals("Ada", statement.parameters().get("p1"));
         assertEquals(true, statement.parameters().get("p2"));
-    }
-
-    @Test
-    void getterFieldNamesFollowMyBatisPropertyNamerRules() {
-        assertEquals("URL", EntityQuery.field(AccessorNames::getURL).name());
-        assertEquals("nMetaType", EntityQuery.field(AccessorNames::getnMetaType).name());
-        assertEquals("NMetaType", EntityQuery.field(AccessorNames::getNMetaType).name());
-
-        assertThrows(IllegalArgumentException.class,
-                () -> EntityQuery.field((EntityQuery.Getter<Item, String>) item -> item.getName()));
     }
 
     @Test

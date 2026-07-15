@@ -20,6 +20,7 @@ import io.github.connellite.microorm.connection.SpringJdbcSupport;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -157,7 +159,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             return total;
         }
         boolean omitPk = m.primaryKey().autoIncrement() && EntityHydrator.isUnsetPk(entities.get(0), m.primaryKey());
-        List<Map<String, Object>> rows = new java.util.ArrayList<>(entities.size());
+        List<Map<String, Object>> rows = new ArrayList<>(entities.size());
         for (T entity : entities) {
             if (entity == null) {
                 throw new IllegalArgumentException("Batch entity cannot be null");
@@ -220,7 +222,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
         String q = "DELETE FROM " + m.sqlTableName(dialect);
-        return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, java.util.Map.of()));
+        return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, Map.of()));
     }
 
     /** Returns whether a row exists for the given primary key. */
@@ -494,7 +496,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
         Set<Object> normalizedRetainedChildPks = retainedChildPks.stream()
                 .map(pk -> normalizePk(childModel, pk))
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         try (Stream<?> rows = SqlExecutor.queryEntitiesStream(
                 connection,
                 sql.selectByJoinColumn(childModel, inverse.joinColumn(), jdbcOwnerPk),
