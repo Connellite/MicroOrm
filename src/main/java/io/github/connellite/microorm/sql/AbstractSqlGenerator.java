@@ -10,8 +10,10 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
+import io.github.connellite.microorm.query.ComparisonOperator;
 import io.github.connellite.microorm.query.CompositeCriterion;
 import io.github.connellite.microorm.query.Criterion;
+import io.github.connellite.microorm.query.CriterionKind;
 import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.query.ExistsCriterion;
 import io.github.connellite.microorm.query.FieldCriterion;
@@ -300,12 +302,19 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         Map<String, Collection<?>> collectionParams = new LinkedHashMap<>();
         JoinContext joinContext = buildJoinContext(model, query, registry);
         int[] paramCounter = {1};
-        String sql = selectAllSql(model, joinContext.hasOneToManyJoin());
+        String sql = selectAllSql(model, query.isDistinct() || joinContext.hasOneToManyJoin());
         if (!joinContext.sql().isEmpty()) {
             sql += " " + joinContext.sql();
         }
         if (query.criterion() != null) {
             sql += " WHERE " + renderCriterion(model, registry, joinContext, query.criterion(), params, collectionParams, paramCounter);
+        }
+        if (!query.groupFields().isEmpty()) {
+            sql += " GROUP BY " + renderGroupBy(model, joinContext, query.groupFields());
+        }
+        if (query.havingCriterion() != null) {
+            sql += " HAVING " + renderCriterion(
+                    model, registry, joinContext, query.havingCriterion(), params, collectionParams, paramCounter);
         }
         if (!query.orders().isEmpty()) {
             List<String> orderSql = new ArrayList<>();
@@ -454,13 +463,21 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         } else {
             projectionSql = "1";
         }
-        String sql = "SELECT " + projectionSql + " FROM " + model.sqlTableName(dialect);
+        String sql = "SELECT " + (query.isDistinct() ? "DISTINCT " : "") + projectionSql
+                + " FROM " + model.sqlTableName(dialect);
         if (!joinContext.sql().isEmpty()) {
             sql += " " + joinContext.sql();
         }
         if (query.criterion() != null) {
             sql += " WHERE " + renderCriterion(
                     model, registry, joinContext, query.criterion(), params, collectionParams, paramCounter);
+        }
+        if (!query.groupFields().isEmpty()) {
+            sql += " GROUP BY " + renderGroupBy(model, joinContext, query.groupFields());
+        }
+        if (query.havingCriterion() != null) {
+            sql += " HAVING " + renderCriterion(
+                    model, registry, joinContext, query.havingCriterion(), params, collectionParams, paramCounter);
         }
         if (!query.orders().isEmpty()) {
             List<String> orderSql = new ArrayList<>();
@@ -475,6 +492,14 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 query.limit().isPresent() ? query.limit().getAsInt() : null,
                 query.offset().isPresent() ? query.offset().getAsInt() : null,
                 !query.orders().isEmpty());
+    }
+
+    private String renderGroupBy(EntityModel model, JoinContext joinContext, List<String> groupFields) {
+        List<String> groupSql = new ArrayList<>();
+        for (String field : groupFields) {
+            groupSql.add(resolveColumn(model, joinContext, field).sql());
+        }
+        return String.join(", ", groupSql);
     }
 
     private String renderFieldCriterion(
@@ -511,7 +536,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Map<String, Object> params,
             int[] paramCounter) {
         if (criterion.value() == null) {
-            return criterion.operator() == io.github.connellite.microorm.query.ComparisonOperator.NE
+            return criterion.operator() == ComparisonOperator.NE
                     ? column + " IS NOT NULL"
                     : column + " IS NULL";
         }
@@ -535,7 +560,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
         String param = nextParam(paramCounter);
         collectionParams.put(param, values);
-        String operator = criterion.kind() == io.github.connellite.microorm.query.CriterionKind.NOT_IN ? "NOT IN" : "IN";
+        String operator = criterion.kind() == CriterionKind.NOT_IN ? "NOT IN" : "IN";
         return column + " " + operator + " (:" + param + ")";
     }
 
@@ -552,7 +577,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         String upperParam = nextParam(paramCounter);
         params.put(lowerParam, dialect.valueMapper().toJdbcValue(field, criterion.values().get(0)));
         params.put(upperParam, dialect.valueMapper().toJdbcValue(field, criterion.values().get(1)));
-        String operator = criterion.kind() == io.github.connellite.microorm.query.CriterionKind.NOT_BETWEEN
+        String operator = criterion.kind() == CriterionKind.NOT_BETWEEN
                 ? "NOT BETWEEN"
                 : "BETWEEN";
         return column + " " + operator + " :" + lowerParam + " AND :" + upperParam;

@@ -53,6 +53,24 @@ class EntityQueryTest {
         static final EntityQuery.Attribute<Item, Boolean> ENABLED = EntityQuery.attribute("enabled");
     }
 
+    @Entity(name = "group_users")
+    public static class GroupUser {
+        @Id
+        private long id;
+
+        private String department;
+
+        private boolean active;
+
+        public String getDepartment() {
+            return department;
+        }
+    }
+
+    static final class GroupUser_ {
+        static final EntityQuery.Attribute<GroupUser, Boolean> ACTIVE = EntityQuery.attribute("active");
+    }
+
     @Entity(name = "schema_query_items", schema = "app")
     public static class SchemaItem {
         @Id
@@ -138,6 +156,7 @@ class EntityQueryTest {
 
     private final EntityModel model = new EntityModelRegistry().register(Item.class);
     private final EntityModel schemaModel = new EntityModelRegistry().register(SchemaItem.class);
+    private final EntityModel groupUserModel = new EntityModelRegistry().register(GroupUser.class);
     private final EntityModelRegistry registry = new EntityModelRegistry();
     private final EntityModel orderModel = registry.register(OrderEntity.class);
     private final List<DialectCase> dialectCases = List.of(
@@ -207,6 +226,28 @@ class EntityQueryTest {
         assertEquals(
                 "INSERT INTO app.schema_query_items (id, name) VALUES (:id, :name)",
                 insert);
+    }
+
+    @Test
+    void rendersDistinctGroupByAndHaving() {
+        EntityQuery<GroupUser> query = EntityQuery.of(GroupUser.class)
+                .distinct()
+                .where(EntityQuery.field("active").eq(true))
+                .groupBy(GroupUser::getDepartment)
+                .groupBy(GroupUser_.ACTIVE)
+                .having(EntityQuery.field(GroupUser::getDepartment).isNotNull())
+                .orderBy(EntityQuery.field(GroupUser::getDepartment).asc());
+
+        BoundStatement statement = SqliteDialect.getInstance().sqlGenerator().select(groupUserModel, query);
+
+        assertEquals(
+                "SELECT DISTINCT group_users.id, group_users.department, group_users.active FROM group_users "
+                        + "WHERE group_users.active = :p1 "
+                        + "GROUP BY group_users.department, group_users.active "
+                        + "HAVING group_users.department IS NOT NULL "
+                        + "ORDER BY group_users.department ASC",
+                statement.sql());
+        assertEquals(true, statement.parameters().get("p1"));
     }
 
     @Test

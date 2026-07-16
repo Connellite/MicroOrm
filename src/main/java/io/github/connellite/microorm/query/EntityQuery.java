@@ -38,11 +38,14 @@ public final class EntityQuery<T> {
 
     private final Class<T> entityType;
     private Criterion criterion;
+    private Criterion havingCriterion;
     private final List<Join> joins = new ArrayList<>();
     private final List<Order> orders = new ArrayList<>();
+    private final List<String> groupFields = new ArrayList<>();
     private Integer limit;
     private Integer offset;
     private String projectionField;
+    private boolean distinct;
 
     private EntityQuery(Class<T> entityType) {
         this.entityType = Objects.requireNonNull(entityType, "entityType");
@@ -155,11 +158,21 @@ public final class EntityQuery<T> {
         return criterion;
     }
 
+    /** Optional {@code HAVING} criterion. */
+    public Criterion havingCriterion() {
+        return havingCriterion;
+    }
+
     /**
      * Immutable join declaration list.
      */
     public List<Join> joins() {
         return List.copyOf(joins);
+    }
+
+    /** Immutable group-by field list. */
+    public List<String> groupFields() {
+        return List.copyOf(groupFields);
     }
 
     /**
@@ -186,6 +199,11 @@ public final class EntityQuery<T> {
     /** Optional single field projection used when this query is rendered as a scalar subquery. */
     public String projectionField() {
         return projectionField;
+    }
+
+    /** Whether this query explicitly requests {@code SELECT DISTINCT}. */
+    public boolean isDistinct() {
+        return distinct;
     }
 
     /**
@@ -223,6 +241,37 @@ public final class EntityQuery<T> {
         return this;
     }
 
+    /** Adds {@code DISTINCT} to the root select. */
+    public EntityQuery<T> distinct() {
+        this.distinct = true;
+        return this;
+    }
+
+    /**
+     * Replaces the current {@code HAVING} criterion.
+     *
+     * @param criterion expression to apply after {@code GROUP BY}
+     * @return this query for chaining
+     */
+    public EntityQuery<T> having(Criterion criterion) {
+        this.havingCriterion = Objects.requireNonNull(criterion, "criterion");
+        return this;
+    }
+
+    /** Adds an {@code AND} expression to the current {@code HAVING} clause. */
+    public EntityQuery<T> andHaving(Criterion criterion) {
+        Objects.requireNonNull(criterion, "criterion");
+        this.havingCriterion = this.havingCriterion == null ? criterion : this.havingCriterion.and(criterion);
+        return this;
+    }
+
+    /** Adds an {@code OR} expression to the current {@code HAVING} clause. */
+    public EntityQuery<T> orHaving(Criterion criterion) {
+        Objects.requireNonNull(criterion, "criterion");
+        this.havingCriterion = this.havingCriterion == null ? criterion : this.havingCriterion.or(criterion);
+        return this;
+    }
+
     /**
      * Selects one mapped field when this query is used as a scalar subquery, for example
      * {@code field("id").eqAny(EntityQuery.of(Ref.class).select("itemId"))}.
@@ -249,6 +298,37 @@ public final class EntityQuery<T> {
     /** Selects one mapped field when this query is used as a scalar subquery. */
     public EntityQuery<T> select(Attribute<T, ?> attribute) {
         return select(field(attribute));
+    }
+
+    /** Appends mapped fields to the SQL {@code GROUP BY} clause. */
+    public EntityQuery<T> groupBy(String... fieldNames) {
+        Objects.requireNonNull(fieldNames, "fieldNames");
+        Arrays.stream(fieldNames)
+                .map(fieldName -> Objects.requireNonNull(fieldName, "fieldName"))
+                .peek(fieldName -> {
+                    if (fieldName.isBlank()) {
+                        throw new IllegalArgumentException("group field name cannot be blank");
+                    }
+                })
+                .forEach(groupFields::add);
+        return this;
+    }
+
+    /** Appends mapped fields to the SQL {@code GROUP BY} clause. */
+    public EntityQuery<T> groupBy(FieldPath... fields) {
+        Objects.requireNonNull(fields, "fields");
+        Arrays.stream(fields).map(field -> Objects.requireNonNull(field, "field").name()).forEach(groupFields::add);
+        return this;
+    }
+
+    /** Appends a getter-referenced field to the SQL {@code GROUP BY} clause. */
+    public <R> EntityQuery<T> groupBy(Getter<T, R> getter) {
+        return groupBy(field(getter));
+    }
+
+    /** Appends a lightweight metamodel attribute to the SQL {@code GROUP BY} clause. */
+    public EntityQuery<T> groupBy(Attribute<T, ?> attribute) {
+        return groupBy(field(attribute));
     }
 
     /**
