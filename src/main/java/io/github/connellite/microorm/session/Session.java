@@ -14,6 +14,8 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.repository.EntityRepository;
+import io.github.connellite.microorm.repository.RepositoryProxyFactory;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
@@ -164,6 +166,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         } else {
             dispatchFallbackEvent(event);
         }
+    }
+
+    /** Creates a typed repository proxy bound to this session. */
+    public <R extends EntityRepository<?, ?>> R repository(Class<R> repositoryType) {
+        return RepositoryProxyFactory.create(repositoryType, operation -> operation.apply(this));
     }
 
     /**

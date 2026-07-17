@@ -13,6 +13,8 @@ import io.github.connellite.microorm.dynamic.DynamicSession;
 import io.github.connellite.microorm.dynamic.DynamicTableRegistry;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.SpringPhysicalNamingStrategy;
+import io.github.connellite.microorm.repository.EntityRepository;
+import io.github.connellite.microorm.repository.RepositoryProxyFactory;
 import io.github.connellite.microorm.session.Session;
 
 import javax.sql.DataSource;
@@ -148,6 +150,15 @@ public final class MicroOrm {
         try (Session session = openSession()) {
             return action.apply(session);
         }
+    }
+
+    /**
+     * Creates an on-demand typed repository proxy. Each repository method opens and closes its own session.
+     * <p>
+     * Use {@link Session#repository(Class)} when multiple repository calls must share one transaction or lazy-load context.
+     */
+    public <R extends EntityRepository<?, ?>> R repository(Class<R> repositoryType) {
+        return RepositoryProxyFactory.create(repositoryType, operation -> withSession(operation::apply));
     }
 
     /** Callback for {@link #withSession(SessionAction)}. */
