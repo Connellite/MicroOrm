@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.session;
 
+import io.github.connellite.collections.NullSkippingArrayList;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.jdbc.EntityHydrator;
@@ -50,8 +51,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     private final EntityModelRegistry registry;
     private final SqlGenerator sql;
     private final Dialect dialect;
+    private final List<TransactionalEventVisitorRegistration<?>> transactionalEventListeners = new ArrayList<>();
+    private final List<Object> transactionEvents = new NullSkippingArrayList<>();
     private SessionLazyContext lazyContext;
     private boolean activeStream;
+    private boolean localTransactionActive;
 
     /** Internal constructor — use {@link io.github.connellite.microorm.MicroOrm#openSession()}. */
     public Session(
@@ -73,13 +77,30 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     /** Disables auto-commit for explicit {@link #commitTransaction()} / {@link #rollbackTransaction()}. */
     public void beginTransaction() throws SQLException {
+        if (localTransactionActive) {
+            throw new MicroOrmException("Session transaction already active");
+        }
+        transactionEvents.clear();
         connection.setAutoCommit(false);
+        localTransactionActive = true;
     }
 
     /** Commits the current transaction and re-enables auto-commit. */
     public void commitTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
+            if (localTransactionActive) {
+                dispatchBeforeCommit();
+            }
             connection.commit();
+            try {
+                if (localTransactionActive) {
+                    dispatchAfterCommit();
+                }
+            } finally {
+                completeLocalTransaction();
+            }
+        } else {
+            completeLocalTransaction();
         }
         connection.setAutoCommit(true);
     }
@@ -88,8 +109,61 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     public void rollbackTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             connection.rollback();
+            try {
+                if (localTransactionActive) {
+                    dispatchAfterRollback();
+                }
+            } finally {
+                completeLocalTransaction();
+            }
+        } else {
+            completeLocalTransaction();
         }
         connection.setAutoCommit(true);
+    }
+
+    /**
+     * Registers a typed listener for events published through {@link #publishEvent(Object)}.
+     * <p>
+     * Events are delivered only for explicit {@link #beginTransaction()} transactions unless
+     * {@code fallbackExecution} is enabled.
+     */
+    public <E> Session addTransactionalEventListener(
+            Class<E> eventType,
+            TransactionalEventVisitor<? super E> visitor) {
+        return addTransactionalEventListener(eventType, false, visitor);
+    }
+
+    /**
+     * Registers a typed listener for events published through {@link #publishEvent(Object)}.
+     *
+     * @param fallbackExecution when {@code true}, events published outside a local transaction are delivered as
+     *                          {@code afterCommit} followed by {@code afterCompletion}
+     */
+    public <E> Session addTransactionalEventListener(
+            Class<E> eventType,
+            boolean fallbackExecution,
+            TransactionalEventVisitor<? super E> visitor) {
+        transactionalEventListeners.add(new TransactionalEventVisitorRegistration<>(
+                Objects.requireNonNull(eventType, "eventType"),
+                fallbackExecution,
+                Objects.requireNonNull(visitor, "visitor")));
+        return this;
+    }
+
+    /**
+     * Publishes an event for transaction-phase delivery.
+     * <p>
+     * Inside a local session transaction, the event is queued until commit or rollback. Outside a local
+     * transaction, only listeners registered with {@code fallbackExecution = true} are invoked.
+     */
+    public void publishEvent(Object event) {
+        Objects.requireNonNull(event, "event");
+        if (localTransactionActive) {
+            transactionEvents.add(event);
+        } else {
+            dispatchFallbackEvent(event);
+        }
     }
 
     /**
@@ -428,6 +502,66 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
+    private void dispatchBeforeCommit() {
+        for (Object event : transactionEvents) {
+            for (TransactionalEventVisitorRegistration<?> registration : transactionalEventListeners) {
+                if (registration.matches(event)) {
+                    registration.beforeCommit(event);
+                }
+            }
+        }
+    }
+
+    private void dispatchAfterCommit() {
+        for (Object event : transactionEvents) {
+            for (TransactionalEventVisitorRegistration<?> registration : transactionalEventListeners) {
+                if (registration.matches(event)) {
+                    registration.afterCommit(event);
+                }
+            }
+        }
+    }
+
+    private void dispatchAfterRollback() {
+        for (Object event : List.copyOf(transactionEvents)) {
+            for (TransactionalEventVisitorRegistration<?> registration : transactionalEventListeners) {
+                if (registration.matches(event)) {
+                    registration.afterRollback(event);
+                }
+            }
+        }
+    }
+
+    private void dispatchAfterCompletion() {
+        for (Object event : transactionEvents) {
+            for (TransactionalEventVisitorRegistration<?> registration : transactionalEventListeners) {
+                if (registration.matches(event)) {
+                    registration.afterCompletion(event);
+                }
+            }
+        }
+    }
+
+    private void dispatchFallbackEvent(Object event) {
+        for (TransactionalEventVisitorRegistration<?> registration : transactionalEventListeners) {
+            if (registration.matchesFallback(event)) {
+                registration.afterCommit(event);
+                registration.afterCompletion(event);
+            }
+        }
+    }
+
+    private void completeLocalTransaction() {
+        try {
+            if (localTransactionActive) {
+                dispatchAfterCompletion();
+            }
+        } finally {
+            localTransactionActive = false;
+            transactionEvents.clear();
+        }
+    }
+
     @Override
     public void assignGeneratedUuidIfNeeded(Object entity, EntityModel model) {
         if (model.primaryKey().autoIncrement()) {
@@ -576,6 +710,36 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 connection.rollback();
             }
             provider.release(connection);
+        }
+    }
+
+    private record TransactionalEventVisitorRegistration<E>(
+            Class<E> eventType,
+            boolean fallbackExecution,
+            TransactionalEventVisitor<? super E> visitor) {
+
+        boolean matches(Object event) {
+            return eventType.isInstance(event);
+        }
+
+        boolean matchesFallback(Object event) {
+            return fallbackExecution && eventType.isInstance(event);
+        }
+
+        void beforeCommit(Object event) {
+            visitor.beforeCommit(eventType.cast(event));
+        }
+
+        void afterCommit(Object event) {
+            visitor.afterCommit(eventType.cast(event));
+        }
+
+        void afterRollback(Object event) {
+            visitor.afterRollback(eventType.cast(event));
+        }
+
+        void afterCompletion(Object event) {
+            visitor.afterCompletion(eventType.cast(event));
         }
     }
 }
