@@ -80,6 +80,7 @@ public final class EntityModelRegistry {
         } catch (NoSuchMethodException e) {
             throw new MicroOrmException("Entity requires a no-arg constructor: " + entityClass.getName(), e);
         }
+        LifecycleCallbacks.validate(entityClass);
 
         rejectInheritedMappedFields(entityClass);
 

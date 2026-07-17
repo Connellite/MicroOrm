@@ -5,6 +5,8 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.jdbc.EntityHydrator;
 import io.github.connellite.microorm.jdbc.SqlExecutor;
 import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.microorm.mapping.LifecycleCallbacks;
+import io.github.connellite.microorm.mapping.LifecycleEvent;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
@@ -132,8 +134,10 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             return RelationPersister.insert(this, entity);
         }
         assignGeneratedUuidIfNeeded(entity, m);
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         BoundStatement bs = sql.insert(m, entity);
         SqlExecutor.executeInsertReturning(connection, bs, m, entity);
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_PERSIST);
         return entity;
     }
 
@@ -172,15 +176,20 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 throw new IllegalArgumentException("Batch insert cannot mix generated and explicit primary keys");
             }
             assignGeneratedUuidIfNeeded(entity, m);
+            LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
             rows.add(sql.insertParameters(m, entity, omitPk));
         }
-        return SqlExecutor.executeBatchInsertReturning(
+        int inserted = SqlExecutor.executeBatchInsertReturning(
                 connection,
                 sql.insertSql(m, omitPk),
                 rows,
                 batchSize,
                 m,
                 entities);
+        for (T entity : entities) {
+            LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_PERSIST);
+        }
+        return inserted;
     }
 
     /** Batch insert with default batch size ({@code 200}). */
@@ -197,7 +206,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         if (m.hasRelations()) {
             return RelationPersister.update(this, entity);
         }
-        return SqlExecutor.executeUpdate(connection, sql.update(m, entity));
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_UPDATE);
+        int updated = SqlExecutor.executeUpdate(connection, sql.update(m, entity));
+        if (updated > 0) {
+            LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_UPDATE);
+        }
+        return updated;
     }
 
     /** Deletes one row by primary key on the entity. Returns {@code 0} when no row matched. */
@@ -208,7 +222,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             return RelationPersister.delete(this, entity);
         }
         EntityHydrator.requirePkSet(entity, m.primaryKey());
-        return SqlExecutor.executeUpdate(connection, sql.delete(m, entity));
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_REMOVE);
+        int deleted = SqlExecutor.executeUpdate(connection, sql.delete(m, entity));
+        if (deleted > 0) {
+            LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_REMOVE);
+        }
+        return deleted;
     }
 
     /** Deletes one row by primary key value. Returns {@code 0} when no row matched. */
@@ -441,7 +460,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         RelationSqlGenerator.RelationInsertParts parts =
                 relationSql().buildRelationInsert(model, entity, omitPk, registry, deferred);
         BoundStatement bs = BoundStatement.of(parts.sql(), parts.parameters());
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         SqlExecutor.executeInsertReturning(connection, bs, model, entity);
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_PERSIST);
     }
 
     @Override
@@ -452,7 +473,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     @Override
     public int updateEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
         EntityHydrator.requirePkSet(entity, model.primaryKey());
-        return SqlExecutor.executeUpdate(connection, relationSql().update(model, entity, registry, deferred));
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_UPDATE);
+        int updated = SqlExecutor.executeUpdate(connection, relationSql().update(model, entity, registry, deferred));
+        if (updated > 0) {
+            LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_UPDATE);
+        }
+        return updated;
     }
 
     @Override
@@ -471,7 +497,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     @Override
     public int deleteEntityRow(Object entity, EntityModel model) {
         EntityHydrator.requirePkSet(entity, model.primaryKey());
-        return SqlExecutor.executeUpdate(connection, sql.delete(model, entity));
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_REMOVE);
+        int deleted = SqlExecutor.executeUpdate(connection, sql.delete(model, entity));
+        if (deleted > 0) {
+            LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_REMOVE);
+        }
+        return deleted;
     }
 
     @Override
@@ -480,9 +511,16 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
         EntityModel ownerModel = registry.get(inverse.targetEntityClass());
         Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
-        execute(Query.of("DELETE FROM " + childModel.sqlTableName(dialect)
-                        + " WHERE " + dialect.sqlName(inverse.joinColumnIdentifier()) + " = :ownerId")
-                .set("ownerId", jdbcOwnerPk));
+        try (Stream<?> rows = SqlExecutor.queryEntitiesStream(
+                connection,
+                sql.selectByJoinColumn(childModel, inverse.joinColumn(), jdbcOwnerPk),
+                childModel,
+                dialect,
+                dialect.valueMapper(),
+                lazyLoadContext(),
+                registry)) {
+            rows.forEach(child -> deleteEntityRow(child, childModel));
+        }
     }
 
     @Override

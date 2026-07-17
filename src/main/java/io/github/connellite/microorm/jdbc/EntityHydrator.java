@@ -8,6 +8,8 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.LifecycleCallbacks;
+import io.github.connellite.microorm.mapping.LifecycleEvent;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.relation.EagerCollection;
@@ -110,6 +112,7 @@ public final class EntityHydrator {
         if (lazyContext != null && registry != null && dialect != null) {
             attachRelations(entity, model, rs, availableColumns, valueMapper, dialect, lazyContext, registry);
         }
+        LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_LOAD);
         return entity;
     }
 
