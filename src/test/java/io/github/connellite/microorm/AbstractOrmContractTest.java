@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
@@ -20,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 abstract class AbstractOrmContractTest {
 
-    @Entity(name = "contract_uuid_widgets")
+    @Entity
+    @Table(name = "contract_uuid_widgets")
     public static class UuidWidget {
         @Id
         private UUID id;
@@ -58,7 +60,8 @@ abstract class AbstractOrmContractTest {
         }
     }
 
-    @Entity(name = "contract_uuid_widgets")
+    @Entity
+    @Table(name = "contract_uuid_widgets")
     public static class UuidWidgetWithDescription {
         @Id
         private UUID id;
@@ -91,7 +94,8 @@ abstract class AbstractOrmContractTest {
         }
     }
 
-    @Entity(name = "contract_numeric_widgets")
+    @Entity
+    @Table(name = "contract_numeric_widgets")
     public static class NumericWidget {
         @Id(autoIncrement = true)
         private long id;

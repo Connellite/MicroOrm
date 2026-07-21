@@ -7,21 +7,11 @@ import java.lang.annotation.Target;
 
 /**
  * Marks a class as a mapped entity. Requires exactly one {@link Id} field and a no-arg constructor.
- * Table name defaults to the class simple name (lower-cased, then optionally transformed by
- * {@link io.github.connellite.microorm.mapping.PhysicalNamingStrategy}). When {@link #schema()} is set,
- * generated SQL and schema operations address the table as {@code schema.table}.
+ * <p>
+ * Use {@link Table} to set the physical table name/schema, {@link Immutable} for read-only entities,
+ * or {@link Subselect} for entities backed by a SQL subselect.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Entity {
-    /** Logical table name; if blank, derived from the class simple name in lowercase. */
-    String name() default "";
-
-    /**
-     * Database schema/catalog name to qualify this entity table with.
-     * <p>
-     * Leave blank to use the connection's default schema. The value supports the same backtick quoting
-     * convention as {@link #name()} for case-sensitive or reserved identifiers.
-     */
-    String schema() default "";
 }

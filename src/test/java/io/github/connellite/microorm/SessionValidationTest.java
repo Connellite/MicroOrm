@@ -4,6 +4,7 @@ import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.connection.KeepOpenConnectionProvider;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
@@ -32,7 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SessionValidationTest {
 
-    @Entity(name = "validation_items")
+    @Entity
+    @Table(name = "validation_items")
     static class Item {
         @Id
         private java.util.UUID id;
@@ -104,7 +106,8 @@ class SessionValidationTest {
         }
     }
 
-    @Entity(name = "pk_only")
+    @Entity
+    @Table(name = "pk_only")
     static class PkOnly {
         @Id
         private UUID id;
@@ -127,13 +130,15 @@ class SessionValidationTest {
         }
     }
 
-    @Entity(name = "custom_relation_customers")
+    @Entity
+    @Table(name = "custom_relation_customers")
     static class RelationCustomer {
         @Id
         private UUID id;
     }
 
-    @Entity(name = "custom_relation_orders")
+    @Entity
+    @Table(name = "custom_relation_orders")
     static class RelationOrder {
         @Id
         private UUID id;
@@ -161,7 +166,8 @@ class SessionValidationTest {
         }
     }
 
-    @Entity(name = "orphan_pk_owners")
+    @Entity
+    @Table(name = "orphan_pk_owners")
     static class OrphanOwner {
         @Id
         private long id;
@@ -170,7 +176,8 @@ class SessionValidationTest {
         private io.github.connellite.microorm.relation.LazyCollection<OrphanChild> children;
     }
 
-    @Entity(name = "orphan_pk_children")
+    @Entity
+    @Table(name = "orphan_pk_children")
     static class OrphanChild {
         @Id
         private int id;

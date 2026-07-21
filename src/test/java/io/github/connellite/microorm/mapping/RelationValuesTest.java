@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
@@ -15,13 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RelationValuesTest {
 
-    @Entity(name = "relation_value_targets")
+    @Entity
+    @Table(name = "relation_value_targets")
     static class Target {
         @Id
         Long id;
     }
 
-    @Entity(name = "relation_value_owners")
+    @Entity
+    @Table(name = "relation_value_owners")
     static class Owner {
         @Id
         long id;

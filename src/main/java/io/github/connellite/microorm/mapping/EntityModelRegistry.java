@@ -6,9 +6,12 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.Immutable;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
+import io.github.connellite.microorm.annotation.Subselect;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
@@ -65,12 +68,22 @@ public final class EntityModelRegistry {
         if (entityAnn == null) {
             throw new MicroOrmException("Missing @Entity on " + entityClass.getName());
         }
-        SqlIdentifier table = entityAnn.name().isBlank()
+        Table tableAnn = entityClass.getAnnotation(Table.class);
+        Subselect subselectAnn = entityClass.getAnnotation(Subselect.class);
+        String tableName = tableAnn == null ? "" : tableAnn.name();
+        String schemaName = tableAnn == null ? "" : tableAnn.schema();
+        SqlIdentifier table = tableName.isBlank()
                 ? toPhysicalTable(SqlIdentifier.unquoted(entityClass.getSimpleName()))
-                : toPhysicalTable(SqlIdentifier.parse(entityAnn.name()));
-        SqlIdentifier schema = entityAnn.schema().isBlank()
+                : toPhysicalTable(SqlIdentifier.parse(tableName));
+        SqlIdentifier schema = schemaName.isBlank()
                 ? null
-                : SqlIdentifier.parse(entityAnn.schema());
+                : SqlIdentifier.parse(schemaName);
+        if (subselectAnn != null && subselectAnn.value().isBlank()) {
+            throw new MicroOrmException("@Subselect value cannot be blank on " + entityClass.getName());
+        }
+        if (subselectAnn != null && schema != null) {
+            throw new MicroOrmException("@Subselect cannot declare @Table.schema on " + entityClass.getName());
+        }
         SqlGenerator.validateIdentifier(table.text(), "table");
         if (schema != null) {
             SqlGenerator.validateIdentifier(schema.text(), "schema");
@@ -143,7 +156,17 @@ public final class EntityModelRegistry {
         if (pk == null) {
             throw new MicroOrmException("Missing @Id on " + entityClass.getName());
         }
-        EntityModel model = new EntityModel(entityClass, table, schema, fields, pk, manyToOneRelations, oneToManyRelations);
+        boolean immutable = entityClass.getAnnotation(Immutable.class) != null || subselectAnn != null;
+        EntityModel model = new EntityModel(
+                entityClass,
+                table,
+                schema,
+                fields,
+                pk,
+                manyToOneRelations,
+                oneToManyRelations,
+                immutable,
+                subselectAnn == null ? null : subselectAnn.value());
         SqlGenerator.validateColumnNames(model);
         return model;
     }

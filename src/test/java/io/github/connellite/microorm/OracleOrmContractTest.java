@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.session.Session;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,8 @@ class OracleOrmContractTest extends AbstractOrmContractTest {
     private static final OracleContainer ORACLE =
             new OracleContainer("gvenzl/oracle-xe:21-slim-faststart");
 
-    @Entity(name = "contract_oracle_temporal")
+    @Entity
+    @Table(name = "contract_oracle_temporal")
     public static class OracleTemporalRow {
         @Id
         private long id;

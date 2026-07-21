@@ -3,6 +3,7 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Transient;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityModelRegistryTest {
 
-    @Entity(name = "registry_items")
+    @Entity
+    @Table(name = "registry_items")
     static class Item {
         @Id
         private long id;
@@ -36,25 +38,29 @@ class EntityModelRegistryTest {
         private UUID id;
     }
 
-    @Entity(name = "schema_items", schema = "app")
+    @Entity
+    @Table(name = "schema_items", schema = "app")
     static class SchemaItem {
         @Id
         private long id;
     }
 
-    @Entity(name = "quoted_schema_items", schema = "`AppSchema`")
+    @Entity
+    @Table(name = "quoted_schema_items", schema = "`AppSchema`")
     static class QuotedSchemaItem {
         @Id
         private long id;
     }
 
-    @Entity(name = "bad_schema_items", schema = "bad-schema")
+    @Entity
+    @Table(name = "bad_schema_items", schema = "bad-schema")
     static class InvalidSchemaName {
         @Id
         private long id;
     }
 
-    @Entity(name = "dup_id")
+    @Entity
+    @Table(name = "dup_id")
     static class DuplicateId {
         @Id
         private long first;
@@ -68,12 +74,14 @@ class EntityModelRegistryTest {
         private long id;
     }
 
-    @Entity(name = "no_pk")
+    @Entity
+    @Table(name = "no_pk")
     static class MissingPrimaryKey {
         private String name;
     }
 
-    @Entity(name = "bad_col")
+    @Entity
+    @Table(name = "bad_col")
     static class InvalidColumnName {
         @Id
         private long id;
@@ -82,13 +90,15 @@ class EntityModelRegistryTest {
         private String label;
     }
 
-    @Entity(name = "bad-table")
+    @Entity
+    @Table(name = "bad-table")
     static class InvalidTableName {
         @Id
         private long id;
     }
 
-    @Entity(name = "unsupported_type")
+    @Entity
+    @Table(name = "unsupported_type")
     static class UnsupportedFieldType {
         @Id
         private long id;
@@ -96,7 +106,8 @@ class EntityModelRegistryTest {
         private List<String> tags;
     }
 
-    @Entity(name = "temporal_fields")
+    @Entity
+    @Table(name = "temporal_fields")
     static class TemporalFields {
         @Id
         private long id;
@@ -111,13 +122,15 @@ class EntityModelRegistryTest {
         protected String inherited;
     }
 
-    @Entity(name = "inheritance_child")
+    @Entity
+    @Table(name = "inheritance_child")
     static class InheritanceChild extends MappedSuperclass {
         @Id
         private long id;
     }
 
-    @Entity(name = "quoted_column")
+    @Entity
+    @Table(name = "quoted_column")
     static class QuotedColumn {
         @Id
         private long id;

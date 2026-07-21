@@ -2,6 +2,7 @@ package io.github.connellite.microorm.schema;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dialect.MssqlDialect;
@@ -20,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SchemaQualifiedEntityTest {
 
-    @Entity(name = "schema_ddl_items", schema = "app")
+    @Entity
+    @Table(name = "schema_ddl_items", schema = "app")
     static class SchemaItem {
         @Id
         private long id;

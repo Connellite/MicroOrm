@@ -3,6 +3,7 @@ package io.github.connellite.microorm.jdbc;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
@@ -17,7 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityHydratorTest {
 
-    @Entity(name = "hydrator_items")
+    @Entity
+    @Table(name = "hydrator_items")
     static class Item {
         @Id(autoIncrement = true)
         private long id;

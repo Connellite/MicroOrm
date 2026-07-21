@@ -2,6 +2,7 @@ package io.github.connellite.microorm.dynamic;
 
 import io.github.connellite.microorm.MicroOrm;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.session.Session;
@@ -22,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DynamicSessionTest {
 
-    @Entity(name = "sidecar")
+    @Entity
+    @Table(name = "sidecar")
     static class Sidecar {
         @Id
         private long id;

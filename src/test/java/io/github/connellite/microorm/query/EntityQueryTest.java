@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.query;
 
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
@@ -28,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityQueryTest {
 
-    @Entity(name = "entity_query_items")
+    @Entity
+    @Table(name = "entity_query_items")
     public static class Item {
         @Id
         private long id;
@@ -53,7 +55,8 @@ class EntityQueryTest {
         static final EntityQuery.Attribute<Item, Boolean> ENABLED = EntityQuery.attribute("enabled");
     }
 
-    @Entity(name = "group_users")
+    @Entity
+    @Table(name = "group_users")
     public static class GroupUser {
         @Id
         private long id;
@@ -71,7 +74,8 @@ class EntityQueryTest {
         static final EntityQuery.Attribute<GroupUser, Boolean> ACTIVE = EntityQuery.attribute("active");
     }
 
-    @Entity(name = "schema_query_items", schema = "app")
+    @Entity
+    @Table(name = "schema_query_items", schema = "app")
     public static class SchemaItem {
         @Id
         private long id;
@@ -79,7 +83,8 @@ class EntityQueryTest {
         private String name;
     }
 
-    @Entity(name = "entity_query_customers")
+    @Entity
+    @Table(name = "entity_query_customers")
     public static class Customer {
         @Id
         private long id;
@@ -87,7 +92,8 @@ class EntityQueryTest {
         private String name;
     }
 
-    @Entity(name = "entity_query_orders")
+    @Entity
+    @Table(name = "entity_query_orders")
     public static class OrderEntity {
         @Id
         private long id;
@@ -102,7 +108,8 @@ class EntityQueryTest {
         private LazyCollection<Line> lines;
     }
 
-    @Entity(name = "entity_query_lines")
+    @Entity
+    @Table(name = "entity_query_lines")
     public static class Line {
         @Id
         private long id;
@@ -114,7 +121,8 @@ class EntityQueryTest {
         private LazyRef<OrderEntity> order;
     }
 
-    @Entity(name = "item_audit")
+    @Entity
+    @Table(name = "item_audit")
     public static class ItemAudit {
         @Id
         private long id;
@@ -124,7 +132,8 @@ class EntityQueryTest {
         private String kind;
     }
 
-    @Entity(name = "item_blocks")
+    @Entity
+    @Table(name = "item_blocks")
     public static class ItemBlock {
         @Id
         private long id;
@@ -134,7 +143,8 @@ class EntityQueryTest {
         private String reason;
     }
 
-    @Entity(name = "item_refs")
+    @Entity
+    @Table(name = "item_refs")
     public static class ItemRef {
         @Id
         private long id;
@@ -144,7 +154,8 @@ class EntityQueryTest {
         private boolean active;
     }
 
-    @Entity(name = "archived_items")
+    @Entity
+    @Table(name = "archived_items")
     public static class ArchivedItem {
         @Id
         private long id;

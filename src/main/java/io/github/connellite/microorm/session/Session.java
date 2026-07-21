@@ -59,7 +59,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     private boolean activeStream;
     private boolean localTransactionActive;
 
-    /** Internal constructor — use {@link io.github.connellite.microorm.MicroOrm#openSession()}. */
+    /**
+     * Internal constructor — use {@link io.github.connellite.microorm.MicroOrm#openSession()}.
+     */
     public Session(
             Connection connection,
             ConnectionProvider provider,
@@ -72,12 +74,16 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         this.sql = dialect.sqlGenerator();
     }
 
-    /** JDBC connection used by this session (same instance for the session lifetime). */
+    /**
+     * JDBC connection used by this session (same instance for the session lifetime).
+     */
     public Connection connection() {
         return connection;
     }
 
-    /** Disables auto-commit for explicit {@link #commitTransaction()} / {@link #rollbackTransaction()}. */
+    /**
+     * Disables auto-commit for explicit {@link #commitTransaction()} / {@link #rollbackTransaction()}.
+     */
     public void beginTransaction() throws SQLException {
         if (localTransactionActive) {
             throw new MicroOrmException("Session transaction already active");
@@ -87,7 +93,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         localTransactionActive = true;
     }
 
-    /** Commits the current transaction and re-enables auto-commit. */
+    /**
+     * Commits the current transaction and re-enables auto-commit.
+     */
     public void commitTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             if (localTransactionActive) {
@@ -107,7 +115,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         connection.setAutoCommit(true);
     }
 
-    /** Rolls back the current transaction and re-enables auto-commit. */
+    /**
+     * Rolls back the current transaction and re-enables auto-commit.
+     */
     public void rollbackTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             connection.rollback();
@@ -168,7 +178,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
-    /** Creates a typed repository proxy bound to this session. */
+    /**
+     * Creates a typed repository proxy bound to this session.
+     */
     public <R extends EntityRepository<?, ?>> R repository(Class<R> repositoryType) {
         return RepositoryProxyFactory.create(repositoryType, operation -> operation.apply(this));
     }
@@ -179,6 +191,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
      */
     public void createEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
+        requireMutable(m, "createEntity");
         dialect.createTable(connection, m);
     }
 
@@ -188,6 +201,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
      */
     public void syncEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
+        requireMutable(m, "syncEntity");
         dialect.syncTable(connection, m);
     }
 
@@ -198,9 +212,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         syncEntity(entityClass);
     }
 
-    /** Drops the entity table and all rows (destructive). */
+    /**
+     * Drops the entity table and all rows (destructive).
+     */
     public void dropEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
+        requireMutable(m, "dropEntity");
         dialect.dropTable(connection, m);
     }
 
@@ -211,6 +228,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     public <T> T insertRow(T entity) {
         Objects.requireNonNull(entity, "insertRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
+        requireMutable(m, "insertRow");
         if (m.hasRelations()) {
             return RelationPersister.insert(this, entity);
         }
@@ -235,6 +253,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
         Class<?> entityClass = entities.get(0).getClass();
         EntityModel m = registry.get(entityClass);
+        requireMutable(m, "insertRows");
         if (m.hasRelations()) {
             int total = 0;
             for (T entity : entities) {
@@ -273,16 +292,21 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return inserted;
     }
 
-    /** Batch insert with default batch size ({@code 200}). */
+    /**
+     * Batch insert with default batch size ({@code 200}).
+     */
     @SuppressWarnings("UnusedReturnValue")
     public <T> int insertRows(List<T> entities) {
         return insertRows(entities, 200);
     }
 
-    /** Updates one row by primary key. Returns {@code 0} when no row matched. */
+    /**
+     * Updates one row by primary key. Returns {@code 0} when no row matched.
+     */
     public int updateRow(Object entity) {
         Objects.requireNonNull(entity, "updateRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
+        requireMutable(m, "updateRow");
         EntityHydrator.requirePkSet(entity, m.primaryKey());
         if (m.hasRelations()) {
             return RelationPersister.update(this, entity);
@@ -295,10 +319,13 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return updated;
     }
 
-    /** Deletes one row by primary key on the entity. Returns {@code 0} when no row matched. */
+    /**
+     * Deletes one row by primary key on the entity. Returns {@code 0} when no row matched.
+     */
     public int deleteRow(Object entity) {
         Objects.requireNonNull(entity, "deleteRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
+        requireMutable(m, "deleteRow");
         if (m.hasRelations()) {
             return RelationPersister.delete(this, entity);
         }
@@ -311,33 +338,45 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return deleted;
     }
 
-    /** Deletes one row by primary key value. Returns {@code 0} when no row matched. */
+    /**
+     * Deletes one row by primary key value. Returns {@code 0} when no row matched.
+     */
     public int deleteById(Class<?> entityClass, Object id) {
         EntityModel m = registry.get(entityClass);
+        requireMutable(m, "deleteById");
         EntityHydrator.requirePkValue(id, m.primaryKey());
         return SqlExecutor.executeUpdate(connection, sql.deleteById(m, id));
     }
 
-    /** Deletes all rows from the entity table (table definition is kept). */
+    /**
+     * Deletes all rows from the entity table (table definition is kept).
+     */
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
+        requireMutable(m, "deleteAllRows");
         String q = "DELETE FROM " + m.sqlTableName(dialect);
         return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, Map.of()));
     }
 
-    /** Returns whether a row exists for the given primary key. */
+    /**
+     * Returns whether a row exists for the given primary key.
+     */
     public boolean existsById(Class<?> type, Object id) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
         return SqlExecutor.queryExists(connection, sql.existsById(m, id));
     }
 
-    /** Returns {@code null} when no row matches the primary key. */
+    /**
+     * Returns {@code null} when no row matches the primary key.
+     */
     public <T> T selectRow(Class<T> type, Object id) {
         return selectRow(type, id, lazyLoadContext());
     }
 
-    /** Returns an {@link Optional} row by primary key. */
+    /**
+     * Returns an {@link Optional} row by primary key.
+     */
     public <T> Optional<T> findById(Class<T> type, Object id) {
         return Optional.ofNullable(selectRow(type, id));
     }
@@ -358,7 +397,9 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
-    /** Materializes all rows; closes the underlying JDBC resources. */
+    /**
+     * Materializes all rows; closes the underlying JDBC resources.
+     */
     public <T> List<T> selectRows(Class<T> type) {
         try (Stream<T> rows = streamRows(type)) {
             return rows.toList();
@@ -380,14 +421,18 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         });
     }
 
-    /** Materializes filtered rows; closes the underlying JDBC resources. */
+    /**
+     * Materializes filtered rows; closes the underlying JDBC resources.
+     */
     public <T> List<T> selectRows(Class<T> type, Map<String, ?> filters) {
         try (Stream<T> rows = streamRows(type, filters)) {
             return rows.toList();
         }
     }
 
-    /** Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
+    /**
+     * Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
+     */
     public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
@@ -397,19 +442,25 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         });
     }
 
-    /** Materializes rows matching an {@link EntityQuery}; closes the underlying JDBC resources. */
+    /**
+     * Materializes rows matching an {@link EntityQuery}; closes the underlying JDBC resources.
+     */
     public <T> List<T> selectRows(EntityQuery<T> query) {
         try (Stream<T> rows = streamRows(query)) {
             return rows.toList();
         }
     }
 
-    /** Returns exactly one row matching an {@link EntityQuery}; throws when none or multiple rows match. */
+    /**
+     * Returns exactly one row matching an {@link EntityQuery}; throws when none or multiple rows match.
+     */
     public <T> T selectOne(EntityQuery<T> query) {
         return singleResult(findAtMostTwo(query), true);
     }
 
-    /** Returns zero or one row matching an {@link EntityQuery}; throws when multiple rows match. */
+    /**
+     * Returns zero or one row matching an {@link EntityQuery}; throws when multiple rows match.
+     */
     public <T> Optional<T> findOne(EntityQuery<T> query) {
         return Optional.ofNullable(singleResult(findAtMostTwo(query), false));
     }
@@ -427,24 +478,32 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         });
     }
 
-    /** Materializes custom-query rows; closes the underlying JDBC resources. */
+    /**
+     * Materializes custom-query rows; closes the underlying JDBC resources.
+     */
     public <T> List<T> selectRows(Class<T> type, Query query) {
         try (Stream<T> rows = streamRows(type, query)) {
             return rows.toList();
         }
     }
 
-    /** Returns exactly one row from a custom {@link Query}; throws when none or multiple rows match. */
+    /**
+     * Returns exactly one row from a custom {@link Query}; throws when none or multiple rows match.
+     */
     public <T> T selectOne(Class<T> type, Query query) {
         return singleResult(findAtMostTwo(type, query), true);
     }
 
-    /** Returns zero or one row from a custom {@link Query}; throws when multiple rows match. */
+    /**
+     * Returns zero or one row from a custom {@link Query}; throws when multiple rows match.
+     */
     public <T> Optional<T> findOne(Class<T> type, Query query) {
         return Optional.ofNullable(singleResult(findAtMostTwo(type, query), false));
     }
 
-    /** Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}. */
+    /**
+     * Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
+     */
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
@@ -596,6 +655,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     @Override
     public void insertEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
+        requireMutable(model, "insertEntityRow");
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
         RelationSqlGenerator.RelationInsertParts parts =
@@ -613,6 +673,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     @Override
     public int updateEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
+        requireMutable(model, "updateEntityRow");
         EntityHydrator.requirePkSet(entity, model.primaryKey());
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_UPDATE);
         int updated = SqlExecutor.executeUpdate(connection, relationSql().update(model, entity, registry, deferred));
@@ -637,6 +698,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     @Override
     public int deleteEntityRow(Object entity, EntityModel model) {
+        requireMutable(model, "deleteEntityRow");
         EntityHydrator.requirePkSet(entity, model.primaryKey());
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_REMOVE);
         int deleted = SqlExecutor.executeUpdate(connection, sql.delete(model, entity));
@@ -700,6 +762,12 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         EntityField pk = model.primaryKey();
         Object jdbcValue = dialect.valueMapper().toJdbcValue(pk, value);
         return dialect.valueMapper().fromJdbcValue(pk, jdbcValue);
+    }
+
+    private static void requireMutable(EntityModel model, String operation) {
+        if (model.immutable()) {
+            throw new MicroOrmException("Entity " + model.entityClass().getName() + " is immutable; operation is not allowed: " + operation);
+        }
     }
 
     /**

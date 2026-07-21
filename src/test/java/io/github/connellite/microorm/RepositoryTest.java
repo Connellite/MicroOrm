@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.repository.EntityRepository;
@@ -22,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RepositoryTest {
 
-    @Entity(name = "repository_items")
+    @Entity
+    @Table(name = "repository_items")
     public static class RepositoryItem {
         @Id(autoIncrement = true)
         private long id;

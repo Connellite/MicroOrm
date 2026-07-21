@@ -42,6 +42,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
 
     @Override
     public BoundStatement insert(EntityModel model, Object entity) {
+        requireMutable(model, "insert");
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
         return insert(model, entity, omitPk);
@@ -58,6 +59,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
     }
 
     public String insertSql(EntityModel model, boolean omitPk, Set<String> omitJoinColumns) {
+        requireMutable(model, "insert");
         List<String> colQuoted = new ArrayList<>();
         List<String> slots = new ArrayList<>();
         for (EntityField f : model.fields()) {
@@ -127,6 +129,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Object entity,
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred) {
+        requireMutable(model, "update");
         EntityField pk = model.primaryKey();
         Map<String, Object> params = new LinkedHashMap<>();
         List<String> sets = new ArrayList<>();
@@ -159,6 +162,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Object entity,
             ManyToOneField relation,
             EntityModelRegistry registry) {
+        requireMutable(model, "updateJoinColumn");
         EntityField pk = model.primaryKey();
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(relation.joinColumn(), joinColumnJdbcValue(entity, relation, registry));
@@ -222,12 +226,14 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
 
     @Override
     public BoundStatement delete(EntityModel model, Object entity) {
+        requireMutable(model, "delete");
         EntityField pk = model.primaryKey();
         return deleteById(model, EntityHydrator.getFieldValue(entity, pk));
     }
 
     @Override
     public BoundStatement deleteById(EntityModel model, Object id) {
+        requireMutable(model, "deleteById");
         EntityField pk = model.primaryKey();
         String pkName = pk.columnName();
         Map<String, Object> params = new LinkedHashMap<>();
@@ -243,7 +249,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
         p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
-        return BoundStatement.of(selectAllSql(model) + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName, p);
+        return BoundStatement.of(selectAllSql(model) + " WHERE "
+                + model.sqlTableQualifier(dialect) + "." + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName, p);
     }
 
     @Override
@@ -252,8 +259,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         String pkName = pk.columnName();
         Map<String, Object> p = new LinkedHashMap<>();
         p.put(pkName, dialect.valueMapper().toJdbcValue(pk, id));
-        String sql = "SELECT 1 FROM " + model.sqlTableName(dialect)
-                + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
+        String sql = "SELECT 1 FROM " + model.sqlFromSource(dialect)
+                + " WHERE " + model.sqlTableQualifier(dialect) + "." + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(limitOne(sql), p);
     }
 
@@ -275,7 +282,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             if (params.containsKey(param)) {
                 throw new MicroOrmException("Duplicate filter for column: " + param);
             }
-            predicates.add(dialect.sqlName(field.columnIdentifier()) + " = :" + param);
+            predicates.add(model.sqlTableQualifier(dialect) + "." + dialect.sqlName(field.columnIdentifier()) + " = :" + param);
             params.put(param, dialect.valueMapper().toJdbcValue(field, entry.getValue()));
         }
         return BoundStatement.of(selectAllSql(model) + " WHERE " + String.join(" AND ", predicates), params);
@@ -340,7 +347,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(joinColumn, joinValue);
         return BoundStatement.of(
-                selectAllSql(model) + " WHERE " + dialect.sqlName(identifier) + " = :" + joinColumn,
+                selectAllSql(model) + " WHERE "
+                        + model.sqlTableQualifier(dialect) + "." + dialect.sqlName(identifier) + " = :" + joinColumn,
                 params);
     }
 
@@ -385,14 +393,15 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
 
     private String selectAllSql(EntityModel model, boolean distinct) {
         List<String> cols = new ArrayList<>();
+        String qualifier = model.sqlTableQualifier(dialect);
         for (EntityField f : model.fields()) {
-            cols.add(model.sqlTableName(dialect) + "." + dialect.sqlName(f.columnIdentifier()));
+            cols.add(qualifier + "." + dialect.sqlName(f.columnIdentifier()));
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            cols.add(model.sqlTableName(dialect) + "." + dialect.sqlName(relation.joinColumnIdentifier()));
+            cols.add(qualifier + "." + dialect.sqlName(relation.joinColumnIdentifier()));
         }
         return "SELECT " + (distinct ? "DISTINCT " : "")
-                + String.join(", ", cols) + " FROM " + model.sqlTableName(dialect);
+                + String.join(", ", cols) + " FROM " + model.sqlFromSource(dialect);
     }
 
     private String renderCriterion(
@@ -464,7 +473,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             projectionSql = "1";
         }
         String sql = "SELECT " + (query.isDistinct() ? "DISTINCT " : "") + projectionSql
-                + " FROM " + model.sqlTableName(dialect);
+                + " FROM " + model.sqlFromSource(dialect);
         if (!joinContext.sql().isEmpty()) {
             sql += " " + joinContext.sql();
         }
@@ -587,6 +596,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         return "p" + paramCounter[0]++;
     }
 
+    private static void requireMutable(EntityModel model, String operation) {
+        if (model.immutable()) {
+            throw new MicroOrmException("Entity " + model.entityClass().getName() + " is immutable; SQL operation is not allowed: " + operation);
+        }
+    }
+
     private static void mergeSubqueryParameters(
             Query query,
             Map<String, Object> params,
@@ -681,7 +696,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             return sql;
         }
         return sql + " ON "
-                + rootModel.sqlTableName(dialect) + "." + dialect.sqlName(relation.joinColumnIdentifier())
+                + rootModel.sqlTableQualifier(dialect) + "." + dialect.sqlName(relation.joinColumnIdentifier())
                 + " = " + alias + "." + dialect.sqlName(targetModel.primaryKey().columnIdentifier());
     }
 
@@ -696,7 +711,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             return sql;
         }
         return sql + " ON "
-                + rootModel.sqlTableName(dialect) + "." + dialect.sqlName(rootModel.primaryKey().columnIdentifier())
+                + rootModel.sqlTableQualifier(dialect) + "." + dialect.sqlName(rootModel.primaryKey().columnIdentifier())
                 + " = " + alias + "." + dialect.sqlName(inverse.joinColumnIdentifier());
     }
 
@@ -704,7 +719,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         String[] parts = path.split("\\.", -1);
         if (parts.length == 1) {
             EntityField field = fieldByName(model, path);
-            return new ColumnRef(field, model.sqlTableName(dialect) + "." + dialect.sqlName(field.columnIdentifier()));
+            return new ColumnRef(field, model.sqlTableQualifier(dialect) + "." + dialect.sqlName(field.columnIdentifier()));
         }
         if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
             throw new MicroOrmException("Invalid joined field path '" + path + "'. Use relation.field");

@@ -6,7 +6,7 @@ package io.github.connellite.microorm.mapping;
  */
 public interface PhysicalNamingStrategy {
 
-    /** Physical table name for {@link io.github.connellite.microorm.annotation.Entity#name()} or the class simple name. */
+    /** Physical table name for {@link io.github.connellite.microorm.annotation.Table#name()} or the class simple name. */
     String toPhysicalTableName(String logicalName);
 
     /** Physical column name for a field or explicit {@link io.github.connellite.microorm.annotation.Column#name()}. */

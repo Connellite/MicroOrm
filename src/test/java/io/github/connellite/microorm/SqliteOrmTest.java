@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.query.EntityQuery;
@@ -26,7 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SqliteOrmTest {
 
-    @Entity(name = "widgets")
+    @Entity
+    @Table(name = "widgets")
     public static class Widget {
         @Id
         private UUID id;
@@ -50,7 +52,8 @@ class SqliteOrmTest {
         }
     }
 
-    @Entity(name = "widgets")
+    @Entity
+    @Table(name = "widgets")
     public static class WidgetWithDescription {
         @Id
         private UUID id;
@@ -76,7 +79,8 @@ class SqliteOrmTest {
         }
     }
 
-    @Entity(name = "numeric_widgets")
+    @Entity
+    @Table(name = "numeric_widgets")
     public static class NumericWidget {
         @Id(autoIncrement = true)
         private long id;
@@ -100,7 +104,8 @@ class SqliteOrmTest {
         }
     }
 
-    @Entity(name = "assigned_numeric_widgets")
+    @Entity
+    @Table(name = "assigned_numeric_widgets")
     public static class AssignedNumericWidget {
         @Id
         private int id;
@@ -129,7 +134,8 @@ class SqliteOrmTest {
         }
     }
 
-    @Entity(name = "invalid_string_id")
+    @Entity
+    @Table(name = "invalid_string_id")
     public static class InvalidStringId {
         @Id
         private String id;
@@ -138,7 +144,8 @@ class SqliteOrmTest {
         }
     }
 
-    @Entity(name = "invalid_uuid_autoincrement")
+    @Entity
+    @Table(name = "invalid_uuid_autoincrement")
     public static class InvalidUuidAutoIncrementId {
         @Id(autoIncrement = true)
         private UUID id;

@@ -2,6 +2,7 @@ package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
@@ -17,13 +18,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RelationMappingTest {
 
-    @Entity(name = "rel_customers")
+    @Entity
+    @Table(name = "rel_customers")
     static class Customer {
         @Id
         private UUID id;
     }
 
-    @Entity(name = "rel_orders")
+    @Entity
+    @Table(name = "rel_orders")
     static class Order {
         @Id
         private UUID id;
@@ -36,7 +39,8 @@ class RelationMappingTest {
         private LazyCollection<OrderItem> lines;
     }
 
-    @Entity(name = "rel_order_items")
+    @Entity
+    @Table(name = "rel_order_items")
     static class OrderItem {
         @Id
         private long id;
@@ -60,7 +64,8 @@ class RelationMappingTest {
         assertEquals(OrderItem.class, orderModel.oneToManyRelations().get(0).targetEntityClass());
     }
 
-    @Entity(name = "bad_rel")
+    @Entity
+    @Table(name = "bad_rel")
     static class MissingManyToOne {
         @Id
         private UUID id;

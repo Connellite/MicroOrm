@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
@@ -34,7 +35,8 @@ class LazyRelationSelectTest {
     private static final UUID CUSTOMER_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
     private static final UUID ORDER_ID = UUID.fromString("bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee");
 
-    @Entity(name = "lazy_customers")
+    @Entity
+    @Table(name = "lazy_customers")
     static class Customer {
         @Id
         private UUID id;
@@ -54,7 +56,8 @@ class LazyRelationSelectTest {
         }
     }
 
-    @Entity(name = "lazy_orders")
+    @Entity
+    @Table(name = "lazy_orders")
     static class Order {
         @Id
         UUID id;
@@ -89,7 +92,8 @@ class LazyRelationSelectTest {
         }
     }
 
-    @Entity(name = "lazy_order_items")
+    @Entity
+    @Table(name = "lazy_order_items")
     static class OrderItem {
         @Id
         private long id;

@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.connection.KeepOpenConnectionProvider;
 import io.github.connellite.microorm.dialect.Dialect;
@@ -81,7 +82,8 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
         }
     }
 
-    @Entity(name = "mssql_precreated_guid_widgets")
+    @Entity
+    @Table(name = "mssql_precreated_guid_widgets")
     static class PrecreatedGuidWidget {
         @Id
         private UUID id;

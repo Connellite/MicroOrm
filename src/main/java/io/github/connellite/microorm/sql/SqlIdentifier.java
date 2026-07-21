@@ -21,8 +21,8 @@ public record SqlIdentifier(String text, boolean quoted) {
     }
 
     /**
-     * Parses a name from {@link io.github.connellite.microorm.annotation.Entity#name()},
-     * {@link io.github.connellite.microorm.annotation.Entity#schema()},
+     * Parses a name from {@link io.github.connellite.microorm.annotation.Table#name()},
+     * {@link io.github.connellite.microorm.annotation.Table#schema()},
      * {@link io.github.connellite.microorm.annotation.Column#name()}, or {@link io.github.connellite.microorm.annotation.JoinColumn#name()}.
      */
     public static SqlIdentifier parse(String raw) {

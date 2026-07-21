@@ -6,7 +6,7 @@ Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https:/
 
 ## Features
 
-- Annotation mapping: `@Entity`, `@Column`, `@Id`, `@Transient`
+- Annotation mapping: `@Entity`, `@Table`, `@Column`, `@Id`, `@Transient`, `@Immutable`, `@Subselect`
 - CRUD, batch insert, map-based filtered select, streaming reads, custom `Query`
 - **`EntityQuery`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, and relation joins
 - **Associations**: `@ManyToOne` / `@OneToMany` with lazy (`LazyRef`, `LazyCollection`) or eager (`EagerRef`, `EagerCollection`) loading
@@ -19,7 +19,8 @@ Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https:/
 ## Quick start
 
 ```java
-@Entity(name = "users")
+@Entity
+@Table(name = "users")
 public class User {
     @Id
     private UUID id;
@@ -87,7 +88,8 @@ Supported join types: inner (default), left, right, full, and cross. For databas
 Map associations with wrapper field types and `@JoinColumn` on the owning side:
 
 ```java
-@Entity(name = "orders")
+@Entity
+@Table(name = "orders")
 public class Order {
     @Id
     private UUID id;
@@ -100,7 +102,8 @@ public class Order {
     private LazyCollection<OrderItem> lines;
 }
 
-@Entity(name = "order_items")
+@Entity
+@Table(name = "order_items")
 public class OrderItem {
     @Id
     private long id;

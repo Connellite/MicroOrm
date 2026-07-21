@@ -33,6 +33,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     @Override
     public void createTable(Connection connection, EntityModel model) throws SQLException {
+        requirePhysicalMutableTable(model, "createTable");
         if (!existingColumns(connection, model).isEmpty()) {
             // Table already exists — ensure indexes only; never recreate or drop.
             createIndexes(connection, model);
@@ -46,6 +47,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     @Override
     public void syncTable(Connection connection, EntityModel model) throws SQLException {
+        requirePhysicalMutableTable(model, "syncTable");
         Set<String> existingColumns = existingColumns(connection, model);
         if (existingColumns.isEmpty()) {
             createTable(connection, model);
@@ -72,6 +74,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     @Override
     public void dropTable(Connection connection, EntityModel model) throws SQLException {
+        requirePhysicalMutableTable(model, "dropTable");
         if (existingColumns(connection, model).isEmpty()) {
             return;
         }
@@ -212,6 +215,12 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected String dropTableDdl(EntityModel model) {
         return "DROP TABLE " + model.sqlTableName(dialect);
+    }
+
+    private static void requirePhysicalMutableTable(EntityModel model, String operation) {
+        if (model.immutable()) {
+            throw new MicroOrmException("Entity " + model.entityClass().getName() + " is immutable; schema operation is not allowed: " + operation);
+        }
     }
 
     protected void validateAddJoinColumn(EntityModel model, io.github.connellite.microorm.mapping.ManyToOneField relation) {

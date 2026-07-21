@@ -1,6 +1,7 @@
 package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.PostLoad;
 import io.github.connellite.microorm.annotation.PostPersist;
@@ -24,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LifecycleCallbacksTest {
 
-    @Entity(name = "lifecycle_items")
+    @Entity
+    @Table(name = "lifecycle_items")
     public static class LifecycleItem {
         static final List<String> EVENTS = new ArrayList<>();
 
@@ -85,7 +87,8 @@ class LifecycleCallbacksTest {
         }
     }
 
-    @Entity(name = "invalid_lifecycle_items")
+    @Entity
+    @Table(name = "invalid_lifecycle_items")
     public static class InvalidLifecycleItem {
         @Id
         private long id;

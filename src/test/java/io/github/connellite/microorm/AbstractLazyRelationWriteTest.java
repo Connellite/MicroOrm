@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
@@ -28,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 abstract class AbstractLazyRelationWriteTest {
 
-    @Entity(name = "write_documents")
+    @Entity
+    @Table(name = "write_documents")
     static class Document {
         @Id
         UUID id;
@@ -55,7 +57,8 @@ abstract class AbstractLazyRelationWriteTest {
         }
     }
 
-    @Entity(name = "write_files")
+    @Entity
+    @Table(name = "write_files")
     static class StoredFile {
         @Id
         UUID id;
@@ -84,7 +87,8 @@ abstract class AbstractLazyRelationWriteTest {
     }
 
     /** Nullable back-link for cyclic graphs (two-pass insert). */
-    @Entity(name = "write_doc_heads")
+    @Entity
+    @Table(name = "write_doc_heads")
     static class DocHead {
         @Id
         UUID id;
@@ -100,7 +104,8 @@ abstract class AbstractLazyRelationWriteTest {
         }
     }
 
-    @Entity(name = "write_head_files")
+    @Entity
+    @Table(name = "write_head_files")
     static class HeadFile {
         @Id
         UUID id;

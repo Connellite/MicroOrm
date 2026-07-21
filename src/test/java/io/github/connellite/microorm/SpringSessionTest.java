@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.connection.SpringJdbcSupport;
 import io.github.connellite.microorm.session.Session;
@@ -27,7 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SpringSessionTest {
 
-    @Entity(name = "spring_widgets")
+    @Entity
+    @Table(name = "spring_widgets")
     public static class Widget {
         @Id
         private UUID id;
