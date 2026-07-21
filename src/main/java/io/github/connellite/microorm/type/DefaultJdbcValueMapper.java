@@ -27,10 +27,17 @@ public final class DefaultJdbcValueMapper implements JdbcValueMapper {
 
     @Override
     public Object toJdbcValue(EntityField field, Object value) {
+        return toJdbcValue(field, value, true);
+    }
+
+    Object toJdbcValue(EntityField field, Object value, boolean convertAttribute) {
+        if (convertAttribute) {
+            value = field.convertToDatabaseColumn(value);
+        }
         if (value == null) {
             return null;
         }
-        if (field.javaType() == UUID.class) {
+        if (field.jdbcJavaType() == UUID.class) {
             UUID uuid = coerce(value, UUID.class, field);
             return switch (uuidStorage) {
                 case NATIVE -> uuid;
@@ -44,16 +51,22 @@ public final class DefaultJdbcValueMapper implements JdbcValueMapper {
 
     @Override
     public Object fromJdbcValue(EntityField field, Object value) {
+        return fromJdbcValue(field, value, true);
+    }
+
+    Object fromJdbcValue(EntityField field, Object value, boolean convertAttribute) {
         if (value == null) {
             return null;
         }
-        if (field.javaType() == UUID.class && uuidStorage == UuidStorage.BINARY && value instanceof byte[] bytes) {
-            return UuidUtil.binary2Uuid(bytes);
+        Object dbValue;
+        if (field.jdbcJavaType() == UUID.class && uuidStorage == UuidStorage.BINARY && value instanceof byte[] bytes) {
+            dbValue = UuidUtil.binary2Uuid(bytes);
+        } else if (field.jdbcJavaType() == UUID.class && uuidStorage == UuidStorage.MICROSOFT_GUID && value instanceof byte[] bytes) {
+            dbValue = UuidUtil.microsoftGuidBinary2Uuid(bytes);
+        } else {
+            dbValue = coerce(value, field.jdbcJavaType(), field);
         }
-        if (field.javaType() == UUID.class && uuidStorage == UuidStorage.MICROSOFT_GUID && value instanceof byte[] bytes) {
-            return UuidUtil.microsoftGuidBinary2Uuid(bytes);
-        }
-        return coerce(value, field.javaType(), field);
+        return convertAttribute ? field.convertToEntityAttribute(dbValue) : dbValue;
     }
 
     private static <T> T coerce(Object value, Class<T> targetType, EntityField field) {

@@ -10,21 +10,22 @@ import java.sql.SQLException;
  */
 public final class OracleJdbcValueMapper implements JdbcValueMapper {
 
-    private final JdbcValueMapper delegate = new DefaultJdbcValueMapper(UuidStorage.BINARY);
+    private final DefaultJdbcValueMapper delegate = new DefaultJdbcValueMapper(UuidStorage.BINARY);
 
     @Override
     public Object toJdbcValue(EntityField field, Object value) {
-        if (value != null && (field.javaType() == boolean.class || field.javaType() == Boolean.class)) {
+        value = field.convertToDatabaseColumn(value);
+        if (value != null && (field.jdbcJavaType() == boolean.class || field.jdbcJavaType() == Boolean.class)) {
             return Boolean.TRUE.equals(value) ? 1 : 0;
         }
-        return delegate.toJdbcValue(field, value);
+        return delegate.toJdbcValue(field, value, false);
     }
 
     @Override
     public Object fromJdbcValue(EntityField field, Object value) {
-        if (value != null && (field.javaType() == boolean.class || field.javaType() == Boolean.class)) {
+        if (value != null && (field.jdbcJavaType() == boolean.class || field.jdbcJavaType() == Boolean.class)) {
             if (value instanceof Number n) {
-                return n.intValue() != 0;
+                return field.convertToEntityAttribute(n.intValue() != 0);
             }
         }
         return delegate.fromJdbcValue(field, value);

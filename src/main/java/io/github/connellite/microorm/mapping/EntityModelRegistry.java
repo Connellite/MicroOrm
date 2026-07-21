@@ -4,6 +4,7 @@ import io.github.connellite.collections.ConcurrentReferenceHashMap;
 import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
+import io.github.connellite.microorm.annotation.Convert;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Immutable;
@@ -17,9 +18,12 @@ import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.AttributeConverter;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -119,14 +123,15 @@ public final class EntityModelRegistry {
             }
             Id idAnn = f.getAnnotation(Id.class);
             Column colAnn = f.getAnnotation(Column.class);
+            ConverterMetadata converter = converterMetadata(entityClass, f);
             if (idAnn != null) {
                 if (pk != null) {
                     throw new MicroOrmException("Multiple @Id fields on " + entityClass.getName());
                 }
-                validateIdField(entityClass, f, idAnn);
+                validateIdField(entityClass, f, idAnn, converter);
                 SqlIdentifier col = toPhysicalColumn(columnIdentifier(f, colAnn));
                 boolean nullable = colAnn != null && colAnn.nullable();
-                pk = new EntityField(
+                pk = newEntityField(
                         f,
                         col,
                         true,
@@ -135,13 +140,14 @@ public final class EntityModelRegistry {
                         colAnn != null && colAnn.unique(),
                         colAnn != null && colAnn.indexed(),
                         colAnn == null ? "" : colAnn.sqlType(),
-                        colAnn == null ? 0 : colAnn.length());
+                        colAnn == null ? 0 : colAnn.length(),
+                        converter);
                 fields.add(pk);
             } else {
-                validateFieldType(entityClass, f);
+                validateFieldType(entityClass, f, converter);
                 SqlIdentifier col = toPhysicalColumn(columnIdentifier(f, colAnn));
                 boolean nullable = colAnn == null || colAnn.nullable();
-                fields.add(new EntityField(
+                fields.add(newEntityField(
                         f,
                         col,
                         false,
@@ -150,7 +156,8 @@ public final class EntityModelRegistry {
                         colAnn != null && colAnn.unique(),
                         colAnn != null && colAnn.indexed(),
                         colAnn == null ? "" : colAnn.sqlType(),
-                        colAnn == null ? 0 : colAnn.length()));
+                        colAnn == null ? 0 : colAnn.length(),
+                        converter));
             }
         }
         if (pk == null) {
@@ -190,7 +197,8 @@ public final class EntityModelRegistry {
     private static Class<?> primaryKeyJavaType(Class<?> entityClass) {
         for (Field f : entityClass.getDeclaredFields()) {
             if (f.getAnnotation(Id.class) != null) {
-                return f.getType();
+                ConverterMetadata converter = converterMetadata(entityClass, f);
+                return converter == null ? f.getType() : converter.databaseType();
             }
         }
         throw new MicroOrmException("Missing @Id on " + entityClass.getName());
@@ -267,9 +275,9 @@ public final class EntityModelRegistry {
         }
     }
 
-    private static void validateIdField(Class<?> entityClass, Field field, Id idAnn) {
-        validateFieldType(entityClass, field);
-        Class<?> type = ReflectionUtil.primitiveToWrapper(field.getType());
+    private static void validateIdField(Class<?> entityClass, Field field, Id idAnn, ConverterMetadata converter) {
+        validateFieldType(entityClass, field, converter);
+        Class<?> type = ReflectionUtil.primitiveToWrapper(converter == null ? field.getType() : converter.databaseType());
         boolean numeric = Number.class.isAssignableFrom(type);
         boolean uuid = type == UUID.class;
         if (!numeric && !uuid) {
@@ -304,15 +312,105 @@ public final class EntityModelRegistry {
         return SqlIdentifier.unquoted(f.getName());
     }
 
-    private static void validateFieldType(Class<?> entityClass, Field field) {
-        if (!SupportedFieldTypes.isSupported(field.getType())) {
-            throw new MicroOrmException("Unsupported field type " + field.getType().getName()
+    private static void validateFieldType(Class<?> entityClass, Field field, ConverterMetadata converter) {
+        Class<?> type = converter == null ? field.getType() : converter.databaseType();
+        if (!SupportedFieldTypes.isSupported(type)) {
+            throw new MicroOrmException("Unsupported field type " + type.getName()
                     + " on " + entityClass.getName() + "." + field.getName());
         }
         Column colAnn = field.getAnnotation(Column.class);
         if (colAnn != null && !colAnn.sqlType().isBlank()) {
             SqlGenerator.validateSqlType(colAnn.sqlType(), entityClass.getName() + "." + field.getName());
         }
+    }
+
+    private static EntityField newEntityField(
+            Field field,
+            SqlIdentifier column,
+            boolean id,
+            boolean autoIncrement,
+            boolean nullable,
+            boolean unique,
+            boolean indexed,
+            String sqlType,
+            int length,
+            ConverterMetadata converter) {
+        if (converter == null) {
+            return new EntityField(field, column, id, autoIncrement, nullable, unique, indexed, sqlType, length);
+        }
+        return new EntityField(
+                field,
+                column,
+                id,
+                autoIncrement,
+                nullable,
+                unique,
+                indexed,
+                sqlType,
+                length,
+                converter.converter(),
+                converter.attributeType(),
+                converter.databaseType());
+    }
+
+    private static ConverterMetadata converterMetadata(Class<?> entityClass, Field field) {
+        Convert convert = field.getAnnotation(Convert.class);
+        if (convert == null) {
+            return null;
+        }
+        AttributeConverter<?, ?> converter;
+        try {
+            converter = ReflectionUtil.getInstance(convert.converter());
+        } catch (ReflectiveOperationException e) {
+            throw new MicroOrmException("Cannot instantiate converter " + convert.converter().getName()
+                    + " for " + entityClass.getName() + "." + field.getName(), e);
+        }
+        List<Class<?>> types = converterTypes(convert.converter());
+        if (types.size() < 2) {
+            throw new MicroOrmException("Converter " + convert.converter().getName()
+                    + " must declare AttributeConverter<Attribute, Database>");
+        }
+        Class<?> attributeType = types.get(0);
+        Class<?> databaseType = types.get(1);
+        Class<?> fieldType = ReflectionUtil.primitiveToWrapper(field.getType());
+        Class<?> normalizedAttributeType = ReflectionUtil.primitiveToWrapper(attributeType);
+        if (!normalizedAttributeType.isAssignableFrom(fieldType) && !fieldType.isAssignableFrom(normalizedAttributeType)) {
+            throw new MicroOrmException("Converter " + convert.converter().getName()
+                    + " attribute type " + attributeType.getName()
+                    + " does not match " + entityClass.getName() + "." + field.getName());
+        }
+        return new ConverterMetadata(converter, attributeType, databaseType);
+    }
+
+    private static List<Class<?>> converterTypes(Class<?> converterClass) {
+        for (Type genericInterface : converterClass.getGenericInterfaces()) {
+            List<Class<?>> classes = converterTypes(genericInterface);
+            if (!classes.isEmpty()) {
+                return classes;
+            }
+        }
+        Class<?> superClass = converterClass.getSuperclass();
+        return superClass == null || superClass == Object.class ? List.of() : converterTypes(superClass);
+    }
+
+    private static List<Class<?>> converterTypes(Type type) {
+        if (type instanceof ParameterizedType parameterized
+                && parameterized.getRawType() == AttributeConverter.class) {
+            return ReflectionUtil.getAllGenericParameterClasses(parameterized);
+        }
+        if (type instanceof Class<?> clazz) {
+            return converterTypes(clazz);
+        }
+        if (type instanceof ParameterizedType parameterized && parameterized.getRawType() instanceof Class<?> rawClass) {
+            return converterTypes(rawClass);
+        }
+        return List.of();
+    }
+
+    private record ConverterMetadata(
+            AttributeConverter<?, ?> converter,
+            Class<?> attributeType,
+            Class<?> databaseType) {
     }
 
     private static void rejectInheritedMappedFields(Class<?> entityClass) {

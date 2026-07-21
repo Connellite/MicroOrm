@@ -106,7 +106,7 @@ public final class EntityHydrator {
             if (raw == null || rs.wasNull()) {
                 setFieldValue(entity, f, null);
             } else {
-                setFieldValue(entity, f, valueMapper == null ? raw : valueMapper.fromJdbcValue(f, raw));
+                setFieldValue(entity, f, valueMapper == null ? f.convertToEntityAttribute(raw) : valueMapper.fromJdbcValue(f, raw));
             }
         }
         if (lazyContext != null && registry != null && dialect != null) {

@@ -6,7 +6,7 @@ Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https:/
 
 ## Features
 
-- Annotation mapping: `@Entity`, `@Table`, `@Column`, `@Id`, `@Transient`, `@Immutable`, `@Subselect`
+- Annotation mapping: `@Entity`, `@Table`, `@Column`, `@Id`, `@Transient`, `@Convert`, `@Immutable`, `@Subselect`
 - CRUD, batch insert, map-based filtered select, streaming reads, custom `Query`
 - **`EntityQuery`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, and relation joins
 - **Associations**: `@ManyToOne` / `@OneToMany` with lazy (`LazyRef`, `LazyCollection`) or eager (`EagerRef`, `EagerCollection`) loading

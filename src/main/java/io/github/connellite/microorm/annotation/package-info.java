@@ -2,6 +2,7 @@
  * Mapping annotations for entity classes: {@link io.github.connellite.microorm.annotation.Entity},
  * {@link io.github.connellite.microorm.annotation.Table},
  * {@link io.github.connellite.microorm.annotation.Column}, {@link io.github.connellite.microorm.annotation.Id},
+ * {@link io.github.connellite.microorm.annotation.Convert},
  * association markers {@link io.github.connellite.microorm.annotation.ManyToOne} /
  * {@link io.github.connellite.microorm.annotation.OneToMany}, read-only mapping markers
  * {@link io.github.connellite.microorm.annotation.Immutable} /

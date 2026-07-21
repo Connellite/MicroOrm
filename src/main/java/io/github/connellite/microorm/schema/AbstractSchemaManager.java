@@ -129,7 +129,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         if (!field.sqlType().isBlank()) {
             return field.sqlType();
         }
-        return baseTypeForJava(field.javaType(), field.length());
+        return baseTypeForJava(field.jdbcJavaType(), field.length());
     }
 
     protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
