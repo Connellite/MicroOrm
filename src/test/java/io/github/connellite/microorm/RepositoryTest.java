@@ -8,10 +8,10 @@ import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.repository.EntityRepository;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
@@ -65,10 +65,12 @@ class RepositoryTest {
     interface IndirectRepositoryItemRepository extends BaseRepository<RepositoryItem, Long> {
     }
 
-    @Test
-    void onDemandRepositoryDelegatesToSessionMethods() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void onDemandRepositoryDelegatesToSessionMethods(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "repository_items");
+            MicroOrm orm = dialect.createOrm(connection);
             RepositoryItemRepository repository = orm.repository(RepositoryItemRepository.class);
 
             repository.createEntity();
@@ -90,10 +92,12 @@ class RepositoryTest {
         }
     }
 
-    @Test
-    void sessionBoundRepositorySharesTransaction() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void sessionBoundRepositorySharesTransaction(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "repository_items");
+            MicroOrm orm = dialect.createOrm(connection);
             try (Session session = orm.openSession()) {
                 RepositoryItemRepository repository = session.repository(RepositoryItemRepository.class);
                 repository.createEntity();
@@ -110,10 +114,12 @@ class RepositoryTest {
         }
     }
 
-    @Test
-    void resolvesEntityTypeThroughIntermediateGenericRepositoryInterface() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection).register(RepositoryItem.class);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void resolvesEntityTypeThroughIntermediateGenericRepositoryInterface(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "repository_items");
+            MicroOrm orm = dialect.createOrm(connection).register(RepositoryItem.class);
             IndirectRepositoryItemRepository repository = orm.repository(IndirectRepositoryItemRepository.class);
 
             repository.createEntity();
@@ -121,5 +127,9 @@ class RepositoryTest {
 
             assertEquals("indirect", repository.selectRow(inserted.getId()).getName());
         }
+    }
+
+    private static java.util.stream.Stream<DialectTestSupport.DialectFixture> dialects() {
+        return DialectTestSupport.dialects();
     }
 }

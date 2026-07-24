@@ -11,14 +11,17 @@ import io.github.connellite.microorm.annotation.PrePersist;
 import io.github.connellite.microorm.annotation.PreRemove;
 import io.github.connellite.microorm.annotation.PreUpdate;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.session.Session;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -99,11 +102,13 @@ class LifecycleCallbacksTest {
         }
     }
 
-    @Test
-    void invokesEntityLifecycleCallbacksAroundCrudAndLoad() throws SQLException {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void invokesEntityLifecycleCallbacksAroundCrudAndLoad(DialectTestSupport.DialectFixture dialect) throws SQLException {
         LifecycleItem.EVENTS.clear();
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection).register(LifecycleItem.class);
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "lifecycle_items", "invalid_lifecycle_items");
+            MicroOrm orm = dialect.createOrm(connection).register(LifecycleItem.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(LifecycleItem.class);
 
@@ -128,11 +133,11 @@ class LifecycleCallbacksTest {
     }
 
     @Test
-    void rejectsInvalidLifecycleCallbackSignatures() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection);
+    void rejectsInvalidLifecycleCallbackSignatures() {
+        assertThrows(MicroOrmException.class, () -> new EntityModelRegistry().register(InvalidLifecycleItem.class));
+    }
 
-            assertThrows(MicroOrmException.class, () -> orm.register(InvalidLifecycleItem.class));
-        }
+    private static Stream<DialectTestSupport.DialectFixture> dialects() {
+        return DialectTestSupport.dialects();
     }
 }

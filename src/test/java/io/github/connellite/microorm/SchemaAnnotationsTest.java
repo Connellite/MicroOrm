@@ -10,16 +10,18 @@ import io.github.connellite.microorm.annotation.Index;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.UniqueConstraint;
 import io.github.connellite.microorm.session.Session;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SchemaAnnotationsTest {
@@ -67,40 +69,44 @@ class SchemaAnnotationsTest {
         private String code;
     }
 
-    @Test
-    void createTableAppliesSchemaAnnotations() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection).register(SchemaOrder.class);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void createTableAppliesSchemaAnnotations(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "schema_orders", "schema_orders_sync");
+            MicroOrm orm = dialect.createOrm(connection).register(SchemaOrder.class);
 
             try (Session session = orm.openSession()) {
                 session.createEntity(SchemaOrder.class);
             }
 
-            assertTrue(indexExists(connection, "schema_orders", "idx_schema_orders_status"));
-            assertTrue(indexExists(connection, "schema_orders", "idx_schema_orders_status_total"));
-            assertTrue(indexExists(connection, "schema_orders", "uk_schema_orders_code"));
-            assertCreateSqlContains(connection, "schema_orders", "DEFAULT 'NEW'");
-            assertCreateSqlContains(connection, "schema_orders", "CONSTRAINT ck_schema_orders_total CHECK (total >= 0)");
-            assertCreateSqlContains(connection, "schema_orders", "CONSTRAINT uk_schema_orders_code UNIQUE (code)");
+            assertTrue(DialectTestSupport.indexExists(connection, "schema_orders", "idx_schema_orders_status"));
+            assertTrue(DialectTestSupport.indexExists(connection, "schema_orders", "idx_schema_orders_status_total"));
+            assertTrue(DialectTestSupport.indexExists(connection, "schema_orders", "uk_schema_orders_code"));
+            assertDefaultValueIsApplied(connection, "schema_orders");
+            assertCheckConstraintIsApplied(connection, "schema_orders");
+            assertUniqueConstraintIsApplied(connection, "schema_orders");
         }
     }
 
-    @Test
-    void syncTableAddsDefaultedNotNullColumnAndMissingIndexesIdempotently() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:");
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void syncTableAddsDefaultedNotNullColumnAndMissingIndexesIdempotently(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection();
              Statement statement = connection.createStatement()) {
-            statement.execute("CREATE TABLE schema_orders_sync (id INTEGER PRIMARY KEY AUTOINCREMENT)");
+            DialectTestSupport.dropTables(connection, "schema_orders", "schema_orders_sync");
+            statement.execute(dialect.autoIncrementIdTableDdl("schema_orders_sync"));
 
-            MicroOrm orm = MicroOrm.sqlite(connection).register(SchemaOrderSync.class);
+            MicroOrm orm = dialect.createOrm(connection).register(SchemaOrderSync.class);
             try (Session session = orm.openSession()) {
                 session.syncEntity(SchemaOrderSync.class);
                 session.syncEntity(SchemaOrderSync.class);
             }
 
-            assertTrue(columnExists(connection, "schema_orders_sync", "status"));
-            assertTrue(columnExists(connection, "schema_orders_sync", "code"));
-            assertTrue(indexExists(connection, "schema_orders_sync", "idx_schema_orders_sync_status"));
-            assertTrue(indexExists(connection, "schema_orders_sync", "uk_schema_orders_sync_code"));
+            assertTrue(DialectTestSupport.columnExists(connection, "schema_orders_sync", "status"));
+            assertTrue(DialectTestSupport.columnExists(connection, "schema_orders_sync", "code"));
+            assertTrue(DialectTestSupport.indexExists(connection, "schema_orders_sync", "idx_schema_orders_sync_status"));
+            assertTrue(DialectTestSupport.indexExists(connection, "schema_orders_sync", "uk_schema_orders_sync_code"));
 
             statement.execute("INSERT INTO schema_orders_sync (code) VALUES ('A-1')");
             try (ResultSet rs = statement.executeQuery("SELECT status FROM schema_orders_sync WHERE code = 'A-1'")) {
@@ -111,28 +117,34 @@ class SchemaAnnotationsTest {
         }
     }
 
-    private static boolean columnExists(Connection connection, String tableName, String columnName) throws SQLException {
-        try (ResultSet rs = connection.getMetaData().getColumns(null, null, tableName, columnName)) {
-            return rs.next();
-        }
+    private static Stream<DialectTestSupport.DialectFixture> dialects() {
+        return DialectTestSupport.dialects();
     }
 
-    private static boolean indexExists(Connection connection, String tableName, String indexName) throws SQLException {
-        try (ResultSet rs = connection.getMetaData().getIndexInfo(null, null, tableName, false, false)) {
-            while (rs.next()) {
-                if (indexName.equalsIgnoreCase(rs.getString("INDEX_NAME"))) {
-                    return true;
-                }
+    private static void assertDefaultValueIsApplied(Connection connection, String tableName) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO " + tableName + " (code, total) VALUES ('D-1', 10)");
+            try (ResultSet rs = statement.executeQuery("SELECT status FROM " + tableName + " WHERE code = 'D-1'")) {
+                assertTrue(rs.next());
+                assertEquals("NEW", rs.getString(1));
+                assertFalse(rs.next());
             }
         }
-        return false;
     }
 
-    private static void assertCreateSqlContains(Connection connection, String tableName, String expected) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '" + tableName + "'")) {
-            assertTrue(rs.next());
-            assertTrue(rs.getString(1).contains(expected), rs.getString(1));
+    private static void assertCheckConstraintIsApplied(Connection connection, String tableName) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            assertThrows(SQLException.class,
+                    () -> statement.execute("INSERT INTO " + tableName + " (status, code, total) VALUES ('NEW', 'C-1', -1)"));
         }
     }
+
+    private static void assertUniqueConstraintIsApplied(Connection connection, String tableName) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO " + tableName + " (status, code, total) VALUES ('NEW', 'U-1', 1)");
+            assertThrows(SQLException.class,
+                    () -> statement.execute("INSERT INTO " + tableName + " (status, code, total) VALUES ('NEW', 'U-1', 2)"));
+        }
+    }
+
 }

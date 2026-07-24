@@ -7,13 +7,14 @@ import io.github.connellite.microorm.annotation.Subselect;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.session.Session;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,11 +41,13 @@ class EntityMappingAnnotationTest {
         private String name;
     }
 
-    @Test
-    void immutableEntityAllowsSelectOnly() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void immutableEntityAllowsSelectOnly(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "read_only_items", "source_items");
             createReadOnlyTable(connection);
-            MicroOrm orm = MicroOrm.sqlite(connection).register(ReadOnlyItem.class);
+            MicroOrm orm = dialect.createOrm(connection).register(ReadOnlyItem.class);
             try (Session session = orm.openSession()) {
                 List<ReadOnlyItem> rows = session.selectRows(ReadOnlyItem.class);
 
@@ -60,11 +63,13 @@ class EntityMappingAnnotationTest {
         }
     }
 
-    @Test
-    void subselectEntityUsesSubquerySourceAndAllowsSelectOnly() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void subselectEntityUsesSubquerySourceAndAllowsSelectOnly(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "read_only_items", "source_items");
             createSourceTable(connection);
-            MicroOrm orm = MicroOrm.sqlite(connection).register(ActiveItem.class);
+            MicroOrm orm = dialect.createOrm(connection).register(ActiveItem.class);
             try (Session session = orm.openSession()) {
                 List<ActiveItem> rows = session.selectRows(ActiveItem.class);
 
@@ -79,16 +84,34 @@ class EntityMappingAnnotationTest {
 
     private static void createReadOnlyTable(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("CREATE TABLE read_only_items (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+            statement.executeUpdate("CREATE TABLE read_only_items (id " + longType(connection)
+                    + " PRIMARY KEY, name " + stringType(connection) + " NOT NULL)");
             statement.executeUpdate("INSERT INTO read_only_items (id, name) VALUES (1, 'locked')");
         }
     }
 
     private static void createSourceTable(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("CREATE TABLE source_items (id INTEGER PRIMARY KEY, name TEXT NOT NULL, active INTEGER NOT NULL)");
+            statement.executeUpdate("CREATE TABLE source_items (id " + longType(connection)
+                    + " PRIMARY KEY, name " + stringType(connection) + " NOT NULL, active INTEGER NOT NULL)");
             statement.executeUpdate("INSERT INTO source_items (id, name, active) VALUES (1, 'active', 1)");
             statement.executeUpdate("INSERT INTO source_items (id, name, active) VALUES (2, 'inactive', 0)");
         }
+    }
+
+    private static String longType(Connection connection) throws SQLException {
+        return oracle(connection) ? "NUMBER(19)" : "BIGINT";
+    }
+
+    private static String stringType(Connection connection) throws SQLException {
+        return oracle(connection) ? "VARCHAR2(64)" : "VARCHAR(64)";
+    }
+
+    private static boolean oracle(Connection connection) throws SQLException {
+        return connection.getMetaData().getDatabaseProductName().toLowerCase().contains("oracle");
+    }
+
+    private static Stream<DialectTestSupport.DialectFixture> dialects() {
+        return DialectTestSupport.dialects();
     }
 }

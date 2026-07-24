@@ -6,18 +6,21 @@ import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.type.AttributeConverter;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -76,10 +79,12 @@ class AttributeConverterTest {
         private Money total;
     }
 
-    @Test
-    void convertsAttributeToDatabaseColumnAndBack() throws SQLException {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection).register(ConvertedOrder.class);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void convertsAttributeToDatabaseColumnAndBack(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "converted_orders", "wrong_converted_orders");
+            MicroOrm orm = dialect.createOrm(connection).register(ConvertedOrder.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(ConvertedOrder.class);
 
@@ -101,13 +106,11 @@ class AttributeConverterTest {
 
     @Test
     void rejectsConverterWhoseAttributeTypeDoesNotMatchField() {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            MicroOrm orm = MicroOrm.sqlite(connection);
+        assertThrows(MicroOrmException.class, () -> new EntityModelRegistry().register(WrongConvertedOrder.class));
+    }
 
-            assertThrows(MicroOrmException.class, () -> orm.register(WrongConvertedOrder.class));
-        } catch (SQLException e) {
-            throw new AssertionError(e);
-        }
+    private static Stream<DialectTestSupport.DialectFixture> dialects() {
+        return DialectTestSupport.dialects();
     }
 
     private static String rawTotal(Connection connection) throws SQLException {

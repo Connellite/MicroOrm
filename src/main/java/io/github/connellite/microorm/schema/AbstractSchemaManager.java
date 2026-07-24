@@ -130,15 +130,15 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             sb.append(baseType(f)).append(" NOT NULL PRIMARY KEY");
         } else {
             sb.append(baseType(f));
+            if (!f.columnDefault().isBlank()) {
+                sb.append(" DEFAULT ").append(f.columnDefault());
+            }
             if (!f.nullable()) {
                 sb.append(" NOT NULL");
             }
             if (includeUnique && f.unique()) {
                 sb.append(" UNIQUE");
             }
-        }
-        if (!f.columnDefault().isBlank()) {
-            sb.append(" DEFAULT ").append(f.columnDefault());
         }
         String inlineComment = inlineColumnComment(f);
         if (!inlineComment.isBlank()) {
