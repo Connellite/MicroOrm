@@ -4,7 +4,7 @@ import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.repository.EntityRepository;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
@@ -54,8 +54,8 @@ class RepositoryTest {
 
     interface RepositoryItemRepository extends EntityRepository<RepositoryItem, Long> {
         default Optional<RepositoryItem> findByName(String name) {
-            return findOne(EntityQuery.of(RepositoryItem.class)
-                    .where(EntityQuery.field(RepositoryItem::getName).eq(name)));
+            return findOne(EntitySelect.of(RepositoryItem.class)
+                    .where(EntitySelect.field(RepositoryItem::getName).eq(name)));
         }
     }
 

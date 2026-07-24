@@ -9,7 +9,7 @@ import java.util.Objects;
  * Reference to a mapped entity field used to build criteria and sort orders.
  * <p>
  * The name may be either the Java field name or the physical column name. Joined fields use
- * {@code relation.field} and require a matching {@link EntityQuery#join(String)} declaration.
+ * {@code relation.field} and require a matching {@link EntitySelect#join(String)} declaration.
  * The path is resolved against the registered entity model when the query is executed.
  *
  * @param name Java field name, mapped column name, or joined path
@@ -74,7 +74,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field = ANY (entity subquery)}. */
-    public Criterion eqAny(EntityQuery<?> query) {
+    public Criterion eqAny(EntitySelect<?> query) {
         return any(ComparisonOperator.EQ, query);
     }
 
@@ -84,7 +84,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field <> ANY (entity subquery)}. */
-    public Criterion neAny(EntityQuery<?> query) {
+    public Criterion neAny(EntitySelect<?> query) {
         return any(ComparisonOperator.NE, query);
     }
 
@@ -94,7 +94,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field < ANY (entity subquery)}. */
-    public Criterion ltAny(EntityQuery<?> query) {
+    public Criterion ltAny(EntitySelect<?> query) {
         return any(ComparisonOperator.LT, query);
     }
 
@@ -104,7 +104,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field <= ANY (entity subquery)}. */
-    public Criterion leAny(EntityQuery<?> query) {
+    public Criterion leAny(EntitySelect<?> query) {
         return any(ComparisonOperator.LE, query);
     }
 
@@ -114,7 +114,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field > ANY (entity subquery)}. */
-    public Criterion gtAny(EntityQuery<?> query) {
+    public Criterion gtAny(EntitySelect<?> query) {
         return any(ComparisonOperator.GT, query);
     }
 
@@ -124,7 +124,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field >= ANY (entity subquery)}. */
-    public Criterion geAny(EntityQuery<?> query) {
+    public Criterion geAny(EntitySelect<?> query) {
         return any(ComparisonOperator.GE, query);
     }
 
@@ -134,7 +134,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field <operator> ANY (entity subquery)}. */
-    public Criterion any(ComparisonOperator operator, EntityQuery<?> query) {
+    public Criterion any(ComparisonOperator operator, EntitySelect<?> query) {
         return quantified(operator, SubqueryQuantifier.ANY, query);
     }
 
@@ -144,7 +144,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field = ALL (entity subquery)}. */
-    public Criterion eqAll(EntityQuery<?> query) {
+    public Criterion eqAll(EntitySelect<?> query) {
         return all(ComparisonOperator.EQ, query);
     }
 
@@ -154,7 +154,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field <> ALL (entity subquery)}. */
-    public Criterion neAll(EntityQuery<?> query) {
+    public Criterion neAll(EntitySelect<?> query) {
         return all(ComparisonOperator.NE, query);
     }
 
@@ -164,7 +164,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field < ALL (entity subquery)}. */
-    public Criterion ltAll(EntityQuery<?> query) {
+    public Criterion ltAll(EntitySelect<?> query) {
         return all(ComparisonOperator.LT, query);
     }
 
@@ -174,7 +174,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field <= ALL (entity subquery)}. */
-    public Criterion leAll(EntityQuery<?> query) {
+    public Criterion leAll(EntitySelect<?> query) {
         return all(ComparisonOperator.LE, query);
     }
 
@@ -184,7 +184,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field > ALL (entity subquery)}. */
-    public Criterion gtAll(EntityQuery<?> query) {
+    public Criterion gtAll(EntitySelect<?> query) {
         return all(ComparisonOperator.GT, query);
     }
 
@@ -194,7 +194,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field >= ALL (entity subquery)}. */
-    public Criterion geAll(EntityQuery<?> query) {
+    public Criterion geAll(EntitySelect<?> query) {
         return all(ComparisonOperator.GE, query);
     }
 
@@ -204,7 +204,7 @@ public record FieldPath(String name) {
     }
 
     /** Builds {@code field <operator> ALL (entity subquery)}. */
-    public Criterion all(ComparisonOperator operator, EntityQuery<?> query) {
+    public Criterion all(ComparisonOperator operator, EntitySelect<?> query) {
         return quantified(operator, SubqueryQuantifier.ALL, query);
     }
 
@@ -253,7 +253,7 @@ public record FieldPath(String name) {
         return new QuantifiedSubqueryCriterion(name, operator, quantifier, query, null);
     }
 
-    private Criterion quantified(ComparisonOperator operator, SubqueryQuantifier quantifier, EntityQuery<?> query) {
+    private Criterion quantified(ComparisonOperator operator, SubqueryQuantifier quantifier, EntitySelect<?> query) {
         Objects.requireNonNull(operator, "operator");
         return new QuantifiedSubqueryCriterion(name, operator, quantifier, null, query);
     }

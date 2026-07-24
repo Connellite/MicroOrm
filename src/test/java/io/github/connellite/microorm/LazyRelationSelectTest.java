@@ -8,7 +8,7 @@ import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.exception.MicroOrmException;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.relation.LazyCollection;
 import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.session.Session;
@@ -232,11 +232,11 @@ class LazyRelationSelectTest {
     }
 
     @Test
-    void entityQueryManyToOneJoinFiltersRows() throws SQLException {
+    void EntitySelectManyToOneJoinFiltersRows() throws SQLException {
         try (Session session = orm.openSession()) {
-            EntityQuery<Order> query = EntityQuery.of(Order.class)
+            EntitySelect<Order> query = EntitySelect.of(Order.class)
                     .join("customer")
-                    .where(EntityQuery.field("customer.name").eq("Acme"));
+                    .where(EntitySelect.field("customer.name").eq("Acme"));
 
             List<Order> rows = session.selectRows(query);
 
@@ -246,11 +246,11 @@ class LazyRelationSelectTest {
     }
 
     @Test
-    void entityQueryOneToManyJoinFiltersRows() throws SQLException {
+    void EntitySelectOneToManyJoinFiltersRows() throws SQLException {
         try (Session session = orm.openSession()) {
-            EntityQuery<Order> query = EntityQuery.of(Order.class)
+            EntitySelect<Order> query = EntitySelect.of(Order.class)
                     .leftJoin("lines")
-                    .where(EntityQuery.field("lines.sku").in(List.of("WIDGET", "GADGET")));
+                    .where(EntitySelect.field("lines.sku").in(List.of("WIDGET", "GADGET")));
 
             List<Order> rows = session.selectRows(query);
 

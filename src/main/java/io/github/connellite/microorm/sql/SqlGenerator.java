@@ -5,7 +5,10 @@ import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntityDelete;
+import io.github.connellite.microorm.query.EntityInsert;
+import io.github.connellite.microorm.query.EntitySelect;
+import io.github.connellite.microorm.query.EntityUpdate;
 
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -44,9 +47,15 @@ public interface SqlGenerator {
 
     BoundStatement selectWhere(EntityModel model, Map<String, ?> filters);
 
-    BoundStatement select(EntityModel model, EntityQuery<?> query);
+    BoundStatement select(EntityModel model, EntitySelect<?> query);
 
-    BoundStatement select(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry);
+    BoundStatement select(EntityModel model, EntitySelect<?> query, EntityModelRegistry registry);
+
+    BoundStatement insert(EntityModel model, EntityInsert<?> mutation);
+
+    BoundStatement update(EntityModel model, EntityUpdate<?> mutation);
+
+    BoundStatement delete(EntityModel model, EntityDelete<?> mutation);
 
     BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
 

@@ -1,7 +1,7 @@
 package io.github.connellite.microorm.repository;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.reflection.ReflectionUtil;
@@ -194,14 +194,14 @@ public final class RepositoryProxyFactory {
                 if ("selectRows".equals(name) && Map.class.isAssignableFrom(parameters[0])) {
                     return session.selectRows(entityType, (Map<String, ?>) arg);
                 }
-                if ("selectRows".equals(name) && EntityQuery.class.isAssignableFrom(parameters[0])) {
-                    return session.selectRows((EntityQuery<?>) arg);
+                if ("selectRows".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
+                    return session.selectRows((EntitySelect<?>) arg);
                 }
-                if ("selectOne".equals(name) && EntityQuery.class.isAssignableFrom(parameters[0])) {
-                    return session.selectOne((EntityQuery<?>) arg);
+                if ("selectOne".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
+                    return session.selectOne((EntitySelect<?>) arg);
                 }
-                if ("findOne".equals(name) && EntityQuery.class.isAssignableFrom(parameters[0])) {
-                    return session.findOne((EntityQuery<?>) arg);
+                if ("findOne".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
+                    return session.findOne((EntitySelect<?>) arg);
                 }
                 if ("selectRows".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
                     return session.selectRows(entityType, (Query) arg);

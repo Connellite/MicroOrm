@@ -13,7 +13,10 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntityDelete;
+import io.github.connellite.microorm.query.EntityInsert;
+import io.github.connellite.microorm.query.EntitySelect;
+import io.github.connellite.microorm.query.EntityUpdate;
 import io.github.connellite.microorm.repository.EntityRepository;
 import io.github.connellite.microorm.repository.RepositoryProxyFactory;
 import io.github.connellite.microorm.sql.BoundStatement;
@@ -39,7 +42,7 @@ import java.util.stream.Stream;
 /**
  * Unit of work over a single JDBC {@link Connection}. Not thread-safe — use one session per thread.
  * <p>
- * Provides entity CRUD, schema helpers, map-based filtered selects, {@link EntityQuery} execution,
+ * Provides entity CRUD, schema helpers, map-based filtered selects, {@link EntitySelect} execution,
  * custom {@link Query} reads, and lazy or eager association loading through
  * {@link io.github.connellite.microorm.relation} wrappers.
  * <p>
@@ -443,32 +446,32 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     }
 
     /**
-     * Materializes rows matching an {@link EntityQuery}; closes the underlying JDBC resources.
+     * Materializes rows matching an {@link EntitySelect}; closes the underlying JDBC resources.
      */
-    public <T> List<T> selectRows(EntityQuery<T> query) {
+    public <T> List<T> selectRows(EntitySelect<T> query) {
         try (Stream<T> rows = streamRows(query)) {
             return rows.toList();
         }
     }
 
     /**
-     * Returns exactly one row matching an {@link EntityQuery}; throws when none or multiple rows match.
+     * Returns exactly one row matching an {@link EntitySelect}; throws when none or multiple rows match.
      */
-    public <T> T selectOne(EntityQuery<T> query) {
+    public <T> T selectOne(EntitySelect<T> query) {
         return singleResult(findAtMostTwo(query), true);
     }
 
     /**
-     * Returns zero or one row matching an {@link EntityQuery}; throws when multiple rows match.
+     * Returns zero or one row matching an {@link EntitySelect}; throws when multiple rows match.
      */
-    public <T> Optional<T> findOne(EntityQuery<T> query) {
+    public <T> Optional<T> findOne(EntitySelect<T> query) {
         return Optional.ofNullable(singleResult(findAtMostTwo(query), false));
     }
 
     /**
      * Lazy entity-query stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
      */
-    public <T> Stream<T> streamRows(EntityQuery<T> query) {
+    public <T> Stream<T> streamRows(EntitySelect<T> query) {
         Objects.requireNonNull(query, "query cannot be null");
         return openStream(() -> {
             EntityModel m = registry.get(query.entityType());
@@ -523,7 +526,43 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return SqlExecutor.executeUpdate(connection, query);
     }
 
-    private <T> List<T> findAtMostTwo(EntityQuery<T> query) {
+    /**
+     * Executes an SQL-oriented typed INSERT builder.
+     *
+     * @return affected row count
+     */
+    public int execute(EntityInsert<?> insert) {
+        Objects.requireNonNull(insert, "insert cannot be null");
+        EntityModel m = registry.get(insert.entityType());
+        requireMutable(m, "execute insert");
+        return SqlExecutor.executeUpdate(connection, sql.insert(m, insert));
+    }
+
+    /**
+     * Executes an SQL-oriented typed UPDATE builder.
+     *
+     * @return affected row count
+     */
+    public int execute(EntityUpdate<?> update) {
+        Objects.requireNonNull(update, "update cannot be null");
+        EntityModel m = registry.get(update.entityType());
+        requireMutable(m, "execute update");
+        return SqlExecutor.executeUpdate(connection, sql.update(m, update));
+    }
+
+    /**
+     * Executes an SQL-oriented typed DELETE builder.
+     *
+     * @return affected row count
+     */
+    public int execute(EntityDelete<?> delete) {
+        Objects.requireNonNull(delete, "delete cannot be null");
+        EntityModel m = registry.get(delete.entityType());
+        requireMutable(m, "execute delete");
+        return SqlExecutor.executeUpdate(connection, sql.delete(m, delete));
+    }
+
+    private <T> List<T> findAtMostTwo(EntitySelect<T> query) {
         try (Stream<T> rows = streamRows(query)) {
             return rows.limit(2).toList();
         }

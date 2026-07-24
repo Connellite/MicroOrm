@@ -14,7 +14,10 @@ import io.github.connellite.microorm.query.ComparisonOperator;
 import io.github.connellite.microorm.query.CompositeCriterion;
 import io.github.connellite.microorm.query.Criterion;
 import io.github.connellite.microorm.query.CriterionKind;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntityDelete;
+import io.github.connellite.microorm.query.EntityInsert;
+import io.github.connellite.microorm.query.EntitySelect;
+import io.github.connellite.microorm.query.EntityUpdate;
 import io.github.connellite.microorm.query.ExistsCriterion;
 import io.github.connellite.microorm.query.FieldCriterion;
 import io.github.connellite.microorm.query.Join;
@@ -289,7 +292,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
     }
 
     @Override
-    public BoundStatement select(EntityModel model, EntityQuery<?> query) {
+    public BoundStatement select(EntityModel model, EntitySelect<?> query) {
         EntityModelRegistry registry = new EntityModelRegistry();
         registry.register(model.entityClass());
         registerJoinTargets(model, registry);
@@ -297,12 +300,12 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
     }
 
     @Override
-    public BoundStatement select(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry) {
+    public BoundStatement select(EntityModel model, EntitySelect<?> query, EntityModelRegistry registry) {
         if (query == null) {
             return selectAll(model);
         }
         if (query.entityType() != model.entityClass()) {
-            throw new MicroOrmException("EntityQuery type " + query.entityType().getName()
+            throw new MicroOrmException("EntitySelect type " + query.entityType().getName()
                     + " does not match model " + model.entityClass().getName());
         }
         Map<String, Object> params = new LinkedHashMap<>();
@@ -336,6 +339,88 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 query.limit().isPresent() ? query.limit().getAsInt() : null,
                 query.offset().isPresent() ? query.offset().getAsInt() : null,
                 !query.orders().isEmpty()), params, collectionParams);
+    }
+
+    @Override
+    public BoundStatement insert(EntityModel model, EntityInsert<?> mutation) {
+        requireMutable(model, "insert");
+        if (mutation.entityType() != model.entityClass()) {
+            throw new MicroOrmException("EntityInsert type " + mutation.entityType().getName()
+                    + " does not match model " + model.entityClass().getName());
+        }
+        if (mutation.values().isEmpty()) {
+            throw new MicroOrmException("EntityInsert requires at least one value: " + model.entityClass().getName());
+        }
+        List<String> columns = new ArrayList<>();
+        List<String> slots = new ArrayList<>();
+        Map<String, Object> params = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : mutation.values().entrySet()) {
+            EntityField field = rootFieldByName(model, entry.getKey(), "insert");
+            String param = "v_" + field.columnName();
+            if (params.containsKey(param)) {
+                throw new MicroOrmException("Duplicate insert value for field: " + entry.getKey());
+            }
+            columns.add(dialect.sqlName(field.columnIdentifier()));
+            slots.add(":" + param);
+            params.put(param, dialect.valueMapper().toJdbcValue(field, entry.getValue()));
+        }
+        return BoundStatement.of(
+                "INSERT INTO " + model.sqlTableName(dialect)
+                        + " (" + String.join(", ", columns) + ") VALUES (" + String.join(", ", slots) + ")",
+                params);
+    }
+
+    @Override
+    public BoundStatement update(EntityModel model, EntityUpdate<?> mutation) {
+        requireMutable(model, "update");
+        if (mutation.entityType() != model.entityClass()) {
+            throw new MicroOrmException("EntityUpdate type " + mutation.entityType().getName()
+                    + " does not match model " + model.entityClass().getName());
+        }
+        if (mutation.assignments().isEmpty()) {
+            throw new MicroOrmException("EntityUpdate requires at least one assignment: " + model.entityClass().getName());
+        }
+        requireWhereOrAllRows(mutation.criterion(), mutation.isAllRows(), "EntityUpdate");
+
+        List<String> sets = new ArrayList<>();
+        Map<String, Object> params = new LinkedHashMap<>();
+        Map<String, Collection<?>> collectionParams = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : mutation.assignments().entrySet()) {
+            EntityField field = rootFieldByName(model, entry.getKey(), "update");
+            if (field.id()) {
+                throw new MicroOrmException("EntityUpdate cannot assign primary key field: " + entry.getKey());
+            }
+            String param = "set_" + field.columnName();
+            if (params.containsKey(param)) {
+                throw new MicroOrmException("Duplicate update assignment for field: " + entry.getKey());
+            }
+            sets.add(dialect.sqlName(field.columnIdentifier()) + " = :" + param);
+            params.put(param, dialect.valueMapper().toJdbcValue(field, entry.getValue()));
+        }
+
+        String sql = "UPDATE " + model.sqlTableName(dialect) + " SET " + String.join(", ", sets);
+        if (mutation.criterion() != null) {
+            sql += " WHERE " + renderRootCriterion(model, mutation.criterion(), params, collectionParams);
+        }
+        return BoundStatement.of(sql, params, collectionParams);
+    }
+
+    @Override
+    public BoundStatement delete(EntityModel model, EntityDelete<?> mutation) {
+        requireMutable(model, "delete");
+        if (mutation.entityType() != model.entityClass()) {
+            throw new MicroOrmException("EntityDelete type " + mutation.entityType().getName()
+                    + " does not match model " + model.entityClass().getName());
+        }
+        requireWhereOrAllRows(mutation.criterion(), mutation.isAllRows(), "EntityDelete");
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        Map<String, Collection<?>> collectionParams = new LinkedHashMap<>();
+        String sql = "DELETE FROM " + model.sqlTableName(dialect);
+        if (mutation.criterion() != null) {
+            sql += " WHERE " + renderRootCriterion(model, mutation.criterion(), params, collectionParams);
+        }
+        return BoundStatement.of(sql, params, collectionParams);
     }
 
     @Override
@@ -429,8 +514,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
         if (criterion instanceof ExistsCriterion existsCriterion) {
             String subquerySql;
-            if (existsCriterion.entityQuery() != null) {
-                subquerySql = renderEntitySubquery(existsCriterion.entityQuery(), registry, params, collectionParams, paramCounter, false);
+            if (existsCriterion.entitySelect() != null) {
+                subquerySql = renderEntitySubquery(existsCriterion.entitySelect(), registry, params, collectionParams, paramCounter, false);
             } else {
                 mergeSubqueryParameters(existsCriterion.query(), params, collectionParams);
                 subquerySql = existsCriterion.query().sql();
@@ -441,8 +526,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         if (criterion instanceof QuantifiedSubqueryCriterion quantified) {
             ColumnRef column = resolveColumn(model, joinContext, quantified.fieldName());
             String subquerySql;
-            if (quantified.entityQuery() != null) {
-                subquerySql = renderEntitySubquery(quantified.entityQuery(), registry, params, collectionParams, paramCounter, true);
+            if (quantified.entitySelect() != null) {
+                subquerySql = renderEntitySubquery(quantified.entitySelect(), registry, params, collectionParams, paramCounter, true);
             } else {
                 mergeSubqueryParameters(quantified.query(), params, collectionParams);
                 subquerySql = quantified.query().sql();
@@ -454,7 +539,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
     }
 
     private String renderEntitySubquery(
-            EntityQuery<?> query,
+            EntitySelect<?> query,
             EntityModelRegistry registry,
             Map<String, Object> params,
             Map<String, Collection<?>> collectionParams,
@@ -602,6 +687,30 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
     }
 
+    private String renderRootCriterion(
+            EntityModel model,
+            Criterion criterion,
+            Map<String, Object> params,
+            Map<String, Collection<?>> collectionParams) {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        registry.register(model.entityClass());
+        registerJoinTargets(model, registry);
+        return renderCriterion(model, registry, new JoinContext(Map.of(), "", false), criterion, params, collectionParams, new int[]{1});
+    }
+
+    private static EntityField rootFieldByName(EntityModel model, String name, String operation) {
+        if (name != null && name.contains(".")) {
+            throw new MicroOrmException("Entity " + operation + " supports only root scalar fields, got: " + name);
+        }
+        return fieldByName(model, name);
+    }
+
+    private static void requireWhereOrAllRows(Criterion criterion, boolean allRows, String operation) {
+        if (criterion == null && !allRows) {
+            throw new MicroOrmException(operation + " requires where(...) or explicit allRows()");
+        }
+    }
+
     private static void mergeSubqueryParameters(
             Query query,
             Map<String, Object> params,
@@ -645,7 +754,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
     }
 
-    private JoinContext buildJoinContext(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry) {
+    private JoinContext buildJoinContext(EntityModel model, EntitySelect<?> query, EntityModelRegistry registry) {
         if (query.joins().isEmpty()) {
             return new JoinContext(Map.of(), "", false);
         }

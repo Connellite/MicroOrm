@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.query;
 
-/** SQL join types supported by {@link EntityQuery}. */
+/** SQL join types supported by {@link EntitySelect}. */
 public enum JoinType {
     /** SQL {@code INNER JOIN}. */
     INNER("INNER JOIN"),

@@ -1,14 +1,14 @@
 package io.github.connellite.microorm.query;
 
 /**
- * Boolean expression used in an {@link EntityQuery} {@code WHERE} clause.
+ * Boolean expression used in an {@link EntitySelect} {@code WHERE} clause.
  * <p>
- * Instances are normally created through {@link EntityQuery#field(String)}:
+ * Instances are normally created through {@link EntitySelect#field(String)}:
  *
  * <pre>{@code
- * EntityQuery.of(User.class)
- *         .where(EntityQuery.field("name").like("Ada%"))
- *         .and(EntityQuery.field("enabled").eq(true));
+ * EntitySelect.of(User.class)
+ *         .where(EntitySelect.field("name").like("Ada%"))
+ *         .and(EntitySelect.field("enabled").eq(true));
  * }</pre>
  */
 public sealed interface Criterion

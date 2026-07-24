@@ -8,13 +8,13 @@ import java.util.Objects;
  * SQL {@code EXISTS (...)} or {@code NOT EXISTS (...)} predicate.
  *
  * @param query raw subquery to render inside {@code EXISTS}
- * @param entityQuery entity subquery to render inside {@code EXISTS}
+ * @param entitySelect entity subquery to render inside {@code EXISTS}
  * @param negated whether to render {@code NOT EXISTS}
  */
-public record ExistsCriterion(Query query, EntityQuery<?> entityQuery, boolean negated) implements Criterion {
+public record ExistsCriterion(Query query, EntitySelect<?> entitySelect, boolean negated) implements Criterion {
 
     public ExistsCriterion {
-        if ((query == null) == (entityQuery == null)) {
+        if ((query == null) == (entitySelect == null)) {
             throw new IllegalArgumentException("Exactly one subquery must be provided");
         }
     }
@@ -23,7 +23,7 @@ public record ExistsCriterion(Query query, EntityQuery<?> entityQuery, boolean n
         return new ExistsCriterion(Objects.requireNonNull(query, "query"), null, false);
     }
 
-    static ExistsCriterion exists(EntityQuery<?> query) {
+    static ExistsCriterion exists(EntitySelect<?> query) {
         return new ExistsCriterion(null, Objects.requireNonNull(query, "query"), false);
     }
 
@@ -31,7 +31,7 @@ public record ExistsCriterion(Query query, EntityQuery<?> entityQuery, boolean n
         return new ExistsCriterion(Objects.requireNonNull(query, "query"), null, true);
     }
 
-    static ExistsCriterion notExists(EntityQuery<?> query) {
+    static ExistsCriterion notExists(EntitySelect<?> query) {
         return new ExistsCriterion(null, Objects.requireNonNull(query, "query"), true);
     }
 }

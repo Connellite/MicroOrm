@@ -7,7 +7,7 @@ import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.annotation.Table;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.relation.EagerCollection;
 import io.github.connellite.microorm.relation.EagerRef;
 import io.github.connellite.microorm.relation.LazyCollection;
@@ -184,15 +184,15 @@ class RelationSelectDialectTest {
                 assertTrue(order.getCustomer().isLoaded());
                 assertEquals(List.of("GADGET", "WIDGET"), order.getLines().get().stream().map(LazyItem::getSku).sorted().toList());
 
-                List<LazyOrder> byCustomer = session.selectRows(EntityQuery.of(LazyOrder.class)
+                List<LazyOrder> byCustomer = session.selectRows(EntitySelect.of(LazyOrder.class)
                         .join("customer")
-                        .where(EntityQuery.field("customer.name").eq("Acme")));
+                        .where(EntitySelect.field("customer.name").eq("Acme")));
                 assertEquals(1, byCustomer.size());
                 assertEquals(LAZY_ORDER_ID, byCustomer.get(0).getId());
 
-                List<LazyOrder> byLine = session.selectRows(EntityQuery.of(LazyOrder.class)
+                List<LazyOrder> byLine = session.selectRows(EntitySelect.of(LazyOrder.class)
                         .leftJoin("lines")
-                        .where(EntityQuery.field("lines.sku").in(List.of("WIDGET", "GADGET"))));
+                        .where(EntitySelect.field("lines.sku").in(List.of("WIDGET", "GADGET"))));
                 assertEquals(1, byLine.size());
                 assertEquals(LAZY_ORDER_ID, byLine.get(0).getId());
 

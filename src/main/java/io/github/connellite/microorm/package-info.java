@@ -3,7 +3,7 @@
  * <p>
  * Entry point: {@link io.github.connellite.microorm.MicroOrm}. Open a
  * {@link io.github.connellite.microorm.session.Session} for entity CRUD, schema helpers, and
- * {@link io.github.connellite.microorm.query.EntityQuery} selects. Map entities with annotations in
- * {@link io.github.connellite.microorm.annotation}.
+ * {@link io.github.connellite.microorm.query.EntitySelect} selects and typed mutation builders in
+ * {@link io.github.connellite.microorm.query}. Map entities with annotations in {@link io.github.connellite.microorm.annotation}.
  */
 package io.github.connellite.microorm;

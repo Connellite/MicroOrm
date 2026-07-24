@@ -8,7 +8,8 @@ Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https:/
 
 - Annotation mapping: `@Entity`, `@Table`, `@Column`, `@Id`, `@Transient`, `@Convert`, `@Immutable`, `@Subselect`
 - CRUD, batch insert, map-based filtered select, streaming reads, custom `Query`
-- **`EntityQuery`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, and relation joins
+- **`EntitySelect`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, relation joins, subqueries, `DISTINCT`, `GROUP BY`, and `HAVING`
+- **CRUD DSL**: `EntityInsert`, `EntityUpdate`, and `EntityDelete` for SQL-oriented typed mutations
 - **Associations**: `@ManyToOne` / `@OneToMany` with lazy (`LazyRef`, `LazyCollection`) or eager (`EagerRef`, `EagerCollection`) loading
 - Schema helpers: `createEntity`, `syncEntity` (add nullable columns), `dropEntity`
 - **Dynamic tables**: runtime-defined schema and Map-based CRUD without entity classes
@@ -56,15 +57,15 @@ try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) 
 
 Use `MicroOrm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool. Prefer `orm.withSession(...)` so pooled connections are always released.
 
-## EntityQuery
+## EntitySelect
 
-`EntityQuery` builds named-parameter SQL for a single root entity. Use it when you need composable predicates, sorting, pagination, or joins — without writing raw SQL.
+`EntitySelect` builds named-parameter SQL for a single root entity. Use it when you need composable predicates, sorting, pagination, or joins — without writing raw SQL.
 
 ```java
-EntityQuery<User> query = EntityQuery.of(User.class)
-        .where(EntityQuery.field("name").like("Ada%"))
-        .and(EntityQuery.field("enabled").eq(true))
-        .orderBy(EntityQuery.field("name").asc())
+EntitySelect<User> query = EntitySelect.of(User.class)
+        .where(EntitySelect.field("name").like("Ada%"))
+        .and(EntitySelect.field("enabled").eq(true))
+        .orderBy(EntitySelect.field("name").asc())
         .limit(20);
 
 List<User> users = session.selectRows(query);
@@ -73,15 +74,34 @@ List<User> users = session.selectRows(query);
 Join a relation and filter on joined fields with dotted paths:
 
 ```java
-EntityQuery<Order> query = EntityQuery.of(Order.class)
+EntitySelect<Order> query = EntitySelect.of(Order.class)
         .leftJoin("customer")
-        .where(EntityQuery.field("customer.name").eq("Acme"))
-        .orderBy(EntityQuery.field("title").desc());
+        .where(EntitySelect.field("customer.name").eq("Acme"))
+        .orderBy(EntitySelect.field("title").desc());
 
 List<Order> orders = session.selectRows(query);
 ```
 
 Supported join types: inner (default), left, right, full, and cross. For database-specific SQL or projections, use `Query` instead.
+
+## CRUD DSL
+
+Use `EntityInsert`, `EntityUpdate`, and `EntityDelete` for SQL-oriented typed mutations when you do not need object-graph persistence:
+
+```java
+session.execute(EntityInsert.into(User.class)
+        .value(User::getName, "Ada")
+        .value(User::isEnabled, true));
+
+session.execute(EntityUpdate.of(User.class)
+        .set(User::getName, "Grace")
+        .where(EntitySelect.field(User::getId).eq(id)));
+
+session.execute(EntityDelete.from(User.class)
+        .where(EntitySelect.field(User::isEnabled).eq(false)));
+```
+
+`UPDATE` and `DELETE` require `where(...)` by default. Use `allRows()` when a bulk mutation is intentional. For generated IDs and relation graph persistence, keep using `insertRow`, `updateRow`, and `deleteRow`.
 
 ## Relations
 
@@ -225,7 +245,7 @@ Entity classes on the classpath (unnamed module) do not need the `add-reads` fla
 - Supported field types: numeric primitives/wrappers, `boolean`, `String`, `UUID`, `float`/`double`
 - Numeric `0` is treated as unset for `@Id(autoIncrement = true)` inserts and PK lookups
 - Entity inheritance is not supported (mapped superclass fields are rejected at registration)
-- `EntityQuery` covers one root entity with relation joins; no subqueries or projections
+- `EntitySelect` covers one root entity; use raw `Query` for arbitrary projections or vendor-specific SQL
 
 ## License
 

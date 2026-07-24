@@ -5,7 +5,7 @@ import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.exception.MicroOrmException;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
 import org.junit.jupiter.api.Test;
@@ -363,7 +363,7 @@ class SqliteOrmTest {
     }
 
     @Test
-    void entityQuerySelectsFilteredOrderedAndLimitedRows() throws SQLException {
+    void EntitySelectSelectsFilteredOrderedAndLimitedRows() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             try (Session s = orm.openSession()) {
@@ -371,9 +371,9 @@ class SqliteOrmTest {
                 s.createEntity(Widget.class);
                 s.insertRows(List.of(newWidget("a"), newWidget("b"), newWidget("b"), newWidget("c")));
 
-                EntityQuery<Widget> query = EntityQuery.of(Widget.class)
-                        .where(EntityQuery.field("name").in(List.of("b", "c")))
-                        .orderBy(EntityQuery.field("name").desc())
+                EntitySelect<Widget> query = EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").in(List.of("b", "c")))
+                        .orderBy(EntitySelect.field("name").desc())
                         .limit(2);
 
                 List<Widget> selected = s.selectRows(query);
@@ -402,19 +402,19 @@ class SqliteOrmTest {
                 assertEquals("a", s.findById(Widget.class, first.getId()).orElseThrow().getName());
                 assertFalse(s.findById(Widget.class, UUID.randomUUID()).isPresent());
 
-                EntityQuery<Widget> oneByEntityQuery = EntityQuery.of(Widget.class)
-                        .where(EntityQuery.field("name").eq("a"));
-                assertEquals("a", s.selectOne(oneByEntityQuery).getName());
-                assertEquals("a", s.findOne(oneByEntityQuery).orElseThrow().getName());
+                EntitySelect<Widget> oneByEntitySelect = EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").eq("a"));
+                assertEquals("a", s.selectOne(oneByEntitySelect).getName());
+                assertEquals("a", s.findOne(oneByEntitySelect).orElseThrow().getName());
 
-                EntityQuery<Widget> missingByEntityQuery = EntityQuery.of(Widget.class)
-                        .where(EntityQuery.field("name").eq("missing"));
-                assertFalse(s.findOne(missingByEntityQuery).isPresent());
-                assertThrows(MicroOrmException.class, () -> s.selectOne(missingByEntityQuery));
+                EntitySelect<Widget> missingByEntitySelect = EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").eq("missing"));
+                assertFalse(s.findOne(missingByEntitySelect).isPresent());
+                assertThrows(MicroOrmException.class, () -> s.selectOne(missingByEntitySelect));
 
-                EntityQuery<Widget> duplicateByEntityQuery = EntityQuery.of(Widget.class)
-                        .where(EntityQuery.field("name").eq("b"));
-                assertThrows(MicroOrmException.class, () -> s.findOne(duplicateByEntityQuery));
+                EntitySelect<Widget> duplicateByEntitySelect = EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").eq("b"));
+                assertThrows(MicroOrmException.class, () -> s.findOne(duplicateByEntitySelect));
 
                 Query oneByRawQuery = Query.of("SELECT id, name FROM widgets WHERE name = :name")
                         .set("name", "a");

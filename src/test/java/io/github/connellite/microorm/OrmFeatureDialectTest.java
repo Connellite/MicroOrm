@@ -4,7 +4,7 @@ import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Table;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -90,7 +90,7 @@ class OrmFeatureDialectTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("dialects")
-    void entityQuerySelectsFilteredOrderedAndLimitedRows(DialectTestSupport.DialectFixture dialect) throws SQLException {
+    void EntitySelectSelectsFilteredOrderedAndLimitedRows(DialectTestSupport.DialectFixture dialect) throws SQLException {
         try (Connection connection = dialect.openConnection()) {
             DialectTestSupport.dropTables(connection, "feature_widgets", "feature_assigned_numeric_widgets");
             MicroOrm orm = dialect.createOrm(connection).register(FeatureWidget.class);
@@ -98,9 +98,9 @@ class OrmFeatureDialectTest {
                 session.createEntity(FeatureWidget.class);
                 session.insertRows(List.of(widget("a"), widget("b"), widget("b"), widget("c")));
 
-                EntityQuery<FeatureWidget> query = EntityQuery.of(FeatureWidget.class)
-                        .where(EntityQuery.field("name").in(List.of("b", "c")))
-                        .orderBy(EntityQuery.field("name").desc())
+                EntitySelect<FeatureWidget> query = EntitySelect.of(FeatureWidget.class)
+                        .where(EntitySelect.field("name").in(List.of("b", "c")))
+                        .orderBy(EntitySelect.field("name").desc())
                         .limit(2);
 
                 List<FeatureWidget> selected = session.selectRows(query);

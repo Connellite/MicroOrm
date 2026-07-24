@@ -11,7 +11,10 @@ import io.github.connellite.microorm.dialect.SqliteDialect;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntityDelete;
+import io.github.connellite.microorm.query.EntityInsert;
+import io.github.connellite.microorm.query.EntitySelect;
+import io.github.connellite.microorm.query.EntityUpdate;
 import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.BoundStatement;
@@ -316,13 +319,28 @@ class SessionValidationTest {
         }
 
         @Override
-        public BoundStatement select(EntityModel model, EntityQuery<?> query) {
+        public BoundStatement select(EntityModel model, EntitySelect<?> query) {
             return delegate.select(model, query);
         }
 
         @Override
-        public BoundStatement select(EntityModel model, EntityQuery<?> query, EntityModelRegistry registry) {
+        public BoundStatement select(EntityModel model, EntitySelect<?> query, EntityModelRegistry registry) {
             return delegate.select(model, query, registry);
+        }
+
+        @Override
+        public BoundStatement insert(EntityModel model, EntityInsert<?> mutation) {
+            return delegate.insert(model, mutation);
+        }
+
+        @Override
+        public BoundStatement update(EntityModel model, EntityUpdate<?> mutation) {
+            return delegate.update(model, mutation);
+        }
+
+        @Override
+        public BoundStatement delete(EntityModel model, EntityDelete<?> mutation) {
+            return delegate.delete(model, mutation);
         }
 
         @Override

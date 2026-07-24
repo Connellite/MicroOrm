@@ -7,7 +7,7 @@ import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.type.AttributeConverter;
 import org.junit.jupiter.api.Test;
@@ -97,8 +97,8 @@ class AttributeConverterTest {
                 ConvertedOrder loaded = session.selectRow(ConvertedOrder.class, order.id);
                 assertEquals(new Money("USD", new BigDecimal("12.34")), loaded.total);
 
-                Optional<ConvertedOrder> byConvertedCriterion = session.findOne(EntityQuery.of(ConvertedOrder.class)
-                        .where(EntityQuery.field("total").eq(new Money("USD", new BigDecimal("12.34")))));
+                Optional<ConvertedOrder> byConvertedCriterion = session.findOne(EntitySelect.of(ConvertedOrder.class)
+                        .where(EntitySelect.field("total").eq(new Money("USD", new BigDecimal("12.34")))));
                 assertEquals(order.id, byConvertedCriterion.orElseThrow().id);
             }
         }

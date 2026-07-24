@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.repository;
 
-import io.github.connellite.microorm.query.EntityQuery;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.sql.Query;
 
 import java.sql.SQLException;
@@ -65,13 +65,13 @@ public interface EntityRepository<T, ID> {
     List<T> selectRows(Map<String, ?> filters);
 
     /** Returns rows matching an entity query. */
-    List<T> selectRows(EntityQuery<T> query);
+    List<T> selectRows(EntitySelect<T> query);
 
     /** Returns exactly one row matching an entity query. */
-    T selectOne(EntityQuery<T> query);
+    T selectOne(EntitySelect<T> query);
 
     /** Returns zero or one row matching an entity query. */
-    Optional<T> findOne(EntityQuery<T> query);
+    Optional<T> findOne(EntitySelect<T> query);
 
     /** Returns rows from a custom SQL query mapped to the entity type. */
     List<T> selectRows(Query query);

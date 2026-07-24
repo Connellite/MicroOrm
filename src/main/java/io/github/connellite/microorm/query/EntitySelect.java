@@ -13,28 +13,28 @@ import java.util.function.Function;
 /**
  * Fluent, named-parameter query builder for selecting mapped entities.
  * <p>
- * {@code EntityQuery} intentionally covers the lightweight ORM use case: one root entity,
+ * {@code EntitySelect} intentionally covers the lightweight ORM use case: one root entity,
  * relation joins for filtering/sorting, composable {@code WHERE} predicates, {@code ORDER BY},
  * and optional {@code LIMIT}/{@code OFFSET}. For projections and database-specific SQL, use
  * {@link io.github.connellite.microorm.sql.Query}.
  *
  * <pre>{@code
- * EntityQuery<User> query = EntityQuery.of(User.class)
- *         .where(EntityQuery.field(User::getName).like("Ada%"))
- *         .and(EntityQuery.field("enabled").eq(true))
- *         .orderBy(EntityQuery.field(User_.NAME).asc())
+ * EntitySelect<User> query = EntitySelect.of(User.class)
+ *         .where(EntitySelect.field(User::getName).like("Ada%"))
+ *         .and(EntitySelect.field("enabled").eq(true))
+ *         .orderBy(EntitySelect.field(User_.NAME).asc())
  *         .limit(20);
  *
- * EntityQuery<Order> joined = EntityQuery.of(Order.class)
+ * EntitySelect<Order> joined = EntitySelect.of(Order.class)
  *         .leftJoin("customer")
- *         .where(EntityQuery.field("customer.name").eq("Acme"));
+ *         .where(EntitySelect.field("customer.name").eq("Acme"));
  *
  * List<User> users = session.selectRows(query);
  * }</pre>
  *
  * @param <T> entity type selected by this query
  */
-public final class EntityQuery<T> {
+public final class EntitySelect<T> {
 
     private final Class<T> entityType;
     private Criterion criterion;
@@ -47,7 +47,7 @@ public final class EntityQuery<T> {
     private String projectionField;
     private boolean distinct;
 
-    private EntityQuery(Class<T> entityType) {
+    private EntitySelect(Class<T> entityType) {
         this.entityType = Objects.requireNonNull(entityType, "entityType");
     }
 
@@ -58,8 +58,8 @@ public final class EntityQuery<T> {
      * @param <T>        entity type
      * @return mutable query builder
      */
-    public static <T> EntityQuery<T> of(Class<T> entityType) {
-        return new EntityQuery<>(entityType);
+    public static <T> EntitySelect<T> of(Class<T> entityType) {
+        return new EntitySelect<>(entityType);
     }
 
     /**
@@ -77,7 +77,7 @@ public final class EntityQuery<T> {
 
     /**
      * Creates a field reference from a JavaBean getter method reference, for example
-     * {@code EntityQuery.field(User::getName)} or {@code EntityQuery.field(User::isEnabled)}.
+     * {@code EntitySelect.field(User::getName)} or {@code EntitySelect.field(User::isEnabled)}.
      */
     public static <T, R> FieldPath field(Getter<T, R> getter) {
         Objects.requireNonNull(getter, "getter");
@@ -86,7 +86,7 @@ public final class EntityQuery<T> {
 
     /**
      * Creates a field reference from a lightweight static metamodel attribute, for example
-     * {@code EntityQuery.field(User_.NAME)}.
+     * {@code EntitySelect.field(User_.NAME)}.
      */
     public static FieldPath field(Attribute<?, ?> attribute) {
         Objects.requireNonNull(attribute, "attribute");
@@ -98,7 +98,7 @@ public final class EntityQuery<T> {
      *
      * <pre>{@code
      * final class User_ {
-     *     static final EntityQuery.Attribute<User, String> NAME = EntityQuery.attribute("name");
+     *     static final EntitySelect.Attribute<User, String> NAME = EntitySelect.attribute("name");
      * }
      * }</pre>
      */
@@ -112,7 +112,7 @@ public final class EntityQuery<T> {
     }
 
     /** Creates an SQL {@code EXISTS (...)} criterion from an entity subquery. */
-    public static Criterion exists(EntityQuery<?> query) {
+    public static Criterion exists(EntitySelect<?> query) {
         return ExistsCriterion.exists(query);
     }
 
@@ -122,7 +122,7 @@ public final class EntityQuery<T> {
     }
 
     /** Creates an SQL {@code NOT EXISTS (...)} criterion from an entity subquery. */
-    public static Criterion notExists(EntityQuery<?> query) {
+    public static Criterion notExists(EntitySelect<?> query) {
         return ExistsCriterion.notExists(query);
     }
 
@@ -212,7 +212,7 @@ public final class EntityQuery<T> {
      * @param criterion expression to apply
      * @return this query for chaining
      */
-    public EntityQuery<T> where(Criterion criterion) {
+    public EntitySelect<T> where(Criterion criterion) {
         this.criterion = Objects.requireNonNull(criterion, "criterion");
         return this;
     }
@@ -223,7 +223,7 @@ public final class EntityQuery<T> {
      * @param criterion expression to combine
      * @return this query for chaining
      */
-    public EntityQuery<T> and(Criterion criterion) {
+    public EntitySelect<T> and(Criterion criterion) {
         Objects.requireNonNull(criterion, "criterion");
         this.criterion = this.criterion == null ? criterion : this.criterion.and(criterion);
         return this;
@@ -235,14 +235,14 @@ public final class EntityQuery<T> {
      * @param criterion expression to combine
      * @return this query for chaining
      */
-    public EntityQuery<T> or(Criterion criterion) {
+    public EntitySelect<T> or(Criterion criterion) {
         Objects.requireNonNull(criterion, "criterion");
         this.criterion = this.criterion == null ? criterion : this.criterion.or(criterion);
         return this;
     }
 
     /** Adds {@code DISTINCT} to the root select. */
-    public EntityQuery<T> distinct() {
+    public EntitySelect<T> distinct() {
         this.distinct = true;
         return this;
     }
@@ -253,20 +253,20 @@ public final class EntityQuery<T> {
      * @param criterion expression to apply after {@code GROUP BY}
      * @return this query for chaining
      */
-    public EntityQuery<T> having(Criterion criterion) {
+    public EntitySelect<T> having(Criterion criterion) {
         this.havingCriterion = Objects.requireNonNull(criterion, "criterion");
         return this;
     }
 
     /** Adds an {@code AND} expression to the current {@code HAVING} clause. */
-    public EntityQuery<T> andHaving(Criterion criterion) {
+    public EntitySelect<T> andHaving(Criterion criterion) {
         Objects.requireNonNull(criterion, "criterion");
         this.havingCriterion = this.havingCriterion == null ? criterion : this.havingCriterion.and(criterion);
         return this;
     }
 
     /** Adds an {@code OR} expression to the current {@code HAVING} clause. */
-    public EntityQuery<T> orHaving(Criterion criterion) {
+    public EntitySelect<T> orHaving(Criterion criterion) {
         Objects.requireNonNull(criterion, "criterion");
         this.havingCriterion = this.havingCriterion == null ? criterion : this.havingCriterion.or(criterion);
         return this;
@@ -274,9 +274,9 @@ public final class EntityQuery<T> {
 
     /**
      * Selects one mapped field when this query is used as a scalar subquery, for example
-     * {@code field("id").eqAny(EntityQuery.of(Ref.class).select("itemId"))}.
+     * {@code field("id").eqAny(EntitySelect.of(Ref.class).select("itemId"))}.
      */
-    public EntityQuery<T> select(String fieldName) {
+    public EntitySelect<T> select(String fieldName) {
         this.projectionField = Objects.requireNonNull(fieldName, "fieldName");
         if (fieldName.isBlank()) {
             throw new IllegalArgumentException("fieldName cannot be blank");
@@ -285,23 +285,23 @@ public final class EntityQuery<T> {
     }
 
     /** Selects one mapped field when this query is used as a scalar subquery. */
-    public EntityQuery<T> select(FieldPath field) {
+    public EntitySelect<T> select(FieldPath field) {
         Objects.requireNonNull(field, "field");
         return select(field.name());
     }
 
     /** Selects one mapped field when this query is used as a scalar subquery. */
-    public <R> EntityQuery<T> select(Getter<T, R> getter) {
+    public <R> EntitySelect<T> select(Getter<T, R> getter) {
         return select(field(getter));
     }
 
     /** Selects one mapped field when this query is used as a scalar subquery. */
-    public EntityQuery<T> select(Attribute<T, ?> attribute) {
+    public EntitySelect<T> select(Attribute<T, ?> attribute) {
         return select(field(attribute));
     }
 
     /** Appends mapped fields to the SQL {@code GROUP BY} clause. */
-    public EntityQuery<T> groupBy(String... fieldNames) {
+    public EntitySelect<T> groupBy(String... fieldNames) {
         Objects.requireNonNull(fieldNames, "fieldNames");
         Arrays.stream(fieldNames)
                 .map(fieldName -> Objects.requireNonNull(fieldName, "fieldName"))
@@ -315,19 +315,19 @@ public final class EntityQuery<T> {
     }
 
     /** Appends mapped fields to the SQL {@code GROUP BY} clause. */
-    public EntityQuery<T> groupBy(FieldPath... fields) {
+    public EntitySelect<T> groupBy(FieldPath... fields) {
         Objects.requireNonNull(fields, "fields");
         Arrays.stream(fields).map(field -> Objects.requireNonNull(field, "field").name()).forEach(groupFields::add);
         return this;
     }
 
     /** Appends a getter-referenced field to the SQL {@code GROUP BY} clause. */
-    public <R> EntityQuery<T> groupBy(Getter<T, R> getter) {
+    public <R> EntitySelect<T> groupBy(Getter<T, R> getter) {
         return groupBy(field(getter));
     }
 
     /** Appends a lightweight metamodel attribute to the SQL {@code GROUP BY} clause. */
-    public EntityQuery<T> groupBy(Attribute<T, ?> attribute) {
+    public EntitySelect<T> groupBy(Attribute<T, ?> attribute) {
         return groupBy(field(attribute));
     }
 
@@ -337,7 +337,7 @@ public final class EntityQuery<T> {
      * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
      * @return this query for chaining
      */
-    public EntityQuery<T> join(String relationName) {
+    public EntitySelect<T> join(String relationName) {
         return join(relationName, JoinType.INNER);
     }
 
@@ -347,7 +347,7 @@ public final class EntityQuery<T> {
      * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
      * @return this query for chaining
      */
-    public EntityQuery<T> leftJoin(String relationName) {
+    public EntitySelect<T> leftJoin(String relationName) {
         return join(relationName, JoinType.LEFT);
     }
 
@@ -357,7 +357,7 @@ public final class EntityQuery<T> {
      * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
      * @return this query for chaining
      */
-    public EntityQuery<T> rightJoin(String relationName) {
+    public EntitySelect<T> rightJoin(String relationName) {
         return join(relationName, JoinType.RIGHT);
     }
 
@@ -367,7 +367,7 @@ public final class EntityQuery<T> {
      * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
      * @return this query for chaining
      */
-    public EntityQuery<T> fullJoin(String relationName) {
+    public EntitySelect<T> fullJoin(String relationName) {
         return join(relationName, JoinType.FULL);
     }
 
@@ -378,7 +378,7 @@ public final class EntityQuery<T> {
      * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
      * @return this query for chaining
      */
-    public EntityQuery<T> crossJoin(String relationName) {
+    public EntitySelect<T> crossJoin(String relationName) {
         return join(relationName, JoinType.CROSS);
     }
 
@@ -389,7 +389,7 @@ public final class EntityQuery<T> {
      * @param type         SQL join type
      * @return this query for chaining
      */
-    public EntityQuery<T> join(String relationName, JoinType type) {
+    public EntitySelect<T> join(String relationName, JoinType type) {
         joins.add(new Join(relationName, type));
         return this;
     }
@@ -400,7 +400,7 @@ public final class EntityQuery<T> {
      * @param orders one or more order items
      * @return this query for chaining
      */
-    public EntityQuery<T> orderBy(Order... orders) {
+    public EntitySelect<T> orderBy(Order... orders) {
         Objects.requireNonNull(orders, "orders");
         Arrays.stream(orders).map(order -> Objects.requireNonNull(order, "order")).forEach(this.orders::add);
         return this;
@@ -412,7 +412,7 @@ public final class EntityQuery<T> {
      * @param limit positive row count
      * @return this query for chaining
      */
-    public EntityQuery<T> limit(int limit) {
+    public EntitySelect<T> limit(int limit) {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");
         }
@@ -426,7 +426,7 @@ public final class EntityQuery<T> {
      * @param offset non-negative row count
      * @return this query for chaining
      */
-    public EntityQuery<T> offset(int offset) {
+    public EntitySelect<T> offset(int offset) {
         if (offset < 0) {
             throw new IllegalArgumentException("offset cannot be negative");
         }

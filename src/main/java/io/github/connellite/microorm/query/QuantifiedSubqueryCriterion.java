@@ -11,14 +11,14 @@ import java.util.Objects;
  * @param operator comparison operator before the quantifier
  * @param quantifier SQL quantifier
  * @param query raw subquery producing comparable values
- * @param entityQuery entity subquery producing comparable values
+ * @param entitySelect entity subquery producing comparable values
  */
 public record QuantifiedSubqueryCriterion(
         String fieldName,
         ComparisonOperator operator,
         SubqueryQuantifier quantifier,
         Query query,
-        EntityQuery<?> entityQuery) implements Criterion {
+        EntitySelect<?> entitySelect) implements Criterion {
 
     public QuantifiedSubqueryCriterion {
         if (fieldName == null || fieldName.isBlank()) {
@@ -26,7 +26,7 @@ public record QuantifiedSubqueryCriterion(
         }
         Objects.requireNonNull(operator, "operator");
         Objects.requireNonNull(quantifier, "quantifier");
-        if ((query == null) == (entityQuery == null)) {
+        if ((query == null) == (entitySelect == null)) {
             throw new IllegalArgumentException("Exactly one subquery must be provided");
         }
     }

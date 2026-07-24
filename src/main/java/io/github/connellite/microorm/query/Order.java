@@ -1,7 +1,7 @@
 package io.github.connellite.microorm.query;
 
 /**
- * One {@code ORDER BY} item for an {@link EntityQuery}.
+ * One {@code ORDER BY} item for an {@link EntitySelect}.
  *
  * @param fieldName mapped Java field name, physical column name, or joined path ({@code relation.field})
  * @param direction sort direction; defaults to {@link OrderDirection#ASC} when {@code null}
