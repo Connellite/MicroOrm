@@ -20,16 +20,15 @@ import io.github.connellite.microorm.relation.LazyRef;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.util.TypeCoercionUtil;
+import lombok.experimental.UtilityClass;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
 
 /** Maps {@link java.sql.ResultSet} rows to entity instances and reads/writes field values. */
+@UtilityClass
 public final class EntityHydrator {
-
-    private EntityHydrator() {
-    }
 
     public static boolean isUnsetPk(Object entity, EntityField pk) {
         return isUnsetPkValue(getFieldValue(entity, pk), pk);

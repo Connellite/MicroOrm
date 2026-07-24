@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.reflection.ReflectionUtil;
+import lombok.experimental.UtilityClass;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -30,6 +31,7 @@ import java.util.UUID;
  * Entity field types that can be bound to a JDBC {@link java.sql.PreparedStatement}
  * and coerced via ExtraLib {@link io.github.connellite.util.TypeCoercionUtil}.
  */
+@UtilityClass
 public final class SupportedFieldTypes {
 
     private static final Set<Class<?>> SCALAR_TYPES = Set.of(
@@ -65,9 +67,6 @@ public final class SupportedFieldTypes {
             RowId.class,
             URL.class,
             SQLXML.class);
-
-    private SupportedFieldTypes() {
-    }
 
     public static boolean isSupported(Class<?> type) {
         Objects.requireNonNull(type, "type");

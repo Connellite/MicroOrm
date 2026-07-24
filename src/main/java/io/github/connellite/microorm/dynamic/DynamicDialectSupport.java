@@ -13,15 +13,14 @@ import io.github.connellite.microorm.dynamic.schema.OracleDynamicSchemaManager;
 import io.github.connellite.microorm.dynamic.schema.PostgresDynamicSchemaManager;
 import io.github.connellite.microorm.dynamic.schema.SqliteDynamicSchemaManager;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import lombok.experimental.UtilityClass;
 
 /**
  * Resolves dialect-specific {@link DynamicSqlGenerator} and {@link DynamicSchemaManager} implementations
  * for a configured {@link Dialect}.
  */
+@UtilityClass
 public final class DynamicDialectSupport {
-
-    private DynamicDialectSupport() {
-    }
 
     /** Returns the SQL generator for the given dialect. */
     public static DynamicSqlGenerator sqlGenerator(Dialect dialect) {

@@ -177,20 +177,21 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("Missing @Id on " + entityClass.getName());
         }
         boolean immutable = entityClass.getAnnotation(Immutable.class) != null || subselectAnn != null;
-        EntityModel model = new EntityModel(
-                entityClass,
-                table,
-                schema,
-                fields,
-                pk,
-                manyToOneRelations,
-                oneToManyRelations,
-                immutable,
-                subselectAnn == null ? null : subselectAnn.value(),
-                tableComment(entityClass),
-                tableIndexes(table.text(), tableAnn),
-                uniqueConstraints(table.text(), tableAnn),
-                tableChecks(table.text(), entityClass.getAnnotationsByType(Check.class)));
+        EntityModel model = EntityModel.builder()
+                .entityClass(entityClass)
+                .tableIdentifier(table)
+                .schemaIdentifier(schema)
+                .fields(fields)
+                .primaryKey(pk)
+                .manyToOneRelations(manyToOneRelations)
+                .oneToManyRelations(oneToManyRelations)
+                .immutable(immutable)
+                .subselectSql(subselectAnn == null ? null : subselectAnn.value())
+                .comment(tableComment(entityClass))
+                .indexes(tableIndexes(table.text(), tableAnn))
+                .uniqueConstraints(uniqueConstraints(table.text(), tableAnn))
+                .checks(tableChecks(table.text(), entityClass.getAnnotationsByType(Check.class)))
+                .build();
         SqlGenerator.validateColumnNames(model);
         return model;
     }
@@ -468,25 +469,38 @@ public final class EntityModelRegistry {
             List<TableCheck> checks,
             ConverterMetadata converter) {
         if (converter == null) {
-            return new EntityField(field, column, id, autoIncrement, nullable, unique, indexed, sqlType, length,
-                    columnDefault, comment, checks, null, null, null);
+            return EntityField.builder()
+                    .javaField(field)
+                    .columnIdentifier(column)
+                    .id(id)
+                    .autoIncrement(autoIncrement)
+                    .nullable(nullable)
+                    .unique(unique)
+                    .indexed(indexed)
+                    .sqlType(sqlType)
+                    .length(length)
+                    .columnDefault(columnDefault)
+                    .comment(comment)
+                    .checks(checks)
+                    .build();
         }
-        return new EntityField(
-                field,
-                column,
-                id,
-                autoIncrement,
-                nullable,
-                unique,
-                indexed,
-                sqlType,
-                length,
-                columnDefault,
-                comment,
-                checks,
-                converter.converter(),
-                converter.attributeType(),
-                converter.databaseType());
+        return EntityField.builder()
+                .javaField(field)
+                .columnIdentifier(column)
+                .id(id)
+                .autoIncrement(autoIncrement)
+                .nullable(nullable)
+                .unique(unique)
+                .indexed(indexed)
+                .sqlType(sqlType)
+                .length(length)
+                .columnDefault(columnDefault)
+                .comment(comment)
+                .checks(checks)
+                .converter(converter.converter())
+                .converterAttributeType(converter.attributeType())
+                .converterDatabaseType(converter.databaseType())
+                .build();
     }
 
     private static ConverterMetadata converterMetadata(Class<?> entityClass, Field field) {

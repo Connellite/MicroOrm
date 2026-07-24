@@ -5,6 +5,7 @@ import io.github.connellite.microorm.query.EntityQuery;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.reflection.ReflectionUtil;
+import lombok.experimental.UtilityClass;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -22,10 +23,8 @@ import java.util.Objects;
 /**
  * Creates dynamic proxies for {@link EntityRepository} interfaces.
  */
+@UtilityClass
 public final class RepositoryProxyFactory {
-
-    private RepositoryProxyFactory() {
-    }
 
     @FunctionalInterface
     public interface RepositoryOperation<T> {

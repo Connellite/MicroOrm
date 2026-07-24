@@ -9,6 +9,7 @@ import java.util.List;
 
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
+import lombok.Builder;
 
 /** One mapped scalar column and its Java field (VarHandle-backed access). */
 public final class EntityField {
@@ -51,6 +52,7 @@ public final class EntityField {
         this(javaField, SqlIdentifier.unquoted(columnName), id, autoIncrement, nullable, unique, indexed, sqlType, length);
     }
 
+    @Builder
     public EntityField(
             Field javaField,
             SqlIdentifier columnIdentifier,

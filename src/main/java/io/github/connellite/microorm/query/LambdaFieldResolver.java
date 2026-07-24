@@ -2,6 +2,7 @@ package io.github.connellite.microorm.query;
 
 import io.github.connellite.collections.ConcurrentReferenceHashMap;
 import io.github.connellite.reflection.ReflectionUtil;
+import lombok.experimental.UtilityClass;
 
 import java.io.Serializable;
 import java.lang.invoke.SerializedLambda;
@@ -10,13 +11,11 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * Resolves serializable getter method references to mapped Java property names.
  */
+@UtilityClass
 final class LambdaFieldResolver {
 
     private static final ConcurrentMap<Class<?>, SerializedLambda> LAMBDA_CACHE =
             new ConcurrentReferenceHashMap<>(16, ConcurrentReferenceHashMap.ReferenceType.WEAK);
-
-    private LambdaFieldResolver() {
-    }
 
     static String fieldName(Serializable getter) {
         return PropertyNamer.methodToProperty(extractLambda(getter).getImplMethodName());

@@ -40,6 +40,7 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <extralib.version>1.4</extralib.version>
+        <lombok.version>1.18.42</lombok.version>
         <junit.version>5.10.2</junit.version>
         <sqlite-jdbc.version>3.46.1.0</sqlite-jdbc.version>
         <testcontainers.version>1.21.4</testcontainers.version>
@@ -72,6 +73,12 @@
             <groupId>io.github.connellite</groupId>
             <artifactId>ExtraLib</artifactId>
             <version>${extralib.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -156,6 +163,13 @@
                 <version>${maven-compiler-plugin.version}</version>
                 <configuration>
                     <release>17</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>

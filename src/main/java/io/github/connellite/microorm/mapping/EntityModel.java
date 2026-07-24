@@ -3,6 +3,7 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import lombok.Builder;
 
 import java.util.List;
 
@@ -88,6 +89,7 @@ public record EntityModel(
                 immutable, subselectSql, "", List.of(), List.of(), List.of());
     }
 
+    @Builder
     public EntityModel(
             Class<?> entityClass,
             SqlIdentifier tableIdentifier,

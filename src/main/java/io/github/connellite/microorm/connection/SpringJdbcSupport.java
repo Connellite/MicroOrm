@@ -1,16 +1,16 @@
 package io.github.connellite.microorm.connection;
 
+import lombok.experimental.UtilityClass;
+
 import java.sql.Connection;
 
 /**
  * Detects Spring {@code TransactionAwareDataSourceProxy} connections without a compile-time Spring dependency.
  */
+@UtilityClass
 public final class SpringJdbcSupport {
 
     private static final String CONNECTION_PROXY = "org.springframework.jdbc.datasource.ConnectionProxy";
-
-    private SpringJdbcSupport() {
-    }
 
     /**
      * Returns {@code true} when the connection is wrapped by Spring's

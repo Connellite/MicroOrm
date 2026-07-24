@@ -1,11 +1,14 @@
 package io.github.connellite.microorm.util;
 
+import lombok.experimental.UtilityClass;
+
 import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
  * Creates {@link Logger} instances using SLF4J when present, otherwise {@code java.util.logging}.
  */
+@UtilityClass
 public final class LoggerFactory {
 
     static final boolean USE_SLF4J;
@@ -19,9 +22,6 @@ public final class LoggerFactory {
             useSlf4j = false;
         }
         USE_SLF4J = useSlf4j;
-    }
-
-    private LoggerFactory() {
     }
 
     /**

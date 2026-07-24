@@ -1,14 +1,14 @@
 package io.github.connellite.microorm.query;
 
+import lombok.experimental.UtilityClass;
+
 import java.util.Locale;
 
 /**
  * Converts JavaBean accessor names to property names.
  */
+@UtilityClass
 final class PropertyNamer {
-
-    private PropertyNamer() {
-    }
 
     // Mirrors MyBatis PropertyNamer.methodToProperty:
     // https://mybatis.org/mybatis-3/xref/org/apache/ibatis/reflection/property/PropertyNamer.html
