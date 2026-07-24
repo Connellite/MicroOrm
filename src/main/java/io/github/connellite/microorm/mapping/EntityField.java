@@ -5,6 +5,7 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.util.List;
 
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
@@ -22,6 +23,9 @@ public final class EntityField {
     private final boolean indexed;
     private final String sqlType;
     private final int length;
+    private final String columnDefault;
+    private final String comment;
+    private final List<TableCheck> checks;
     private final AttributeConverter<Object, Object> converter;
     private final Class<?> converterAttributeType;
     private final Class<?> converterDatabaseType;
@@ -57,6 +61,9 @@ public final class EntityField {
             boolean indexed,
             String sqlType,
             int length,
+            String columnDefault,
+            String comment,
+            List<TableCheck> checks,
             AttributeConverter<?, ?> converter,
             Class<?> converterAttributeType,
             Class<?> converterDatabaseType) {
@@ -69,6 +76,9 @@ public final class EntityField {
         this.indexed = indexed;
         this.sqlType = sqlType == null ? "" : sqlType;
         this.length = length;
+        this.columnDefault = columnDefault == null ? "" : columnDefault;
+        this.comment = comment == null ? "" : comment;
+        this.checks = checks == null ? List.of() : List.copyOf(checks);
         @SuppressWarnings("unchecked")
         AttributeConverter<Object, Object> typedConverter = (AttributeConverter<Object, Object>) converter;
         this.converter = typedConverter;
@@ -100,6 +110,9 @@ public final class EntityField {
         this.indexed = indexed;
         this.sqlType = sqlType == null ? "" : sqlType;
         this.length = length;
+        this.columnDefault = "";
+        this.comment = "";
+        this.checks = List.of();
         this.converter = null;
         this.converterAttributeType = null;
         this.converterDatabaseType = null;
@@ -158,6 +171,18 @@ public final class EntityField {
 
     public int length() {
         return length;
+    }
+
+    public String columnDefault() {
+        return columnDefault;
+    }
+
+    public String comment() {
+        return comment;
+    }
+
+    public List<TableCheck> checks() {
+        return checks;
     }
 
     /** Declared Java field type. */

@@ -54,6 +54,17 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected String buildCreateTableDdl(EntityModel model) {
+        String ddl = super.buildCreateTableDdl(model);
+        return model.comment().isBlank() ? ddl : ddl + " COMMENT=" + sqlStringLiteral(model.comment());
+    }
+
+    @Override
+    protected String inlineColumnComment(EntityField field) {
+        return field.comment().isBlank() ? "" : "COMMENT " + sqlStringLiteral(field.comment());
+    }
+
+    @Override
     protected String metadataCatalog(EntityModel model) {
         return model.catalogSchemaName(dialect);
     }

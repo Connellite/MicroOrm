@@ -9,13 +9,18 @@ import io.github.connellite.microorm.util.LoggerFactory;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.mapping.TableCheck;
+import io.github.connellite.microorm.mapping.TableIndex;
+import io.github.connellite.microorm.mapping.TableUniqueConstraint;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -35,14 +40,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     public void createTable(Connection connection, EntityModel model) throws SQLException {
         requirePhysicalMutableTable(model, "createTable");
         if (!existingColumns(connection, model).isEmpty()) {
-            // Table already exists — ensure indexes only; never recreate or drop.
-            createIndexes(connection, model);
+            createSchemaObjects(connection, model);
             return;
         }
         try (Statement st = connection.createStatement()) {
             executeSql(st, buildCreateTableDdl(model));
         }
-        createIndexes(connection, model);
+        createSchemaObjects(connection, model);
     }
 
     @Override
@@ -69,7 +73,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                 executeSql(st, "ALTER TABLE " + model.sqlTableName(dialect) + " ADD " + joinColumnDefinition(relation));
             }
         }
-        createIndexes(connection, model);
+        createSchemaObjects(connection, model);
     }
 
     @Override
@@ -90,6 +94,17 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
             columns.add(joinColumnDefinition(relation));
+        }
+        for (TableUniqueConstraint constraint : model.uniqueConstraints()) {
+            columns.add(uniqueConstraintDefinition(constraint));
+        }
+        for (TableCheck check : model.checks()) {
+            columns.add(checkConstraintDefinition(check));
+        }
+        for (EntityField field : model.fields()) {
+            for (TableCheck check : field.checks()) {
+                columns.add(checkConstraintDefinition(check));
+            }
         }
         return "CREATE TABLE " + model.sqlTableName(dialect) + " (" + columns + ")";
     }
@@ -121,6 +136,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             if (includeUnique && f.unique()) {
                 sb.append(" UNIQUE");
             }
+        }
+        if (!f.columnDefault().isBlank()) {
+            sb.append(" DEFAULT ").append(f.columnDefault());
+        }
+        String inlineComment = inlineColumnComment(f);
+        if (!inlineComment.isBlank()) {
+            sb.append(' ').append(inlineComment);
         }
         return sb.toString();
     }
@@ -164,7 +186,24 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                 }
                 executeSql(st, createIndexDdl(model, f));
             }
+            for (TableIndex index : model.indexes()) {
+                if (indexExists(connection, model, index.name())) {
+                    continue;
+                }
+                executeSql(st, createIndexDdl(model, index));
+            }
+            for (TableUniqueConstraint constraint : model.uniqueConstraints()) {
+                if (indexExists(connection, model, constraint.name())) {
+                    continue;
+                }
+                executeSql(st, createUniqueIndexDdl(model, constraint));
+            }
         }
+    }
+
+    protected void createSchemaObjects(Connection connection, EntityModel model) throws SQLException {
+        createIndexes(connection, model);
+        applyComments(connection, model);
     }
 
     private static void executeSql(Statement statement, String sql) throws SQLException {
@@ -174,6 +213,10 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected boolean indexExists(Connection connection, EntityModel model, EntityField field) throws SQLException {
         String indexName = indexName(model, field);
+        return indexExists(connection, model, indexName);
+    }
+
+    protected boolean indexExists(Connection connection, EntityModel model, String indexName) throws SQLException {
         String catalog = metadataCatalog(model);
         String schema = metadataSchema(model);
         String table = model.catalogTableName(dialect);
@@ -213,6 +256,69 @@ public abstract class AbstractSchemaManager implements SchemaManager {
                 + " ON " + model.sqlTableName(dialect) + " (" + dialect.sqlName(field.columnIdentifier()) + ")";
     }
 
+    protected String createIndexDdl(EntityModel model, TableIndex index) {
+        return "CREATE " + (index.unique() ? "UNIQUE " : "")
+                + "INDEX " + dialect.sqlName(SqlIdentifier.unquoted(index.name()))
+                + " ON " + model.sqlTableName(dialect) + " (" + renderIndexColumns(index.columnList()) + ")";
+    }
+
+    protected String createUniqueIndexDdl(EntityModel model, TableUniqueConstraint constraint) {
+        return "CREATE UNIQUE INDEX " + dialect.sqlName(SqlIdentifier.unquoted(constraint.name()))
+                + " ON " + model.sqlTableName(dialect) + " (" + renderColumns(constraint.columnNames()) + ")";
+    }
+
+    protected String uniqueConstraintDefinition(TableUniqueConstraint constraint) {
+        return "CONSTRAINT " + dialect.sqlName(SqlIdentifier.unquoted(constraint.name()))
+                + " UNIQUE (" + renderColumns(constraint.columnNames()) + ")";
+    }
+
+    protected String checkConstraintDefinition(TableCheck check) {
+        return "CONSTRAINT " + dialect.sqlName(SqlIdentifier.unquoted(check.name()))
+                + " CHECK (" + check.constraints() + ")";
+    }
+
+    protected String renderColumns(List<String> columnNames) {
+        List<String> rendered = new ArrayList<>();
+        for (String column : columnNames) {
+            rendered.add(dialect.sqlName(SqlIdentifier.parse(column)));
+        }
+        return String.join(", ", rendered);
+    }
+
+    protected String renderIndexColumns(List<String> columnNames) {
+        List<String> rendered = new ArrayList<>();
+        for (String column : columnNames) {
+            String[] parts = column.split("\\s+");
+            String renderedColumn = dialect.sqlName(SqlIdentifier.parse(parts[0]));
+            rendered.add(parts.length == 1 ? renderedColumn : renderedColumn + " " + parts[1]);
+        }
+        return String.join(", ", rendered);
+    }
+
+    protected String inlineColumnComment(EntityField field) {
+        return "";
+    }
+
+    protected void applyComments(Connection connection, EntityModel model) throws SQLException {
+        List<String> statements = commentDdl(model);
+        if (statements.isEmpty()) {
+            return;
+        }
+        try (Statement st = connection.createStatement()) {
+            for (String statement : statements) {
+                executeSql(st, statement);
+            }
+        }
+    }
+
+    protected List<String> commentDdl(EntityModel model) {
+        return List.of();
+    }
+
+    protected String sqlStringLiteral(String value) {
+        return "'" + value.replace("'", "''") + "'";
+    }
+
     protected String dropTableDdl(EntityModel model) {
         return "DROP TABLE " + model.sqlTableName(dialect);
     }
@@ -235,7 +341,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             throw new MicroOrmException("Cannot add missing primary key column to existing table: "
                     + model.tableName() + "." + f.columnName());
         }
-        if (!f.nullable()) {
+        if (!f.nullable() && f.columnDefault().isBlank()) {
             throw new MicroOrmException("Cannot add NOT NULL column without a default to existing table: "
                     + model.tableName() + "." + f.columnName());
         }

@@ -17,4 +17,10 @@ public @interface Table {
 
     /** Optional database schema/catalog name. */
     String schema() default "";
+
+    /** Indexes to create for this table. */
+    Index[] indexes() default {};
+
+    /** Unique constraints to create for this table. */
+    UniqueConstraint[] uniqueConstraints() default {};
 }

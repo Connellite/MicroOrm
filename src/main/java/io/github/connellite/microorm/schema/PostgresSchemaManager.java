@@ -5,6 +5,8 @@ import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.type.UuidStorage;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public final class PostgresSchemaManager extends AbstractSchemaManager {
@@ -57,5 +59,20 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
     @Override
     protected String dropTableDdl(EntityModel model) {
         return "DROP TABLE IF EXISTS " + model.sqlTableName(dialect);
+    }
+
+    @Override
+    protected List<String> commentDdl(EntityModel model) {
+        List<String> ddl = new ArrayList<>();
+        if (!model.comment().isBlank()) {
+            ddl.add("COMMENT ON TABLE " + model.sqlTableName(dialect) + " IS " + sqlStringLiteral(model.comment()));
+        }
+        for (EntityField field : model.fields()) {
+            if (!field.comment().isBlank()) {
+                ddl.add("COMMENT ON COLUMN " + model.sqlTableName(dialect) + "."
+                        + dialect.sqlName(field.columnIdentifier()) + " IS " + sqlStringLiteral(field.comment()));
+            }
+        }
+        return ddl;
     }
 }

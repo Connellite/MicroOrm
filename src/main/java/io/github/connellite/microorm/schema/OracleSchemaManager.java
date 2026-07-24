@@ -10,6 +10,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -63,6 +65,11 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
     @Override
     protected boolean indexExists(Connection connection, EntityModel model, EntityField field) throws SQLException {
         String indexName = indexName(model, field);
+        return indexExists(connection, model, indexName);
+    }
+
+    @Override
+    protected boolean indexExists(Connection connection, EntityModel model, String indexName) throws SQLException {
         String owner = owner(model);
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT 1
@@ -128,5 +135,20 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
         int hash = Math.abs(name.hashCode()) % 10000;
         String suffix = "_" + hash;
         return name.substring(0, 30 - suffix.length()) + suffix;
+    }
+
+    @Override
+    protected List<String> commentDdl(EntityModel model) {
+        List<String> ddl = new ArrayList<>();
+        if (!model.comment().isBlank()) {
+            ddl.add("COMMENT ON TABLE " + model.sqlTableName(dialect) + " IS " + sqlStringLiteral(model.comment()));
+        }
+        for (EntityField field : model.fields()) {
+            if (!field.comment().isBlank()) {
+                ddl.add("COMMENT ON COLUMN " + model.sqlTableName(dialect) + "."
+                        + dialect.sqlName(field.columnIdentifier()) + " IS " + sqlStringLiteral(field.comment()));
+            }
+        }
+        return ddl;
     }
 }

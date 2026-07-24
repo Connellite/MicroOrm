@@ -19,6 +19,10 @@ import java.util.List;
  * @param oneToManyRelations {@link OneToManyField} descriptors
  * @param immutable          whether only select operations are allowed
  * @param subselectSql       SQL subselect source, or {@code null} for physical tables
+ * @param comment            optional table comment
+ * @param indexes            table indexes
+ * @param uniqueConstraints  table-level unique constraints
+ * @param checks             table-level check constraints
  */
 public record EntityModel(
         Class<?> entityClass,
@@ -29,7 +33,11 @@ public record EntityModel(
         List<ManyToOneField> manyToOneRelations,
         List<OneToManyField> oneToManyRelations,
         boolean immutable,
-        String subselectSql) {
+        String subselectSql,
+        String comment,
+        List<TableIndex> indexes,
+        List<TableUniqueConstraint> uniqueConstraints,
+        List<TableCheck> checks) {
 
     public EntityModel(Class<?> entityClass, String tableName, List<EntityField> fields, EntityField primaryKey) {
         this(entityClass, SqlIdentifier.unquoted(tableName), null, fields, primaryKey, List.of(), List.of(), false, null);
@@ -76,6 +84,24 @@ public record EntityModel(
             List<OneToManyField> oneToManyRelations,
             boolean immutable,
             String subselectSql) {
+        this(entityClass, tableIdentifier, schemaIdentifier, fields, primaryKey, manyToOneRelations, oneToManyRelations,
+                immutable, subselectSql, "", List.of(), List.of(), List.of());
+    }
+
+    public EntityModel(
+            Class<?> entityClass,
+            SqlIdentifier tableIdentifier,
+            SqlIdentifier schemaIdentifier,
+            List<EntityField> fields,
+            EntityField primaryKey,
+            List<ManyToOneField> manyToOneRelations,
+            List<OneToManyField> oneToManyRelations,
+            boolean immutable,
+            String subselectSql,
+            String comment,
+            List<TableIndex> indexes,
+            List<TableUniqueConstraint> uniqueConstraints,
+            List<TableCheck> checks) {
         this.entityClass = entityClass;
         this.tableIdentifier = tableIdentifier;
         this.schemaIdentifier = schemaIdentifier;
@@ -85,6 +111,10 @@ public record EntityModel(
         this.oneToManyRelations = List.copyOf(oneToManyRelations);
         this.immutable = immutable;
         this.subselectSql = subselectSql == null || subselectSql.isBlank() ? null : subselectSql;
+        this.comment = comment == null ? "" : comment;
+        this.indexes = List.copyOf(indexes);
+        this.uniqueConstraints = List.copyOf(uniqueConstraints);
+        this.checks = List.copyOf(checks);
     }
 
     /**

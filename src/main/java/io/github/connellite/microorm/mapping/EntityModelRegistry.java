@@ -3,17 +3,22 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.collections.ConcurrentReferenceHashMap;
 import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.annotation.Check;
 import io.github.connellite.microorm.annotation.Column;
+import io.github.connellite.microorm.annotation.ColumnDefault;
+import io.github.connellite.microorm.annotation.Comment;
 import io.github.connellite.microorm.annotation.Convert;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Immutable;
+import io.github.connellite.microorm.annotation.Index;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.annotation.Subselect;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Transient;
+import io.github.connellite.microorm.annotation.UniqueConstraint;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.sql.SqlGenerator;
@@ -123,6 +128,8 @@ public final class EntityModelRegistry {
             }
             Id idAnn = f.getAnnotation(Id.class);
             Column colAnn = f.getAnnotation(Column.class);
+            ColumnDefault defaultAnn = f.getAnnotation(ColumnDefault.class);
+            Comment commentAnn = f.getAnnotation(Comment.class);
             ConverterMetadata converter = converterMetadata(entityClass, f);
             if (idAnn != null) {
                 if (pk != null) {
@@ -141,6 +148,9 @@ public final class EntityModelRegistry {
                         colAnn != null && colAnn.indexed(),
                         colAnn == null ? "" : colAnn.sqlType(),
                         colAnn == null ? 0 : colAnn.length(),
+                        defaultAnn == null ? "" : defaultAnn.value(),
+                        commentAnn == null ? "" : commentAnn.value(),
+                        fieldChecks(table.text(), col.text(), f.getAnnotationsByType(Check.class)),
                         converter);
                 fields.add(pk);
             } else {
@@ -157,6 +167,9 @@ public final class EntityModelRegistry {
                         colAnn != null && colAnn.indexed(),
                         colAnn == null ? "" : colAnn.sqlType(),
                         colAnn == null ? 0 : colAnn.length(),
+                        defaultAnn == null ? "" : defaultAnn.value(),
+                        commentAnn == null ? "" : commentAnn.value(),
+                        fieldChecks(table.text(), col.text(), f.getAnnotationsByType(Check.class)),
                         converter));
             }
         }
@@ -173,7 +186,11 @@ public final class EntityModelRegistry {
                 manyToOneRelations,
                 oneToManyRelations,
                 immutable,
-                subselectAnn == null ? null : subselectAnn.value());
+                subselectAnn == null ? null : subselectAnn.value(),
+                tableComment(entityClass),
+                tableIndexes(table.text(), tableAnn),
+                uniqueConstraints(table.text(), tableAnn),
+                tableChecks(table.text(), entityClass.getAnnotationsByType(Check.class)));
         SqlGenerator.validateColumnNames(model);
         return model;
     }
@@ -324,6 +341,118 @@ public final class EntityModelRegistry {
         }
     }
 
+    private static String tableComment(Class<?> entityClass) {
+        Comment comment = entityClass.getAnnotation(Comment.class);
+        return comment == null ? "" : comment.value();
+    }
+
+    private static List<TableIndex> tableIndexes(String tableName, Table tableAnn) {
+        if (tableAnn == null || tableAnn.indexes().length == 0) {
+            return List.of();
+        }
+        List<TableIndex> indexes = new ArrayList<>();
+        for (Index index : tableAnn.indexes()) {
+            List<String> columns = parseColumnList(index.columnList(), "index " + index.name());
+            String name = index.name().isBlank() ? generatedName("idx", tableName, columns) : index.name();
+            SqlGenerator.validateIdentifier(name, "index");
+            indexes.add(new TableIndex(name, columns, index.unique()));
+        }
+        return indexes;
+    }
+
+    private static List<TableUniqueConstraint> uniqueConstraints(String tableName, Table tableAnn) {
+        if (tableAnn == null || tableAnn.uniqueConstraints().length == 0) {
+            return List.of();
+        }
+        List<TableUniqueConstraint> constraints = new ArrayList<>();
+        for (UniqueConstraint constraint : tableAnn.uniqueConstraints()) {
+            List<String> columns = parseColumnNames(constraint.columnNames(), "unique constraint " + constraint.name());
+            String name = constraint.name().isBlank() ? generatedName("uk", tableName, columns) : constraint.name();
+            SqlGenerator.validateIdentifier(name, "unique constraint");
+            constraints.add(new TableUniqueConstraint(name, columns));
+        }
+        return constraints;
+    }
+
+    private static List<TableCheck> tableChecks(String tableName, Check[] checks) {
+        if (checks.length == 0) {
+            return List.of();
+        }
+        List<TableCheck> constraints = new ArrayList<>();
+        for (int i = 0; i < checks.length; i++) {
+            Check check = checks[i];
+            String name = check.name().isBlank() ? "ck_" + tableName + "_" + (i + 1) : check.name();
+            SqlGenerator.validateIdentifier(name, "check constraint");
+            constraints.add(new TableCheck(name, check.constraints()));
+        }
+        return constraints;
+    }
+
+    private static List<TableCheck> fieldChecks(String tableName, String columnName, Check[] checks) {
+        if (checks.length == 0) {
+            return List.of();
+        }
+        List<TableCheck> constraints = new ArrayList<>();
+        for (int i = 0; i < checks.length; i++) {
+            Check check = checks[i];
+            String name = check.name().isBlank()
+                    ? "ck_" + tableName + "_" + columnName + (checks.length == 1 ? "" : "_" + (i + 1))
+                    : check.name();
+            SqlGenerator.validateIdentifier(name, "check constraint");
+            constraints.add(new TableCheck(name, check.constraints()));
+        }
+        return constraints;
+    }
+
+    private static List<String> parseColumnNames(String[] rawColumns, String context) {
+        if (rawColumns.length == 0) {
+            throw new MicroOrmException("Empty column list for " + context);
+        }
+        List<String> columns = new ArrayList<>();
+        for (String rawColumn : rawColumns) {
+            String column = rawColumn == null ? "" : rawColumn.trim();
+            if (column.isEmpty()) {
+                throw new MicroOrmException("Blank column name in " + context);
+            }
+            SqlGenerator.validateIdentifier(column, "column");
+            columns.add(column);
+        }
+        return columns;
+    }
+
+    private static List<String> parseColumnList(String columnList, String context) {
+        if (columnList == null || columnList.isBlank()) {
+            throw new MicroOrmException("Empty columnList for " + context);
+        }
+        List<String> columns = new ArrayList<>();
+        for (String item : columnList.split(",")) {
+            String column = item.trim();
+            if (column.isEmpty()) {
+                throw new MicroOrmException("Blank column in " + context);
+            }
+            String[] parts = column.split("\\s+");
+            if (parts.length > 2) {
+                throw new MicroOrmException("Invalid indexed column '" + column + "' in " + context);
+            }
+            SqlGenerator.validateIdentifier(parts[0], "column");
+            if (parts.length == 2
+                    && !"ASC".equalsIgnoreCase(parts[1])
+                    && !"DESC".equalsIgnoreCase(parts[1])) {
+                throw new MicroOrmException("Invalid sort direction '" + parts[1] + "' in " + context);
+            }
+            columns.add(parts.length == 1 ? parts[0] : parts[0] + " " + parts[1].toUpperCase());
+        }
+        return columns;
+    }
+
+    private static String generatedName(String prefix, String tableName, List<String> columns) {
+        StringBuilder name = new StringBuilder(prefix).append('_').append(tableName);
+        for (String column : columns) {
+            name.append('_').append(column.split("\\s+")[0]);
+        }
+        return name.toString();
+    }
+
     private static EntityField newEntityField(
             Field field,
             SqlIdentifier column,
@@ -334,9 +463,13 @@ public final class EntityModelRegistry {
             boolean indexed,
             String sqlType,
             int length,
+            String columnDefault,
+            String comment,
+            List<TableCheck> checks,
             ConverterMetadata converter) {
         if (converter == null) {
-            return new EntityField(field, column, id, autoIncrement, nullable, unique, indexed, sqlType, length);
+            return new EntityField(field, column, id, autoIncrement, nullable, unique, indexed, sqlType, length,
+                    columnDefault, comment, checks, null, null, null);
         }
         return new EntityField(
                 field,
@@ -348,6 +481,9 @@ public final class EntityModelRegistry {
                 indexed,
                 sqlType,
                 length,
+                columnDefault,
+                comment,
+                checks,
                 converter.converter(),
                 converter.attributeType(),
                 converter.databaseType());
