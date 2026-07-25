@@ -17,7 +17,8 @@
  * {@link io.github.connellite.microorm.annotation.PreUpdate},
  * {@link io.github.connellite.microorm.annotation.PostUpdate},
  * {@link io.github.connellite.microorm.annotation.PreRemove},
- * {@link io.github.connellite.microorm.annotation.PostRemove}, and
- * {@link io.github.connellite.microorm.annotation.PostLoad}.
+ * {@link io.github.connellite.microorm.annotation.PostRemove}, {@link io.github.connellite.microorm.annotation.PostLoad},
+ * and repository native SQL annotations {@link io.github.connellite.microorm.annotation.Query} /
+ * {@link io.github.connellite.microorm.annotation.Param}.
  */
 package io.github.connellite.microorm.annotation;

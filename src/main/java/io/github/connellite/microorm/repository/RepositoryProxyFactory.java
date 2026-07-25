@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.repository;
 
+import io.github.connellite.microorm.annotation.Param;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
@@ -8,17 +9,22 @@ import io.github.connellite.reflection.ReflectionUtil;
 import lombok.experimental.UtilityClass;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.invoke.MethodHandles;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Creates dynamic proxies for {@link EntityRepository} interfaces.
@@ -107,6 +113,11 @@ public final class RepositoryProxyFactory {
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
             if (method.getDeclaringClass() == Object.class) {
                 return invokeObjectMethod(proxy, method, args);
+            }
+            var queryAnnotation = method.getAnnotation(io.github.connellite.microorm.annotation.Query.class);
+            if (queryAnnotation != null) {
+                Object[] arguments = args == null ? new Object[0] : args;
+                return executor.execute(session -> invokeAnnotatedQuery(session, method, arguments, queryAnnotation));
             }
             if (method.isDefault()) {
                 return invokeDefaultMethod(proxy, method, args);
@@ -220,6 +231,102 @@ public final class RepositoryProxyFactory {
                 return session.insertRows((List<?>) args[0], (Integer) args[1]);
             }
             return unsupported(method);
+        }
+
+        private Object invokeAnnotatedQuery(
+                Session session,
+                Method method,
+                Object[] args,
+                io.github.connellite.microorm.annotation.Query annotation) {
+            Query query = buildNativeQuery(method, args, annotation.value());
+            Class<?> returnType = method.getReturnType();
+            if (returnType == void.class) {
+                session.execute(query);
+                return null;
+            }
+            if (returnType == int.class || returnType == Integer.class) {
+                return session.execute(query);
+            }
+            if (returnType == long.class || returnType == Long.class) {
+                return (long) session.execute(query);
+            }
+            if (returnType == boolean.class || returnType == Boolean.class) {
+                return session.execute(query) > 0;
+            }
+            if (List.class.isAssignableFrom(returnType)) {
+                return session.selectRows(entityType, query);
+            }
+            if (Optional.class.isAssignableFrom(returnType)) {
+                return session.findOne(entityType, query);
+            }
+            if (entityType.isAssignableFrom(returnType)) {
+                return session.selectOne(entityType, query);
+            }
+            throw new MicroOrmException("Unsupported @Query return type " + returnType.getName()
+                    + " for " + repositoryType.getName() + "." + method.getName());
+        }
+
+        private Query buildNativeQuery(Method method, Object[] args, String sql) {
+            Query query = Query.of(sql);
+            Parameter[] parameters = method.getParameters();
+            for (int i = 0; i < parameters.length; i++) {
+                Object value = args[i];
+                Param param = parameters[i].getAnnotation(Param.class);
+                if (param == null && value instanceof Map<?, ?> map) {
+                    bindMap(query, method, map);
+                    continue;
+                }
+                bindValue(query, parameterName(method, parameters[i], param), value);
+            }
+            return query;
+        }
+
+        private void bindMap(Query query, Method method, Map<?, ?> values) {
+            Map<String, Object> namedValues = new HashMap<>();
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                if (!(entry.getKey() instanceof String name)) {
+                    throw new MicroOrmException("@Query Map parameter keys must be String for "
+                            + repositoryType.getName() + "." + method.getName());
+                }
+                namedValues.put(name, entry.getValue());
+            }
+            query.setAll(namedValues);
+        }
+
+        private void bindValue(Query query, String name, Object value) {
+            if (value instanceof Collection<?> collection) {
+                query.setCollection(name, collection);
+                return;
+            }
+            if (value != null && value.getClass().isArray()) {
+                query.setCollection(name, arrayValues(value));
+                return;
+            }
+            query.set(name, value);
+        }
+
+        private Collection<?> arrayValues(Object array) {
+            int length = Array.getLength(array);
+            List<Object> values = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                values.add(Array.get(array, i));
+            }
+            return values;
+        }
+
+        private String parameterName(Method method, Parameter parameter, Param param) {
+            if (param != null) {
+                if (param.value().isBlank()) {
+                    throw new MicroOrmException("@Param value cannot be blank for "
+                            + repositoryType.getName() + "." + method.getName());
+                }
+                return param.value();
+            }
+            if (parameter.isNamePresent()) {
+                return parameter.getName();
+            }
+            throw new MicroOrmException("@Query parameter names are not available for "
+                    + repositoryType.getName() + "." + method.getName() + "; add @Param to each argument");
         }
 
         private Object unsupported(Method method) {

@@ -2,6 +2,7 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Param;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.query.EntitySelect;
@@ -57,6 +58,22 @@ class RepositoryTest {
             return findOne(EntitySelect.of(RepositoryItem.class)
                     .where(EntitySelect.field(RepositoryItem::getName).eq(name)));
         }
+
+        @io.github.connellite.microorm.annotation.Query(
+                "SELECT id, name FROM repository_items WHERE name = :name")
+        Optional<RepositoryItem> findNativeByName(@Param("name") String name);
+
+        @io.github.connellite.microorm.annotation.Query(
+                "SELECT id, name FROM repository_items WHERE name IN (:names)")
+        List<RepositoryItem> findNativeByNames(@Param("names") List<String> names);
+
+        @io.github.connellite.microorm.annotation.Query(
+                "UPDATE repository_items SET name = :name WHERE id = :id")
+        int renameNative(@Param("id") long id, @Param("name") String name);
+
+        @io.github.connellite.microorm.annotation.Query(
+                "DELETE FROM repository_items WHERE name = :name")
+        boolean deleteNativeByName(@Param("name") String name);
     }
 
     interface BaseRepository<T, ID> extends EntityRepository<T, ID> {
@@ -81,13 +98,14 @@ class RepositoryTest {
             assertEquals("first", repository.selectRow(inserted.getId()).getName());
             assertEquals("first", repository.findById(inserted.getId()).orElseThrow().getName());
             assertEquals("first", repository.findByName("first").orElseThrow().getName());
+            assertEquals("first", repository.findNativeByName("first").orElseThrow().getName());
+            assertEquals(1, repository.findNativeByNames(List.of("first", "missing")).size());
 
-            inserted.setName("renamed");
-            assertEquals(1, repository.updateRow(inserted));
+            assertEquals(1, repository.renameNative(inserted.getId(), "renamed"));
             assertEquals("renamed", repository.selectOne(Query.of(
                     "SELECT id, name FROM repository_items WHERE id = :id").set("id", inserted.getId())).getName());
 
-            assertEquals(1, repository.deleteById(inserted.getId()));
+            assertTrue(repository.deleteNativeByName("renamed"));
             assertFalse(repository.findById(inserted.getId()).isPresent());
         }
     }

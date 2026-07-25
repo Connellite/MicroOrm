@@ -141,6 +141,22 @@ For writes, attach entities with `LazyRef.to(entity)` or reference existing rows
 
 Relation graphs (including cyclic references) are persisted through `session.insertRow` / `updateRow`.
 
+## Repositories
+
+Repository interfaces can extend `EntityRepository<T, ID>` and may declare native SQL methods with `@Query`:
+
+```java
+interface UserRepository extends EntityRepository<User, UUID> {
+    @Query("SELECT id, name FROM users WHERE name = :name")
+    Optional<User> findNativeByName(@Param("name") String name);
+
+    @Query("UPDATE users SET name = :name WHERE id = :id")
+    int rename(@Param("id") UUID id, @Param("name") String name);
+}
+```
+
+`@Query` is native SQL only. Result rows are mapped to the repository entity type for `T`, `Optional<T>`, and `List<T>` returns; DML methods can return `void`, `int`, `long`, or `boolean`.
+
 ## Dynamic tables
 
 When entity classes are not needed, describe tables in code and use `DynamicSession`:
