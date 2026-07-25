@@ -17,6 +17,7 @@ import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.util.Logger;
 import io.github.connellite.microorm.util.LoggerFactory;
 import io.github.connellite.microorm.type.JdbcValueMapper;
+import io.github.connellite.util.TypeCoercionUtil;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -276,6 +277,23 @@ public final class SqlExecutor {
             throw new MicroOrmException("Expected at most one row, got " + rows.size());
         }
         return rows.get(0);
+    }
+
+    public static <T> T queryScalar(Connection connection, Query query, Class<T> targetType) {
+        LogHolder.logger.debug(() -> formatSql("scalar", query));
+        try (NamedPreparedStatement nps = prepare(connection, query);
+             ResultSet rs = nps.executeQuery()) {
+            if (!rs.next()) {
+                return null;
+            }
+            Object value = rs.getObject(1);
+            if (value == null || rs.wasNull()) {
+                return null;
+            }
+            return TypeCoercionUtil.coerce(value, targetType);
+        } catch (SQLException e) {
+            throw MicroOrmException.wrap(e);
+        }
     }
 
     /** Materializes all rows from a dynamic-table query as maps keyed by column name. */

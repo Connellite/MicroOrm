@@ -527,6 +527,15 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     }
 
     /**
+     * Executes a custom scalar query and returns the first column of the first row.
+     */
+    public <T> T selectScalar(Query query, Class<T> targetType) {
+        Objects.requireNonNull(query, "query cannot be null");
+        Objects.requireNonNull(targetType, "targetType cannot be null");
+        return SqlExecutor.queryScalar(connection, query, targetType);
+    }
+
+    /**
      * Executes an SQL-oriented typed INSERT builder.
      *
      * @return affected row count

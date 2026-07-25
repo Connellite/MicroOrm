@@ -152,10 +152,16 @@ interface UserRepository extends EntityRepository<User, UUID> {
 
     @Query("UPDATE users SET name = :name WHERE id = :id")
     int rename(@Param("id") UUID id, @Param("name") String name);
+
+    @Procedure("archive_inactive_users")
+    void archiveInactiveUsers();
+
+    @Procedure("count_active_users")
+    long countActiveUsers();
 }
 ```
 
-`@Query` is native SQL only. Result rows are mapped to the repository entity type for `T`, `Optional<T>`, and `List<T>` returns; DML methods can return `void`, `int`, `long`, or `boolean`.
+`@Query` is native SQL only. `@Procedure` uses the return type to choose the call style: `void` methods render procedure calls such as `CALL archive_inactive_users()`, while non-void methods render scalar function queries such as `SELECT count_active_users()`. If you need vendor-specific syntax such as MSSQL `EXEC` or Oracle `FROM dual`, pass the full native SQL.
 
 ## Dynamic tables
 

@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.repository;
 
 import io.github.connellite.microorm.annotation.Param;
+import io.github.connellite.microorm.annotation.Procedure;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
@@ -115,9 +116,26 @@ public final class RepositoryProxyFactory {
                 return invokeObjectMethod(proxy, method, args);
             }
             var queryAnnotation = method.getAnnotation(io.github.connellite.microorm.annotation.Query.class);
+            var procedureAnnotation = method.getAnnotation(Procedure.class);
+            int nativeAnnotationCount = (queryAnnotation == null ? 0 : 1)
+                    + (procedureAnnotation == null ? 0 : 1);
+            if (nativeAnnotationCount > 1) {
+                throw new MicroOrmException("Repository method cannot declare more than one native SQL annotation: "
+                        + repositoryType.getName() + "." + method.getName());
+            }
             if (queryAnnotation != null) {
                 Object[] arguments = args == null ? new Object[0] : args;
-                return executor.execute(session -> invokeAnnotatedQuery(session, method, arguments, queryAnnotation));
+                return executor.execute(session -> invokeNativeQuery(
+                        session, method, buildNativeQuery(method, arguments, queryAnnotation.value(), "@Query"), "@Query"));
+            }
+            if (procedureAnnotation != null) {
+                Object[] arguments = args == null ? new Object[0] : args;
+                if (method.getReturnType() != void.class && method.getReturnType() != Void.class) {
+                    return executor.execute(session -> invokeFunction(
+                            session, method, buildFunctionQuery(method, arguments, procedureAnnotation)));
+                }
+                return executor.execute(session -> invokeNativeQuery(
+                        session, method, buildProcedureQuery(method, arguments, procedureAnnotation), "@Procedure"));
             }
             if (method.isDefault()) {
                 return invokeDefaultMethod(proxy, method, args);
@@ -233,12 +251,11 @@ public final class RepositoryProxyFactory {
             return unsupported(method);
         }
 
-        private Object invokeAnnotatedQuery(
+        private Object invokeNativeQuery(
                 Session session,
                 Method method,
-                Object[] args,
-                io.github.connellite.microorm.annotation.Query annotation) {
-            Query query = buildNativeQuery(method, args, annotation.value());
+                Query query,
+                String annotationName) {
             Class<?> returnType = method.getReturnType();
             if (returnType == void.class) {
                 session.execute(query);
@@ -262,30 +279,109 @@ public final class RepositoryProxyFactory {
             if (entityType.isAssignableFrom(returnType)) {
                 return session.selectOne(entityType, query);
             }
-            throw new MicroOrmException("Unsupported @Query return type " + returnType.getName()
+            throw new MicroOrmException("Unsupported " + annotationName + " return type " + returnType.getName()
                     + " for " + repositoryType.getName() + "." + method.getName());
         }
 
-        private Query buildNativeQuery(Method method, Object[] args, String sql) {
+        private Query buildProcedureQuery(
+                Method method,
+                Object[] args,
+                Procedure annotation) {
+            String procedure = annotation.value().isBlank() ? annotation.procedureName() : annotation.value();
+            if (procedure.isBlank()) {
+                procedure = method.getName();
+            }
+            return buildNativeQuery(method, args, procedureSql(method, args, procedure), "@Procedure");
+        }
+
+        private Query buildFunctionQuery(
+                Method method,
+                Object[] args,
+                Procedure annotation) {
+            String function = annotation.value().isBlank() ? annotation.procedureName() : annotation.value();
+            if (function.isBlank()) {
+                function = method.getName();
+            }
+            return buildNativeQuery(method, args, functionSql(method, args, function), "@Procedure");
+        }
+
+        private Object invokeFunction(Session session, Method method, Query query) {
+            Class<?> returnType = method.getReturnType();
+            if (returnType == void.class) {
+                throw new MicroOrmException("Unsupported stored function return type void for "
+                        + repositoryType.getName() + "." + method.getName());
+            }
+            if (List.class.isAssignableFrom(returnType)
+                    || Optional.class.isAssignableFrom(returnType)
+                    || entityType.isAssignableFrom(returnType)) {
+                return invokeNativeQuery(session, method, query, "@Procedure");
+            }
+            Class<?> scalarType = ReflectionUtil.primitiveToWrapper(returnType);
+            return session.selectScalar(query, scalarType);
+        }
+
+        private String functionSql(Method method, Object[] args, String function) {
+            if (looksLikeNativeSql(function)) {
+                return function;
+            }
+            return "SELECT " + function + "(" + String.join(", ", parameterPlaceholders(method, args, "@Procedure")) + ")";
+        }
+
+        private String procedureSql(Method method, Object[] args, String procedure) {
+            if (looksLikeNativeSql(procedure)) {
+                return procedure;
+            }
+            return "CALL " + procedure + "(" + String.join(", ", parameterPlaceholders(method, args, "@Procedure")) + ")";
+        }
+
+        private List<String> parameterPlaceholders(Method method, Object[] args, String annotationName) {
+            Parameter[] parameters = method.getParameters();
+            List<String> placeholders = new ArrayList<>();
+            for (int i = 0; i < parameters.length; i++) {
+                Object value = args[i];
+                Param param = parameters[i].getAnnotation(Param.class);
+                if (param == null && value instanceof Map<?, ?> map) {
+                    for (Object key : map.keySet()) {
+                        if (!(key instanceof String name)) {
+                            throw new MicroOrmException(annotationName + " Map parameter keys must be String for "
+                                    + repositoryType.getName() + "." + method.getName());
+                        }
+                        placeholders.add(":" + name);
+                    }
+                    continue;
+                }
+                placeholders.add(":" + parameterName(method, parameters[i], param, annotationName));
+            }
+            return placeholders;
+        }
+
+        private boolean looksLikeNativeSql(String procedure) {
+            String trimmed = procedure.trim();
+            String lower = trimmed.toLowerCase();
+            return trimmed.startsWith("{") || lower.startsWith("select ") || lower.startsWith("call ")
+                    || lower.startsWith("exec ") || lower.startsWith("execute ");
+        }
+
+        private Query buildNativeQuery(Method method, Object[] args, String sql, String annotationName) {
             Query query = Query.of(sql);
             Parameter[] parameters = method.getParameters();
             for (int i = 0; i < parameters.length; i++) {
                 Object value = args[i];
                 Param param = parameters[i].getAnnotation(Param.class);
                 if (param == null && value instanceof Map<?, ?> map) {
-                    bindMap(query, method, map);
+                    bindMap(query, method, map, annotationName);
                     continue;
                 }
-                bindValue(query, parameterName(method, parameters[i], param), value);
+                bindValue(query, parameterName(method, parameters[i], param, annotationName), value);
             }
             return query;
         }
 
-        private void bindMap(Query query, Method method, Map<?, ?> values) {
+        private void bindMap(Query query, Method method, Map<?, ?> values, String annotationName) {
             Map<String, Object> namedValues = new HashMap<>();
             for (Map.Entry<?, ?> entry : values.entrySet()) {
                 if (!(entry.getKey() instanceof String name)) {
-                    throw new MicroOrmException("@Query Map parameter keys must be String for "
+                    throw new MicroOrmException(annotationName + " Map parameter keys must be String for "
                             + repositoryType.getName() + "." + method.getName());
                 }
                 namedValues.put(name, entry.getValue());
@@ -314,7 +410,7 @@ public final class RepositoryProxyFactory {
             return values;
         }
 
-        private String parameterName(Method method, Parameter parameter, Param param) {
+        private String parameterName(Method method, Parameter parameter, Param param, String annotationName) {
             if (param != null) {
                 if (param.value().isBlank()) {
                     throw new MicroOrmException("@Param value cannot be blank for "
@@ -325,7 +421,7 @@ public final class RepositoryProxyFactory {
             if (parameter.isNamePresent()) {
                 return parameter.getName();
             }
-            throw new MicroOrmException("@Query parameter names are not available for "
+            throw new MicroOrmException(annotationName + " parameter names are not available for "
                     + repositoryType.getName() + "." + method.getName() + "; add @Param to each argument");
         }
 
