@@ -41,11 +41,6 @@ public final class LoggerFactory {
         }
 
         @Override
-        public boolean isDebugEnabled() {
-            return logger.isLoggable(Level.FINE);
-        }
-
-        @Override
         public void debug(Supplier<String> message) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.log(Level.FINE, message.get());
@@ -85,11 +80,6 @@ public final class LoggerFactory {
 
         private Slf4jLogger(Class<?> logger) {
             this(org.slf4j.LoggerFactory.getLogger(logger));
-        }
-
-        @Override
-        public boolean isDebugEnabled() {
-            return logger.isDebugEnabled();
         }
 
         @Override
