@@ -262,11 +262,10 @@ Entity classes on the classpath (unnamed module) do not need the `add-reads` fla
 
 - Single-column primary keys only (numeric or UUID)
 - Associations: `@ManyToOne` and `@OneToMany` only (no `@OneToOne`, `@ManyToMany`, or embeddables)
-- No migrations framework or entity inheritance
+- No migrations framework or entity inheritance strategies
 - `Session` is not thread-safe — one session per thread
 - Supported field types: numeric primitives/wrappers, `boolean`, `String`, `UUID`, `float`/`double`
 - Numeric `0` is treated as unset for `@Id(autoIncrement = true)` inserts and PK lookups
-- Entity inheritance is not supported (mapped superclass fields are rejected at registration)
 - `EntitySelect` covers one root entity; use raw `Query` for arbitrary projections or vendor-specific SQL
 
 ## License

@@ -3,6 +3,7 @@ package io.github.connellite.microorm;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.session.Session;
@@ -88,6 +89,42 @@ class OrmFeatureDialectTest {
         }
     }
 
+    @MappedSuperclass
+    public static class InheritedWidgetBase {
+        @Id
+        protected int id;
+
+        @Column(nullable = false)
+        protected String inheritedName;
+    }
+
+    @Entity
+    @Table(name = "feature_inherited_widgets")
+    public static class InheritedWidget extends InheritedWidgetBase {
+        private String description;
+
+        InheritedWidget() {
+        }
+
+        InheritedWidget(int id, String inheritedName, String description) {
+            this.id = id;
+            this.inheritedName = inheritedName;
+            this.description = description;
+        }
+
+        int getId() {
+            return id;
+        }
+
+        String getInheritedName() {
+            return inheritedName;
+        }
+
+        String getDescription() {
+            return description;
+        }
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("dialects")
     void EntitySelectSelectsFilteredOrderedAndLimitedRows(DialectTestSupport.DialectFixture dialect) throws SQLException {
@@ -142,7 +179,7 @@ class OrmFeatureDialectTest {
     @MethodSource("dialects")
     void explicitNumericIdIsSupported(DialectTestSupport.DialectFixture dialect) throws SQLException {
         try (Connection connection = dialect.openConnection()) {
-            DialectTestSupport.dropTables(connection, "feature_widgets", "feature_assigned_numeric_widgets");
+            DialectTestSupport.dropTables(connection, "feature_widgets", "feature_assigned_numeric_widgets", "feature_inherited_widgets");
             MicroOrm orm = dialect.createOrm(connection).register(AssignedNumericWidget.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(AssignedNumericWidget.class);
@@ -155,6 +192,25 @@ class OrmFeatureDialectTest {
                         new AssignedNumericWidget(43, "next"),
                         new AssignedNumericWidget(44, "last")), 1));
                 assertEquals(3, session.selectRows(AssignedNumericWidget.class).size());
+            }
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void mappedSuperclassFieldsArePersistedAndHydrated(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "feature_inherited_widgets");
+            MicroOrm orm = dialect.createOrm(connection).register(InheritedWidget.class);
+            try (Session session = orm.openSession()) {
+                session.createEntity(InheritedWidget.class);
+                session.insertRow(new InheritedWidget(7, "base", "child"));
+
+                InheritedWidget loaded = session.selectRow(InheritedWidget.class, 7);
+
+                assertEquals(7, loaded.getId());
+                assertEquals("base", loaded.getInheritedName());
+                assertEquals("child", loaded.getDescription());
             }
         }
     }

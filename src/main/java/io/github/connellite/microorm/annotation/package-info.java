@@ -3,6 +3,7 @@
  * {@link io.github.connellite.microorm.annotation.Table},
  * {@link io.github.connellite.microorm.annotation.Column}, {@link io.github.connellite.microorm.annotation.Id},
  * {@link io.github.connellite.microorm.annotation.Convert},
+ * {@link io.github.connellite.microorm.annotation.MappedSuperclass},
  * DDL hints such as {@link io.github.connellite.microorm.annotation.ColumnDefault},
  * {@link io.github.connellite.microorm.annotation.Comment},
  * {@link io.github.connellite.microorm.annotation.Index},

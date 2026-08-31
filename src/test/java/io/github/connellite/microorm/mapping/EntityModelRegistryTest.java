@@ -5,6 +5,7 @@ import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.Transient;
 import org.junit.jupiter.api.Test;
 
@@ -117,16 +118,29 @@ class EntityModelRegistryTest {
         private LocalDateTime updatedAt;
     }
 
-    static class MappedSuperclass {
+    @MappedSuperclass
+    static class RegistryMappedSuperclass {
         @Column
         protected String inherited;
     }
 
     @Entity
     @Table(name = "inheritance_child")
-    static class InheritanceChild extends MappedSuperclass {
+    static class InheritanceChild extends RegistryMappedSuperclass {
         @Id
         private long id;
+    }
+
+    @MappedSuperclass
+    static class IdMappedSuperclass {
+        @Id
+        protected long id;
+    }
+
+    @Entity
+    @Table(name = "inherited_id_child")
+    static class InheritedIdChild extends IdMappedSuperclass {
+        private String name;
     }
 
     @Entity
@@ -272,8 +286,20 @@ class EntityModelRegistryTest {
     }
 
     @Test
-    void rejectsInheritedMappedFields() {
+    void mapsInheritedMappedSuperclassFields() {
         EntityModelRegistry registry = new EntityModelRegistry();
-        assertThrows(MicroOrmException.class, () -> registry.register(InheritanceChild.class));
+        EntityModel model = registry.register(InheritanceChild.class);
+
+        assertEquals(2, model.fields().size());
+        assertTrue(model.fields().stream().anyMatch(f -> f.javaField().getName().equals("inherited")));
+    }
+
+    @Test
+    void mapsInheritedMappedSuperclassPrimaryKey() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(InheritedIdChild.class);
+
+        assertEquals("id", model.primaryKey().javaField().getName());
+        assertEquals(2, model.fields().size());
     }
 }

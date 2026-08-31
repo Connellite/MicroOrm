@@ -14,6 +14,7 @@ import io.github.connellite.microorm.annotation.Immutable;
 import io.github.connellite.microorm.annotation.Index;
 import io.github.connellite.microorm.annotation.JoinColumn;
 import io.github.connellite.microorm.annotation.ManyToOne;
+import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.annotation.Subselect;
 import io.github.connellite.microorm.annotation.Table;
@@ -30,6 +31,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -104,13 +106,11 @@ public final class EntityModelRegistry {
         }
         LifecycleCallbacks.validate(entityClass);
 
-        rejectInheritedMappedFields(entityClass);
-
         List<EntityField> fields = new ArrayList<>();
         List<ManyToOneField> manyToOneRelations = new ArrayList<>();
         List<OneToManyField> oneToManyRelations = new ArrayList<>();
         EntityField pk = null;
-        for (Field f : entityClass.getDeclaredFields()) {
+        for (Field f : mappedFields(entityClass)) {
             if (Modifier.isStatic(f.getModifiers())) {
                 continue;
             }
@@ -213,7 +213,7 @@ public final class EntityModelRegistry {
     }
 
     private static Class<?> primaryKeyJavaType(Class<?> entityClass) {
-        for (Field f : entityClass.getDeclaredFields()) {
+        for (Field f : mappedFields(entityClass)) {
             if (f.getAnnotation(Id.class) != null) {
                 ConverterMetadata converter = converterMetadata(entityClass, f);
                 return converter == null ? f.getType() : converter.databaseType();
@@ -242,7 +242,7 @@ public final class EntityModelRegistry {
     private static void validateInverseManyToOne(Class<?> childClass, String mappedByField, Class<?> ownerClass) {
         Field inverse;
         try {
-            inverse = childClass.getDeclaredField(mappedByField);
+            inverse = mappedField(childClass, mappedByField);
         } catch (NoSuchFieldException e) {
             throw new MicroOrmException("mappedBy field '" + mappedByField + "' not found on " + childClass.getName(), e);
         }
@@ -563,25 +563,26 @@ public final class EntityModelRegistry {
             Class<?> databaseType) {
     }
 
-    private static void rejectInheritedMappedFields(Class<?> entityClass) {
-        Class<?> superClass = entityClass.getSuperclass();
-        if (superClass == null || superClass == Object.class) {
-            return;
-        }
-        for (Field f : superClass.getDeclaredFields()) {
-            if (Modifier.isStatic(f.getModifiers())) {
-                continue;
-            }
-            if (f.getAnnotation(Transient.class) != null) {
-                continue;
-            }
-            if (f.getAnnotation(Id.class) != null
-                    || f.getAnnotation(Column.class) != null
-                    || f.getAnnotation(ManyToOne.class) != null
-                    || f.getAnnotation(OneToMany.class) != null) {
-                throw new MicroOrmException("Entity inheritance is not supported; move mapped fields to "
-                        + entityClass.getName() + " (found " + superClass.getName() + "." + f.getName() + ")");
+    private static List<Field> mappedFields(Class<?> entityClass) {
+        List<Class<?>> hierarchy = new ArrayList<>();
+        for (Class<?> current = entityClass; current != null && current != Object.class; current = current.getSuperclass()) {
+            if (current == entityClass || current.getAnnotation(MappedSuperclass.class) != null) {
+                hierarchy.add(0, current);
             }
         }
+        List<Field> fields = new ArrayList<>();
+        for (Class<?> type : hierarchy) {
+            Collections.addAll(fields, type.getDeclaredFields());
+        }
+        return fields;
+    }
+
+    private static Field mappedField(Class<?> entityClass, String name) throws NoSuchFieldException {
+        for (Field field : mappedFields(entityClass)) {
+            if (field.getName().equals(name)) {
+                return field;
+            }
+        }
+        throw new NoSuchFieldException(name);
     }
 }
