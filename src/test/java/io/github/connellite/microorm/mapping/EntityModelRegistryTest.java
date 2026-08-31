@@ -7,6 +7,7 @@ import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.Transient;
+import io.github.connellite.microorm.schema.PackageAnnotatedEntity;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -200,6 +201,16 @@ class EntityModelRegistryTest {
                 .findFirst()
                 .orElseThrow()
                 .columnName());
+    }
+
+    @Test
+    void packageEntityAnnotationMarksPackageClassesAsEntities() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(PackageAnnotatedEntity.class);
+
+        assertEquals(PackageAnnotatedEntity.class, model.entityClass());
+        assertEquals("packageannotatedentity", model.tableName());
+        assertEquals(2, model.fields().size());
     }
 
     @Test

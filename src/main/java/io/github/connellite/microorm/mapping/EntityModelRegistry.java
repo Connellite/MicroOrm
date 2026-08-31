@@ -75,9 +75,8 @@ public final class EntityModelRegistry {
     }
 
     private EntityModel build(Class<?> entityClass) {
-        Entity entityAnn = entityClass.getAnnotation(Entity.class);
-        if (entityAnn == null) {
-            throw new MicroOrmException("Missing @Entity on " + entityClass.getName());
+        if (!isEntity(entityClass)) {
+            throw new MicroOrmException("Missing @Entity on class or package: " + entityClass.getName());
         }
         Table tableAnn = entityClass.getAnnotation(Table.class);
         Subselect subselectAnn = entityClass.getAnnotation(Subselect.class);
@@ -288,9 +287,15 @@ public final class EntityModelRegistry {
     }
 
     private static void requireEntity(Class<?> type) {
-        if (type.getAnnotation(Entity.class) == null) {
+        if (!isEntity(type)) {
             throw new MicroOrmException("Association target must be @Entity: " + type.getName());
         }
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private static boolean isEntity(Class<?> type) {
+        Package packageInfo = type.getPackage();
+        return type.getAnnotation(Entity.class) != null || packageInfo != null && packageInfo.getAnnotation(Entity.class) != null;
     }
 
     private static void validateIdField(Class<?> entityClass, Field field, Id idAnn, ConverterMetadata converter) {
