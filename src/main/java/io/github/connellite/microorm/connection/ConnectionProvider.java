@@ -16,4 +16,12 @@ public interface ConnectionProvider {
 
     /** Returns or closes the connection when the session ends. */
     void release(Connection connection) throws SQLException;
+
+    /**
+     * Returns {@code true} when transaction completion is owned outside of the session,
+     * for example by Spring.
+     */
+    default boolean isTransactionManaged(Connection connection) {
+        return SpringJdbcSupport.isTransactionManagedConnection(connection);
+    }
 }

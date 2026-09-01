@@ -24,7 +24,6 @@ import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.RelationSqlGenerator;
 import io.github.connellite.microorm.connection.ConnectionProvider;
-import io.github.connellite.microorm.connection.SpringJdbcSupport;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -820,8 +819,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
 
     /**
      * Releases the JDBC connection. Rolls back an open local transaction unless the connection is
-     * managed by Spring ({@code TransactionAwareDataSourceProxy}), in which case commit/rollback is
-     * left to Spring.
+     * managed by an external transaction manager, in which case commit/rollback is left to that owner.
      */
     @Override
     public void close() throws SQLException {
@@ -829,7 +827,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             lazyContext.markClosed();
         }
         if (connection != null && !connection.isClosed()) {
-            if (!connection.getAutoCommit() && !SpringJdbcSupport.isTransactionManagedConnection(connection)) {
+            if (!connection.getAutoCommit() && !provider.isTransactionManaged(connection)) {
                 connection.rollback();
             }
             provider.release(connection);

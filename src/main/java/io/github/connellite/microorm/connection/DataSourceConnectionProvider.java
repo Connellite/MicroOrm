@@ -5,7 +5,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
 
-/** {@link ConnectionProvider} that delegates to {@link javax.sql.DataSource#getConnection()}. */
+/** {@link ConnectionProvider} that delegates to a {@link javax.sql.DataSource}. */
 public final class DataSourceConnectionProvider implements ConnectionProvider {
 
     private final DataSource dataSource;
@@ -17,13 +17,18 @@ public final class DataSourceConnectionProvider implements ConnectionProvider {
 
     @Override
     public Connection acquire() throws SQLException {
-        return dataSource.getConnection();
+        return SpringJdbcSupport.getConnection(dataSource);
     }
 
     @Override
     public void release(Connection connection) throws SQLException {
-        if (connection != null && !connection.isClosed()) {
-            connection.close();
-        }
+        SpringJdbcSupport.releaseConnection(connection, dataSource);
+    }
+
+    @Override
+    public boolean isTransactionManaged(Connection connection) {
+        return SpringJdbcSupport.isTransactionManagedConnection(connection)
+                || (SpringJdbcSupport.isActualTransactionActive()
+                && SpringJdbcSupport.isConnectionTransactional(connection, dataSource));
     }
 }
