@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.dynamic;
 
 import io.github.connellite.microorm.annotation.GenerationType;
+import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
@@ -86,6 +87,11 @@ public final class Column {
         return idGeneration.sequence();
     }
 
+    /** {@code true} when the primary key is generated as a UUID before insert. */
+    public boolean uuidGenerated() {
+        return idGeneration.uuid();
+    }
+
     /** {@code true} when SQL NULL is allowed. Primary keys are never nullable. */
     public boolean nullable() {
         return nullable;
@@ -120,6 +126,7 @@ public final class Column {
         private boolean primaryKey;
         private GenerationType generatedStrategy;
         private String generatedGenerator = "";
+        private UuidGenerator.Version uuidGeneratorVersion;
         private final Map<String, SequenceGeneratorSpec> sequenceGenerators = new HashMap<>();
         private final Map<String, GenericGeneratorSpec> genericGenerators = new HashMap<>();
         private boolean nullable = true;
@@ -187,6 +194,17 @@ public final class Column {
             return this;
         }
 
+        /** Enables UUID primary key generation with the default UUID version. */
+        public Builder uuidGenerator() {
+            return uuidGenerator(UuidGenerator.Version.VERSION_4);
+        }
+
+        /** Enables UUID primary key generation with the selected UUID version. */
+        public Builder uuidGenerator(UuidGenerator.Version version) {
+            this.uuidGeneratorVersion = Objects.requireNonNull(version, "version");
+            return this;
+        }
+
         /** Requires a non-null value. Ignored for primary keys (always NOT NULL). */
         public Builder notNull() {
             this.nullable = false;
@@ -232,9 +250,12 @@ public final class Column {
             SqlGenerator.validateIdentifier(name, "column");
             IdGeneration idGeneration = resolveIdGeneration();
             if (idGeneration.generated() && !primaryKey) {
-                throw new IllegalArgumentException("generatedValue requires primaryKey on column: " + name);
+                throw new IllegalArgumentException("Generated primary key generation requires primaryKey on column: " + name);
             }
-            if (idGeneration.generated() && type != LogicalType.INT && type != LogicalType.LONG) {
+            if (idGeneration.uuid() && type != LogicalType.UUID) {
+                throw new IllegalArgumentException("uuidGenerator supports UUID only: " + name);
+            }
+            if (idGeneration.generated() && !idGeneration.uuid() && type != LogicalType.INT && type != LogicalType.LONG) {
                 throw new IllegalArgumentException("generatedValue supports INT or LONG only: " + name);
             }
             return new Column(
@@ -250,6 +271,12 @@ public final class Column {
         }
 
         private IdGeneration resolveIdGeneration() {
+            if (uuidGeneratorVersion != null) {
+                if (generatedStrategy != null) {
+                    throw new IllegalArgumentException("uuidGenerator cannot be combined with generatedValue");
+                }
+                return IdGeneration.uuid(uuidGeneratorVersion.number());
+            }
             if (generatedStrategy == null) {
                 return IdGeneration.none();
             }
@@ -276,11 +303,7 @@ public final class Column {
                 if (generatedStrategy != GenerationType.SEQUENCE) {
                     throw new IllegalArgumentException("sequenceGenerator requires GenerationType.SEQUENCE");
                 }
-                return IdGeneration.sequence(
-                        generatedGenerator,
-                        sequenceGenerator.sequenceName(),
-                        sequenceGenerator.allocationSize(),
-                        sequenceGenerator.initialValue());
+                return IdGeneration.sequence(generatedGenerator, sequenceGenerator.sequenceName(), sequenceGenerator.allocationSize(), sequenceGenerator.initialValue());
             }
             throw new IllegalArgumentException("Unknown generated value generator: " + generatedGenerator);
         }

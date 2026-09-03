@@ -250,6 +250,16 @@ DynamicTable docs = DynamicTable.builder("docs")
         .build();
 ```
 
+Dynamic UUID ids can choose the same UUID generator versions as `@UuidGenerator`:
+
+```java
+DynamicTable docs = DynamicTable.builder("docs")
+        .column("id", LogicalType.UUID, c -> c.primaryKey()
+                .uuidGenerator(UuidGenerator.Version.VERSION_7))
+        .column("name", LogicalType.STRING, Column.Builder::notNull)
+        .build();
+```
+
 See `io.github.connellite.microorm.dynamic` in the Javadoc for details.
 
 ## Requirements

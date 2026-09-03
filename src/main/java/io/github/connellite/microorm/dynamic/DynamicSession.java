@@ -8,6 +8,7 @@ import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.jdbc.SqlExecutor;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
+import io.github.connellite.util.UuidGenerators;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Session for runtime-defined tables: DDL (create/sync/drop) and Map-based CRUD.
@@ -164,6 +166,9 @@ public final class DynamicSession implements AutoCloseable {
         Objects.requireNonNull(values, "values");
         Map<String, Object> effectiveValues = new LinkedHashMap<>(values);
         Column pk = table.primaryKey();
+        if (pk.uuidGenerated() && effectiveValues.get(pk.name()) == null) {
+            effectiveValues.put(pk.name(), generateUuid(pk.idGeneration().uuidVersion()));
+        }
         if (pk.sequenceGenerated() && isUnsetGeneratedPk(effectiveValues.get(pk.name()))) {
             if (!dialect.supportsSequences()) {
                 throw new MicroOrmException("GenerationType.SEQUENCE is not supported by "
@@ -185,6 +190,16 @@ public final class DynamicSession implements AutoCloseable {
             return true;
         }
         return value instanceof Number number && number.longValue() == 0L;
+    }
+
+    private static UUID generateUuid(int version) {
+        return switch (version) {
+            case 1 -> UuidGenerators.generateVersion1();
+            case 4 -> UuidGenerators.generateVersion4();
+            case 6 -> UuidGenerators.generateVersion6();
+            case 7 -> UuidGenerators.generateVersion7();
+            default -> throw new MicroOrmException("Unsupported UUID version: " + version);
+        };
     }
 
     @Override

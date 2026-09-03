@@ -6,6 +6,7 @@ import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.session.Session;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,24 @@ class DynamicSessionTest {
                         MicroOrmException.class,
                         () -> session.createTable("generated_items"));
                 assertTrue(error.getMessage().contains("GenerationType.SEQUENCE"));
+            }
+        }
+    }
+
+    @Test
+    void insertReturningIdReturnsGeneratedUuidKey() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(generatedUuidTable());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("generated_uuid_items");
+
+                Object id = session.insertReturningId("generated_uuid_items", Map.of("name", "uuid7"));
+
+                assertTrue(id instanceof UUID);
+                assertEquals(7, ((UUID) id).version());
+                Map<String, Object> row = session.selectOne("generated_uuid_items", Map.of("id", id)).orElseThrow();
+                assertEquals("uuid7", row.get("name"));
             }
         }
     }
@@ -203,6 +222,14 @@ class DynamicSessionTest {
     private static DynamicTable generatedIdTable(GenerationType strategy) {
         return DynamicTable.builder("generated_items")
                 .column("id", LogicalType.LONG, c -> c.primaryKey().generatedValue(strategy))
+                .column("name", LogicalType.STRING, Column.Builder::notNull)
+                .build();
+    }
+
+    private static DynamicTable generatedUuidTable() {
+        return DynamicTable.builder("generated_uuid_items")
+                .column("id", LogicalType.UUID, c -> c.primaryKey()
+                        .uuidGenerator(UuidGenerator.Version.VERSION_7))
                 .column("name", LogicalType.STRING, Column.Builder::notNull)
                 .build();
     }

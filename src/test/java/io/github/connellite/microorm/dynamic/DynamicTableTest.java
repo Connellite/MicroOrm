@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.dynamic;
 
 import io.github.connellite.microorm.annotation.GenerationType;
+import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.IdGenerationKind;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,17 @@ class DynamicTableTest {
     }
 
     @Test
+    void uuidGeneratorStoresUuidGenerationMetadata() {
+        DynamicTable table = DynamicTable.builder("items")
+                .column("id", LogicalType.UUID, c -> c.primaryKey()
+                        .uuidGenerator(UuidGenerator.Version.VERSION_7))
+                .build();
+
+        assertEquals(IdGenerationKind.UUID, table.primaryKey().idGeneration().kind());
+        assertEquals(7, table.primaryKey().idGeneration().uuidVersion());
+    }
+
+    @Test
     void rejectsGeneratedValueOnNonPrimaryKey() {
         assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
                 .column("id", LogicalType.LONG, c -> c.generatedValue(GenerationType.IDENTITY))
@@ -107,6 +119,22 @@ class DynamicTableTest {
     void rejectsGeneratedValueOnUnsupportedType() {
         assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
                 .column("id", LogicalType.UUID, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
+                .build());
+    }
+
+    @Test
+    void rejectsUuidGeneratorOnUnsupportedType() {
+        assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.LONG, c -> c.primaryKey().uuidGenerator())
+                .build());
+    }
+
+    @Test
+    void rejectsUuidGeneratorCombinedWithGeneratedValue() {
+        assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.UUID, c -> c.primaryKey()
+                        .uuidGenerator()
+                        .generatedValue(GenerationType.IDENTITY))
                 .build());
     }
 
