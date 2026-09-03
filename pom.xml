@@ -6,10 +6,10 @@
 
     <groupId>io.github.connellite</groupId>
     <artifactId>MicroOrm</artifactId>
-    <version>1.0.0-alpha.11</version>
+    <version>1.0.0-alpha.12</version>
     <packaging>jar</packaging>
     <name>MicroOrm</name>
-    <description>Lightweight JDBC ORM (SQLite first), built on ExtraLib.</description>
+    <description>Lightweight JDBC ORM, built on ExtraLib.</description>
     <url>https://github.com/Connellite/MicroOrm</url>
 
     <licenses>
