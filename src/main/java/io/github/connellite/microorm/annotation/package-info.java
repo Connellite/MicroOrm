@@ -6,6 +6,7 @@
  * {@link io.github.connellite.microorm.annotation.GenerationType},
  * {@link io.github.connellite.microorm.annotation.SequenceGenerator},
  * {@link io.github.connellite.microorm.annotation.GenericGenerator},
+ * {@link io.github.connellite.microorm.annotation.UuidGenerator},
  * {@link io.github.connellite.microorm.annotation.Convert},
  * {@link io.github.connellite.microorm.annotation.MappedSuperclass},
  * DDL hints such as {@link io.github.connellite.microorm.annotation.ColumnDefault},

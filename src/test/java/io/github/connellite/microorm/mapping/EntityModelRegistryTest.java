@@ -11,6 +11,7 @@ import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.SequenceGenerator;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Transient;
+import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.generation.IdGenerationKind;
 import io.github.connellite.microorm.schema.PackageAnnotatedEntity;
@@ -110,6 +111,31 @@ class EntityModelRegistryTest {
     @Table(name = "generated_uuid_ids")
     static class GeneratedUuidId {
         @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private UUID id;
+    }
+
+    @Entity
+    @Table(name = "uuid_generated_ids")
+    static class UuidGeneratedId {
+        @Id
+        @UuidGenerator(version = UuidGenerator.Version.VERSION_7)
+        private UUID id;
+    }
+
+    @Entity
+    @Table(name = "uuid_generator_on_numeric_ids")
+    static class UuidGeneratorOnNumericId {
+        @Id
+        @UuidGenerator
+        private Long id;
+    }
+
+    @Entity
+    @Table(name = "uuid_generator_with_generated_value_ids")
+    static class UuidGeneratorWithGeneratedValueId {
+        @Id
+        @UuidGenerator
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private UUID id;
     }
@@ -338,6 +364,15 @@ class EntityModelRegistryTest {
     }
 
     @Test
+    void uuidGeneratorMapsToUuidGeneration() {
+        EntityModel model = new EntityModelRegistry().register(UuidGeneratedId.class);
+        IdGeneration generation = model.primaryKey().idGeneration();
+
+        assertEquals(IdGenerationKind.UUID, generation.kind());
+        assertEquals(7, generation.uuidVersion());
+    }
+
+    @Test
     void rejectsUnknownGeneratedValueGenerator() {
         EntityModelRegistry registry = new EntityModelRegistry();
 
@@ -363,6 +398,20 @@ class EntityModelRegistryTest {
         EntityModelRegistry registry = new EntityModelRegistry();
 
         assertThrows(MicroOrmException.class, () -> registry.register(GeneratedUuidId.class));
+    }
+
+    @Test
+    void rejectsUuidGeneratorOnNumericId() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        assertThrows(MicroOrmException.class, () -> registry.register(UuidGeneratorOnNumericId.class));
+    }
+
+    @Test
+    void rejectsUuidGeneratorCombinedWithGeneratedValue() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        assertThrows(MicroOrmException.class, () -> registry.register(UuidGeneratorWithGeneratedValueId.class));
     }
 
     @Test

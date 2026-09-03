@@ -24,6 +24,7 @@ import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.RelationSqlGenerator;
 import io.github.connellite.microorm.connection.ConnectionProvider;
+import io.github.connellite.util.UuidGenerators;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -676,12 +677,27 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     }
 
     public void assignGeneratedUuidIfNeeded(Object entity, EntityModel model) {
-        if (model.primaryKey().idGeneration().generated()) {
+        EntityField pk = model.primaryKey();
+        if (pk.idGeneration().uuid() && EntityHydrator.getFieldValue(entity, pk) == null) {
+            EntityHydrator.setFieldValue(entity, pk, generateUuid(pk.idGeneration().uuidVersion()));
             return;
         }
-        if (model.primaryKey().javaType() == UUID.class && EntityHydrator.getFieldValue(entity, model.primaryKey()) == null) {
-            EntityHydrator.setFieldValue(entity, model.primaryKey(), UUID.randomUUID());
+        if (pk.idGeneration().generated()) {
+            return;
         }
+        if (pk.javaType() == UUID.class && EntityHydrator.getFieldValue(entity, pk) == null) {
+            EntityHydrator.setFieldValue(entity, pk, UuidGenerators.generateVersion4());
+        }
+    }
+
+    private static UUID generateUuid(int version) {
+        return switch (version) {
+            case 1 -> UuidGenerators.generateVersion1();
+            case 4 -> UuidGenerators.generateVersion4();
+            case 6 -> UuidGenerators.generateVersion6();
+            case 7 -> UuidGenerators.generateVersion7();
+            default -> throw new MicroOrmException("Unsupported UUID version: " + version);
+        };
     }
 
     @Override

@@ -7,6 +7,7 @@ import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.GenericGenerator;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.connection.KeepOpenConnectionProvider;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
@@ -51,6 +52,32 @@ class SqliteOrmTest {
         private String name;
 
         public Widget() {
+        }
+
+        public UUID getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+
+    @Entity
+    @Table(name = "uuid_generated_widgets")
+    public static class UuidGeneratedWidget {
+        @Id
+        @UuidGenerator(version = UuidGenerator.Version.VERSION_7)
+        private UUID id;
+
+        @Column(nullable = false)
+        private String name;
+
+        public UuidGeneratedWidget() {
         }
 
         public UUID getId() {
@@ -299,6 +326,24 @@ class SqliteOrmTest {
                 assertEquals(explicitId, explicit.getId());
                 assertEquals("explicit", s.selectRow(Widget.class, explicitId).getName());
                 assertTrue(s.existsById(Widget.class, generated.getId()));
+            }
+        }
+    }
+
+    @Test
+    void uuidGeneratorUsesConfiguredUuidVersion() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(UuidGeneratedWidget.class);
+            try (Session s = orm.openSession()) {
+                s.createEntity(UuidGeneratedWidget.class);
+
+                UuidGeneratedWidget generated = new UuidGeneratedWidget();
+                generated.setName("uuid7");
+                s.insertRow(generated);
+
+                assertNotNull(generated.getId());
+                assertEquals(7, generated.getId().version());
+                assertEquals("uuid7", s.selectRow(UuidGeneratedWidget.class, generated.getId()).getName());
             }
         }
     }

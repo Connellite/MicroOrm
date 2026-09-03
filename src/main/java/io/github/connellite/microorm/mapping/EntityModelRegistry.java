@@ -306,12 +306,13 @@ public final class EntityModelRegistry {
         boolean numeric = Number.class.isAssignableFrom(type);
         boolean uuid = type == UUID.class;
         if (!numeric && !uuid) {
-            throw new MicroOrmException("@Id field must be numeric or UUID on "
-                    + entityClass.getName() + "." + field.getName());
+            throw new MicroOrmException("@Id field must be numeric or UUID on " + entityClass.getName() + "." + field.getName());
         }
-        if (idGeneration.generated() && !numeric) {
-            throw new MicroOrmException("@GeneratedValue requires a numeric @Id field on "
-                    + entityClass.getName() + "." + field.getName());
+        if (idGeneration.uuid() && !uuid) {
+            throw new MicroOrmException("@UuidGenerator requires a UUID @Id field on " + entityClass.getName() + "." + field.getName());
+        }
+        if (idGeneration.generated() && !idGeneration.uuid() && !numeric) {
+            throw new MicroOrmException("@GeneratedValue requires a numeric @Id field on " + entityClass.getName() + "." + field.getName());
         }
     }
 

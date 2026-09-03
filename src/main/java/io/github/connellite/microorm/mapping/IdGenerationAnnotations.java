@@ -4,6 +4,7 @@ import io.github.connellite.microorm.annotation.GeneratedValue;
 import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.GenericGenerator;
 import io.github.connellite.microorm.annotation.SequenceGenerator;
+import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.IdGeneration;
 
@@ -20,6 +21,13 @@ final class IdGenerationAnnotations {
 
     static IdGeneration resolve(Class<?> entityClass, Field field) {
         GeneratedValue generatedValue = field.getAnnotation(GeneratedValue.class);
+        UuidGenerator uuidGenerator = field.getAnnotation(UuidGenerator.class);
+        if (uuidGenerator != null) {
+            if (generatedValue != null) {
+                throw new MicroOrmException("@UuidGenerator cannot be combined with @GeneratedValue on " + entityClass.getName() + "." + field.getName());
+            }
+            return IdGeneration.uuid(uuidGenerator.version().number());
+        }
         if (generatedValue == null) {
             return IdGeneration.none();
         }
@@ -37,13 +45,11 @@ final class IdGenerationAnnotations {
             }
             if (sequenceGenerator != null) {
                 if (generatedValue.strategy() != GenerationType.SEQUENCE) {
-                    throw new MicroOrmException("@SequenceGenerator requires GenerationType.SEQUENCE on "
-                            + entityClass.getName() + "." + field.getName());
+                    throw new MicroOrmException("@SequenceGenerator requires GenerationType.SEQUENCE on " + entityClass.getName() + "." + field.getName());
                 }
                 return resolveSequence(generatorName, sequenceGenerator);
             }
-            throw new MicroOrmException("@GeneratedValue references unknown generator '" + generatorName + "' on "
-                    + entityClass.getName() + "." + field.getName());
+            throw new MicroOrmException("@GeneratedValue references unknown generator '" + generatorName + "' on " + entityClass.getName() + "." + field.getName());
         }
 
         if (generatedValue.strategy() == GenerationType.SEQUENCE) {
@@ -61,12 +67,10 @@ final class IdGenerationAnnotations {
             GeneratedValue generatedValue,
             GenericGenerator generator) {
         if (!NATIVE.equalsIgnoreCase(generator.strategy().trim())) {
-            throw new MicroOrmException("Unsupported @GenericGenerator strategy '" + generator.strategy()
-                    + "' on " + entityClass.getName() + "." + field.getName());
+            throw new MicroOrmException("Unsupported @GenericGenerator strategy '" + generator.strategy() + "' on " + entityClass.getName() + "." + field.getName());
         }
         if (generatedValue.strategy() == GenerationType.SEQUENCE) {
-            throw new MicroOrmException("@GenericGenerator(strategy = \"native\") cannot be used with GenerationType.SEQUENCE on "
-                    + entityClass.getName() + "." + field.getName());
+            throw new MicroOrmException("@GenericGenerator(strategy = \"native\") cannot be used with GenerationType.SEQUENCE on " + entityClass.getName() + "." + field.getName());
         }
         return IdGeneration.identity(generator.name().trim());
     }

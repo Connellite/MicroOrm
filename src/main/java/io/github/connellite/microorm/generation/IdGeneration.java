@@ -6,7 +6,8 @@ public record IdGeneration(
         String generatorName,
         String sequenceName,
         int allocationSize,
-        int initialValue) {
+        int initialValue,
+        int uuidVersion) {
 
     public static final int DEFAULT_ALLOCATION_SIZE = 1;
     public static final int DEFAULT_INITIAL_VALUE = 1;
@@ -21,6 +22,9 @@ public record IdGeneration(
         if (initialValue <= 0) {
             throw new IllegalArgumentException("initialValue must be positive");
         }
+        if (kind == IdGenerationKind.UUID && uuidVersion != 1 && uuidVersion != 4 && uuidVersion != 6 && uuidVersion != 7) {
+            throw new IllegalArgumentException("Unsupported UUID version: " + uuidVersion);
+        }
     }
 
     public static IdGeneration none() {
@@ -29,7 +33,8 @@ public record IdGeneration(
                 "",
                 "",
                 DEFAULT_ALLOCATION_SIZE,
-                DEFAULT_INITIAL_VALUE);
+                DEFAULT_INITIAL_VALUE,
+                0);
     }
 
     public static IdGeneration identity(String generatorName) {
@@ -38,7 +43,8 @@ public record IdGeneration(
                 generatorName,
                 "",
                 DEFAULT_ALLOCATION_SIZE,
-                DEFAULT_INITIAL_VALUE);
+                DEFAULT_INITIAL_VALUE,
+                0);
     }
 
     public static IdGeneration sequence(String generatorName, String sequenceName, int allocationSize, int initialValue) {
@@ -47,7 +53,18 @@ public record IdGeneration(
                 generatorName,
                 sequenceName,
                 allocationSize,
-                initialValue);
+                initialValue,
+                0);
+    }
+
+    public static IdGeneration uuid(int version) {
+        return new IdGeneration(
+                IdGenerationKind.UUID,
+                "",
+                "",
+                DEFAULT_ALLOCATION_SIZE,
+                DEFAULT_INITIAL_VALUE,
+                version);
     }
 
     public boolean generated() {
@@ -60,5 +77,9 @@ public record IdGeneration(
 
     public boolean sequence() {
         return kind == IdGenerationKind.SEQUENCE;
+    }
+
+    public boolean uuid() {
+        return kind == IdGenerationKind.UUID;
     }
 }

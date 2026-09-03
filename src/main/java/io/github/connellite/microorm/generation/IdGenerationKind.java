@@ -4,5 +4,6 @@ package io.github.connellite.microorm.generation;
 public enum IdGenerationKind {
     NONE,
     IDENTITY,
-    SEQUENCE
+    SEQUENCE,
+    UUID
 }

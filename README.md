@@ -89,6 +89,14 @@ Sequence-backed ids are allocated before insert and supported by PostgreSQL, Ora
 @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_seq")
 private Long id;
 ```
+
+UUID primary keys can be generated before insert with `@UuidGenerator`. Supported automatic UUID versions are 1, 4, 6, and 7; version 4 is the default.
+
+```java
+@Id
+@UuidGenerator(version = UuidGenerator.Version.VERSION_7)
+private UUID id;
+```
 ## EntitySelect
 
 `EntitySelect` builds named-parameter SQL for a single root entity. Use it when you need composable predicates, sorting, pagination, or joins — without writing raw SQL.
