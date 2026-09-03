@@ -1,7 +1,8 @@
 package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Entity;
-import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.PostLoad;
 import io.github.connellite.microorm.annotation.PostPersist;
@@ -10,6 +11,7 @@ import io.github.connellite.microorm.annotation.PostUpdate;
 import io.github.connellite.microorm.annotation.PrePersist;
 import io.github.connellite.microorm.annotation.PreRemove;
 import io.github.connellite.microorm.annotation.PreUpdate;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.session.Session;
@@ -33,7 +35,8 @@ class LifecycleCallbacksTest {
     public static class LifecycleItem {
         static final List<String> EVENTS = new ArrayList<>();
 
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         private String name;

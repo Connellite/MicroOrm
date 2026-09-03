@@ -7,11 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * Primary key field. Supported types: numeric wrappers/primitives and {@link java.util.UUID}.
- * UUID keys are generated on insert when unset; numeric keys require {@link #autoIncrement()}.
+ * UUID keys are generated on insert when unset; numeric database-generated keys use {@link GeneratedValue}.
  */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Id {
-    /** When true, the primary key column is omitted on insert and filled from generated keys. */
-    boolean autoIncrement() default false;
 }

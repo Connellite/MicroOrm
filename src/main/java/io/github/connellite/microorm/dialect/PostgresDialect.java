@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.PostgresSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -48,6 +49,23 @@ public final class PostgresDialect extends AbstractDialect {
     @Override
     public JdbcValueMapper valueMapper() {
         return valueMapper;
+    }
+
+    @Override
+    public boolean supportsSequences() {
+        return true;
+    }
+
+    @Override
+    public String createSequenceDdl(EntityModel model, EntityField pk) {
+        return "CREATE SEQUENCE IF NOT EXISTS " + sequenceSqlName(model, pk)
+                + " START WITH " + pk.idGeneration().initialValue()
+                + " INCREMENT BY " + pk.idGeneration().allocationSize();
+    }
+
+    @Override
+    public String nextSequenceValueSql(EntityModel model, EntityField pk) {
+        return "SELECT nextval('" + sequenceLiteralName(model, pk) + "')";
     }
 
     @Override

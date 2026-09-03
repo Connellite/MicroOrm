@@ -39,6 +39,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     @Override
     public void createTable(Connection connection, EntityModel model) throws SQLException {
         requirePhysicalMutableTable(model, "createTable");
+        createSequences(connection, model);
         if (!existingColumns(connection, model).isEmpty()) {
             createSchemaObjects(connection, model);
             return;
@@ -57,6 +58,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             createTable(connection, model);
             return;
         }
+        createSequences(connection, model);
         try (Statement st = connection.createStatement()) {
             for (EntityField f : model.fields()) {
                 if (existingColumns.contains(dialect.catalogName(f.columnIdentifier()))) {
@@ -204,6 +206,20 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     protected void createSchemaObjects(Connection connection, EntityModel model) throws SQLException {
         createIndexes(connection, model);
         applyComments(connection, model);
+    }
+
+    protected void createSequences(Connection connection, EntityModel model) throws SQLException {
+        EntityField pk = model.primaryKey();
+        if (!pk.sequenceGenerated()) {
+            return;
+        }
+        if (!dialect.supportsSequences()) {
+            throw new MicroOrmException("GenerationType.SEQUENCE is not supported by "
+                    + dialect.getClass().getSimpleName() + " for " + model.entityClass().getName());
+        }
+        try (Statement st = connection.createStatement()) {
+            executeSql(st, dialect.createSequenceDdl(model, pk));
+        }
     }
 
     private static void executeSql(Statement statement, String sql) throws SQLException {

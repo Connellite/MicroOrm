@@ -6,7 +6,7 @@ Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https:/
 
 ## Features
 
-- Annotation mapping: `@Entity`, `@Table`, `@Column`, `@Id`, `@Transient`, `@Convert`, `@Immutable`, `@Subselect`
+- Annotation mapping: `@Entity`, `@Table`, `@Column`, `@Id`, `@GeneratedValue`, `@Transient`, `@Convert`, `@Immutable`, `@Subselect`
 - CRUD, batch insert, map-based filtered select, streaming reads, custom `Query`
 - **`EntitySelect`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, relation joins, subqueries, `DISTINCT`, `GROUP BY`, and `HAVING`
 - **CRUD DSL**: `EntityInsert`, `EntityUpdate`, and `EntityDelete` for SQL-oriented typed mutations
@@ -57,6 +57,38 @@ try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) 
 
 Use `MicroOrm.sqlite(dataSource)` (or `postgres`, `mysql`, `mssql`, `oracle`) when connections come from a pool. Prefer `orm.withSession(...)` so pooled connections are always released.
 
+## Generated IDs
+
+Numeric database-generated primary keys use MicroOrm annotations with JPA/Hibernate-style names:
+
+```java
+@Entity
+public class IDSeq {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    public IDSeq() {}
+}
+```
+
+`@GenericGenerator(strategy = "native")` maps to the dialect's native identity/autoincrement behavior:
+
+```java
+@Id
+@GenericGenerator(name = "native_generator", strategy = "native")
+@GeneratedValue(generator = "native_generator")
+private Long id;
+```
+
+Sequence-backed ids are allocated before insert and supported by PostgreSQL, Oracle, and SQL Server:
+
+```java
+@Id
+@SequenceGenerator(name = "order_seq", sequenceName = "orders_seq")
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_seq")
+private Long id;
+```
 ## EntitySelect
 
 `EntitySelect` builds named-parameter SQL for a single root entity. Use it when you need composable predicates, sorting, pagination, or joins — without writing raw SQL.

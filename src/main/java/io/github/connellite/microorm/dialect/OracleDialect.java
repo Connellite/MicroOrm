@@ -1,10 +1,12 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.OracleSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.sql.OracleSqlGenerator;
 import io.github.connellite.microorm.sql.SqlGenerator;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.OracleJdbcValueMapper;
 
@@ -47,6 +49,35 @@ public final class OracleDialect extends AbstractDialect {
     @Override
     public JdbcValueMapper valueMapper() {
         return valueMapper;
+    }
+
+    @Override
+    public boolean supportsSequences() {
+        return true;
+    }
+
+    @Override
+    public String createSequenceDdl(EntityModel model, EntityField pk) {
+        String configuredName = pk.idGeneration().sequenceName();
+        String sequenceName = configuredName.isBlank()
+                ? model.tableName() + "_" + pk.columnName() + "_seq"
+                : configuredName;
+        String catalogSequenceName = catalogName(SqlIdentifier.parse(sequenceName));
+        String ownerPredicate = model.hasSchema()
+                ? "sequence_owner = '" + model.catalogSchemaName(this).replace("'", "''") + "'"
+                : "sequence_owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')";
+        String createSequence = "CREATE SEQUENCE " + sequenceSqlName(model, pk)
+                + " START WITH " + pk.idGeneration().initialValue()
+                + " INCREMENT BY " + pk.idGeneration().allocationSize();
+        return "DECLARE sequence_count NUMBER; BEGIN SELECT COUNT(*) INTO sequence_count FROM all_sequences WHERE "
+                + ownerPredicate + " AND sequence_name = '" + catalogSequenceName.replace("'", "''") + "'; "
+                + "IF sequence_count = 0 THEN EXECUTE IMMEDIATE '" + createSequence.replace("'", "''")
+                + "'; END IF; END;";
+    }
+
+    @Override
+    public String nextSequenceValueSql(EntityModel model, EntityField pk) {
+        return "SELECT " + sequenceSqlName(model, pk) + ".NEXTVAL FROM dual";
     }
 
     @Override

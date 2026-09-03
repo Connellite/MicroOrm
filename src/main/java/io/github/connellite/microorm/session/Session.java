@@ -234,7 +234,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         if (m.hasRelations()) {
             return RelationPersister.insert(this, entity);
         }
-        assignGeneratedUuidIfNeeded(entity, m);
+        assignGeneratedIdsIfNeeded(entity, m);
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         BoundStatement bs = sql.insert(m, entity);
         SqlExecutor.executeInsertReturning(connection, bs, m, entity);
@@ -277,7 +277,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             if (entityOmitPk != omitPk) {
                 throw new IllegalArgumentException("Batch insert cannot mix generated and explicit primary keys");
             }
-            assignGeneratedUuidIfNeeded(entity, m);
+            assignGeneratedIdsIfNeeded(entity, m);
             LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
             rows.add(sql.insertParameters(m, entity, omitPk));
         }
@@ -675,9 +675,8 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
     }
 
-    @Override
     public void assignGeneratedUuidIfNeeded(Object entity, EntityModel model) {
-        if (model.primaryKey().autoIncrement()) {
+        if (model.primaryKey().idGeneration().generated()) {
             return;
         }
         if (model.primaryKey().javaType() == UUID.class && EntityHydrator.getFieldValue(entity, model.primaryKey()) == null) {
@@ -703,6 +702,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     @Override
     public void insertEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
         requireMutable(model, "insertEntityRow");
+        assignGeneratedIdsIfNeeded(entity, model);
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
         RelationSqlGenerator.RelationInsertParts parts =
@@ -741,6 +741,28 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         }
         throw new MicroOrmException(
                 "SqlGenerator " + sql.getClass().getName() + " does not support relation persistence");
+    }
+
+    @Override
+    public void assignGeneratedIdsIfNeeded(Object entity, EntityModel model) {
+        assignGeneratedUuidIfNeeded(entity, model);
+        assignSequenceValueIfNeeded(entity, model);
+    }
+
+    private void assignSequenceValueIfNeeded(Object entity, EntityModel model) {
+        EntityField pk = model.primaryKey();
+        if (!pk.sequenceGenerated() || !EntityHydrator.isUnsetPk(entity, pk)) {
+            return;
+        }
+        if (!dialect.supportsSequences()) {
+            throw new MicroOrmException("GenerationType.SEQUENCE is not supported by "
+                    + dialect.getClass().getSimpleName() + " for " + model.entityClass().getName());
+        }
+        Object id = SqlExecutor.queryScalar(connection, Query.of(dialect.nextSequenceValueSql(model, pk)), pk.javaType());
+        if (id == null) {
+            throw new MicroOrmException("Sequence returned NULL for " + model.entityClass().getName());
+        }
+        EntityHydrator.setFieldValue(entity, pk, id);
     }
 
     @Override

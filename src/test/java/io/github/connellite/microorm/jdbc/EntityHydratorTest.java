@@ -3,8 +3,10 @@ package io.github.connellite.microorm.jdbc;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
-import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
@@ -21,7 +23,8 @@ class EntityHydratorTest {
     @Entity
     @Table(name = "hydrator_items")
     static class Item {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false)

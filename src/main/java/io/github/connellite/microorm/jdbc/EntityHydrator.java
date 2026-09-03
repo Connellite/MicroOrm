@@ -38,7 +38,7 @@ public final class EntityHydrator {
         if (value == null) {
             return true;
         }
-        if (pk.autoIncrement() && value instanceof Number n) {
+        if (pk.idGeneration().generated() && value instanceof Number n) {
             return n.longValue() == 0L;
         }
         return false;

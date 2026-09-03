@@ -2,12 +2,26 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
-import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
+import io.github.connellite.microorm.annotation.GenericGenerator;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.connection.KeepOpenConnectionProvider;
+import io.github.connellite.microorm.dialect.Dialect;
+import io.github.connellite.microorm.dialect.SqliteDialect;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.query.EntitySelect;
+import io.github.connellite.microorm.schema.SchemaManager;
+import io.github.connellite.microorm.schema.SqliteSchemaManager;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
+import io.github.connellite.microorm.sql.SqlGenerator;
+import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.JdbcValueMapper;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -82,7 +96,8 @@ class SqliteOrmTest {
     @Entity
     @Table(name = "numeric_widgets")
     public static class NumericWidget {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false)
@@ -92,6 +107,55 @@ class SqliteOrmTest {
         }
 
         public long getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+
+    @Entity
+    @Table(name = "native_numeric_widgets")
+    public static class NativeNumericWidget {
+        @Id
+        @GenericGenerator(name = "native_generator", strategy = "native")
+        @GeneratedValue(generator = "native_generator")
+        private Long id;
+
+        @Column(nullable = false)
+        private String name;
+
+        public NativeNumericWidget() {
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+
+    @Entity
+    @Table(name = "sequence_numeric_widgets")
+    public static class SequenceNumericWidget {
+        @Id
+        @GeneratedValue(strategy = GenerationType.SEQUENCE)
+        private Long id;
+
+        @Column(nullable = false)
+        private String name;
+
+        public SequenceNumericWidget() {
+        }
+
+        public Long getId() {
             return id;
         }
 
@@ -147,7 +211,8 @@ class SqliteOrmTest {
     @Entity
     @Table(name = "invalid_uuid_autoincrement")
     public static class InvalidUuidAutoIncrementId {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private UUID id;
 
         public InvalidUuidAutoIncrementId() {
@@ -199,6 +264,19 @@ class SqliteOrmTest {
         NumericWidget w = new NumericWidget();
         w.setName(name);
         return w;
+    }
+
+    private static SequenceNumericWidget newSequenceWidget(String name) {
+        SequenceNumericWidget w = new SequenceNumericWidget();
+        w.setName(name);
+        return w;
+    }
+
+    private static MicroOrm sequenceTestOrm(Connection connection) {
+        return new MicroOrm(
+                new SqliteSequenceTestDialect(),
+                new KeepOpenConnectionProvider(connection),
+                new EntityModelRegistry());
     }
 
     @Test
@@ -271,6 +349,72 @@ class SqliteOrmTest {
                 assertEquals(2L, widgets.get(1).getId());
                 assertEquals(3L, widgets.get(2).getId());
                 assertEquals(3, s.selectRows(NumericWidget.class).size());
+            }
+        }
+    }
+
+    @Test
+    void genericNativeGeneratorUsesIdentityGeneratedKeys() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(NativeNumericWidget.class);
+            try (Session s = orm.openSession()) {
+                s.dropEntity(NativeNumericWidget.class);
+                s.createEntity(NativeNumericWidget.class);
+
+                NativeNumericWidget widget = new NativeNumericWidget();
+                widget.setName("native");
+                s.insertRow(widget);
+
+                assertEquals(1L, widget.getId());
+            }
+        }
+    }
+
+    @Test
+    void sqliteRejectsSequenceGeneratedIds() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(SequenceNumericWidget.class);
+            try (Session s = orm.openSession()) {
+                MicroOrmException error = assertThrows(MicroOrmException.class,
+                        () -> s.createEntity(SequenceNumericWidget.class));
+                assertTrue(error.getMessage().contains("GenerationType.SEQUENCE"));
+            }
+        }
+    }
+
+    @Test
+    void sequenceGeneratedIdIsAllocatedBeforeInsert() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = sequenceTestOrm(c).register(SequenceNumericWidget.class);
+            try (Session s = orm.openSession()) {
+                s.createEntity(SequenceNumericWidget.class);
+
+                SequenceNumericWidget widget = new SequenceNumericWidget();
+                widget.setName("sequence");
+                s.insertRow(widget);
+
+                assertEquals(1L, widget.getId());
+                assertEquals("sequence", s.selectRow(SequenceNumericWidget.class, widget.getId()).getName());
+            }
+        }
+    }
+
+    @Test
+    void sequenceGeneratedBatchAllocatesIdsBeforeInsert() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = sequenceTestOrm(c).register(SequenceNumericWidget.class);
+            try (Session s = orm.openSession()) {
+                s.createEntity(SequenceNumericWidget.class);
+                List<SequenceNumericWidget> widgets = List.of(
+                        newSequenceWidget("a"),
+                        newSequenceWidget("b"),
+                        newSequenceWidget("c"));
+
+                assertEquals(3, s.insertRows(widgets, 2));
+                assertEquals(1L, widgets.get(0).getId());
+                assertEquals(2L, widgets.get(1).getId());
+                assertEquals(3L, widgets.get(2).getId());
+                assertEquals(3, s.selectRows(SequenceNumericWidget.class).size());
             }
         }
     }
@@ -508,6 +652,66 @@ class SqliteOrmTest {
                 assertEquals("kept", loaded.getName());
                 assertNull(loaded.getDescription());
             }
+        }
+    }
+
+    private static final class SqliteSequenceTestDialect implements Dialect {
+        private final SqliteDialect delegate = SqliteDialect.getInstance();
+        private final SchemaManager schemaManager = new SqliteSchemaManager(this);
+
+        @Override
+        public String sqlName(SqlIdentifier identifier) {
+            return delegate.sqlName(identifier);
+        }
+
+        @Override
+        public String catalogName(SqlIdentifier identifier) {
+            return delegate.catalogName(identifier);
+        }
+
+        @Override
+        public String jdbcColumnLabel(SqlIdentifier identifier) {
+            return delegate.jdbcColumnLabel(identifier);
+        }
+
+        @Override
+        public SqlGenerator sqlGenerator() {
+            return delegate.sqlGenerator();
+        }
+
+        @Override
+        public JdbcValueMapper valueMapper() {
+            return delegate.valueMapper();
+        }
+
+        @Override
+        public boolean supportsSequences() {
+            return true;
+        }
+
+        @Override
+        public String createSequenceDdl(EntityModel model, EntityField pk) {
+            return "CREATE TABLE IF NOT EXISTS microorm_sequence_values (id INTEGER PRIMARY KEY AUTOINCREMENT)";
+        }
+
+        @Override
+        public String nextSequenceValueSql(EntityModel model, EntityField pk) {
+            return "INSERT INTO microorm_sequence_values DEFAULT VALUES RETURNING id";
+        }
+
+        @Override
+        public void createTable(Connection c, EntityModel model) throws SQLException {
+            schemaManager.createTable(c, model);
+        }
+
+        @Override
+        public void syncTable(Connection c, EntityModel model) throws SQLException {
+            schemaManager.syncTable(c, model);
+        }
+
+        @Override
+        public void dropTable(Connection c, EntityModel model) throws SQLException {
+            schemaManager.dropTable(c, model);
         }
     }
 }

@@ -14,7 +14,7 @@ public interface RelationPersistSession {
 
     EntityModelRegistry registry();
 
-    void assignGeneratedUuidIfNeeded(Object entity, EntityModel model);
+    void assignGeneratedIdsIfNeeded(Object entity, EntityModel model);
 
     void requirePkSet(Object entity, EntityModel model);
 

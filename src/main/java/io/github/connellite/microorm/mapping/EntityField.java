@@ -18,7 +18,7 @@ public final class EntityField {
     private final VarHandle varHandle;
     private final SqlIdentifier columnIdentifier;
     private final boolean id;
-    private final boolean autoIncrement;
+    private final IdGeneration idGeneration;
     private final boolean nullable;
     private final boolean unique;
     private final boolean indexed;
@@ -57,7 +57,7 @@ public final class EntityField {
             Field javaField,
             SqlIdentifier columnIdentifier,
             boolean id,
-            boolean autoIncrement,
+            IdGeneration idGeneration,
             boolean nullable,
             boolean unique,
             boolean indexed,
@@ -72,7 +72,7 @@ public final class EntityField {
         this.javaField = javaField;
         this.columnIdentifier = columnIdentifier;
         this.id = id;
-        this.autoIncrement = autoIncrement;
+        this.idGeneration = idGeneration == null ? IdGeneration.none() : idGeneration;
         this.nullable = nullable;
         this.unique = unique;
         this.indexed = indexed;
@@ -106,7 +106,7 @@ public final class EntityField {
         this.javaField = javaField;
         this.columnIdentifier = columnIdentifier;
         this.id = id;
-        this.autoIncrement = autoIncrement;
+        this.idGeneration = autoIncrement ? IdGeneration.identity("") : IdGeneration.none();
         this.nullable = nullable;
         this.unique = unique;
         this.indexed = indexed;
@@ -152,7 +152,17 @@ public final class EntityField {
 
     /** {@code true} when the primary key is database-generated on insert. */
     public boolean autoIncrement() {
-        return autoIncrement;
+        return idGeneration.identity();
+    }
+
+    /** Primary key generation metadata. */
+    public IdGeneration idGeneration() {
+        return idGeneration;
+    }
+
+    /** {@code true} when the primary key is allocated from a database sequence before insert. */
+    public boolean sequenceGenerated() {
+        return idGeneration.sequence();
     }
 
     public boolean nullable() {

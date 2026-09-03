@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
@@ -35,6 +37,38 @@ public interface Dialect {
     /** Converts Java field values to JDBC parameters and back (UUID storage, booleans, etc.). */
     JdbcValueMapper valueMapper();
 
+    /** Returns whether this dialect supports standalone sequence-backed primary keys. */
+    default boolean supportsSequences() {
+        return false;
+    }
+
+    /** DDL that creates the sequence used by a {@link io.github.connellite.microorm.annotation.GenerationType#SEQUENCE} id. */
+    default String createSequenceDdl(EntityModel model, EntityField pk) {
+        throw unsupportedSequences();
+    }
+
+    /** Query that returns the next sequence value for a {@link io.github.connellite.microorm.annotation.GenerationType#SEQUENCE} id. */
+    default String nextSequenceValueSql(EntityModel model, EntityField pk) {
+        throw unsupportedSequences();
+    }
+
+    /** Renders the physical sequence name, using the entity schema when present. */
+    default String sequenceSqlName(EntityModel model, EntityField pk) {
+        String configuredName = pk.idGeneration().sequenceName();
+        String sequenceName = configuredName.isBlank()
+                ? model.tableName() + "_" + pk.columnName() + "_seq"
+                : configuredName;
+        SqlIdentifier sequenceIdentifier = SqlIdentifier.parse(sequenceName);
+        SqlGenerator.validateIdentifier(sequenceIdentifier.text(), "sequence");
+        String rendered = sqlName(sequenceIdentifier);
+        return model.hasSchema() ? sqlName(model.schemaIdentifier()) + "." + rendered : rendered;
+    }
+
+    /** Sequence name for SQL string literals such as PostgreSQL {@code nextval('...')}. */
+    default String sequenceLiteralName(EntityModel model, EntityField pk) {
+        return sequenceSqlName(model, pk).replace("'", "''");
+    }
+
     /** Creates the entity table and indexes when missing. */
     void createTable(Connection c, EntityModel model) throws SQLException;
 
@@ -43,4 +77,8 @@ public interface Dialect {
 
     /** Drops the entity table (destructive). */
     void dropTable(Connection c, EntityModel model) throws SQLException;
+
+    private MicroOrmException unsupportedSequences() {
+        return new MicroOrmException("GenerationType.SEQUENCE is not supported by " + getClass().getSimpleName());
+    }
 }

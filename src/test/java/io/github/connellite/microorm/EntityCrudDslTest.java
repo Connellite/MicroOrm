@@ -3,6 +3,8 @@ package io.github.connellite.microorm;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Convert;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Immutable;
 import io.github.connellite.microorm.annotation.Table;
@@ -50,7 +52,8 @@ class EntityCrudDslTest {
     @Entity
     @Table(name = "crud_dsl_items")
     public static class CrudItem {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false, length = 80)
@@ -84,7 +87,8 @@ class EntityCrudDslTest {
     @Immutable
     @Table(name = "crud_dsl_items")
     public static class ImmutableCrudItem {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         private String name;

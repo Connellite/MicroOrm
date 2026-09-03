@@ -1,6 +1,5 @@
 package io.github.connellite.microorm.mapping;
 
-import io.github.connellite.microorm.relation.EagerCollection;
 import io.github.connellite.microorm.relation.EagerRef;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
@@ -90,7 +89,7 @@ public final class RelationPersister {
         }
 
         if (!inserted.contains(entity)) {
-            session.assignGeneratedUuidIfNeeded(entity, model);
+            session.assignGeneratedIdsIfNeeded(entity, model);
             session.insertEntityRow(entity, model, deferred);
             inserted.add(entity);
         }

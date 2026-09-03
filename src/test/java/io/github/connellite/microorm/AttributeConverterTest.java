@@ -3,6 +3,8 @@ package io.github.connellite.microorm;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Convert;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.exception.MicroOrmException;
@@ -61,7 +63,8 @@ class AttributeConverterTest {
     @Entity
     @Table(name = "converted_orders")
     public static class ConvertedOrder {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false, length = 64)
@@ -72,7 +75,8 @@ class AttributeConverterTest {
     @Entity
     @Table(name = "wrong_converted_orders")
     public static class WrongConvertedOrder {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Convert(converter = WrongConverter.class)

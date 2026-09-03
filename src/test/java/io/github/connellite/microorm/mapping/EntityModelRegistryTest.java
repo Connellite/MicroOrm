@@ -3,9 +3,13 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
-import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
+import io.github.connellite.microorm.annotation.GenericGenerator;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.MappedSuperclass;
+import io.github.connellite.microorm.annotation.SequenceGenerator;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.schema.PackageAnnotatedEntity;
 import org.junit.jupiter.api.Test;
@@ -37,6 +41,74 @@ class EntityModelRegistryTest {
     @Entity
     static class DefaultTable {
         @Id
+        private UUID id;
+    }
+
+    @Entity
+    @Table(name = "identity_ids")
+    static class IdentityId {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private long id;
+    }
+
+    @Entity
+    @Table(name = "sequence_ids")
+    static class SequenceId {
+        @Id
+        @GeneratedValue(strategy = GenerationType.SEQUENCE)
+        private long id;
+    }
+
+    @Entity
+    @Table(name = "named_sequence_ids")
+    static class NamedSequenceId {
+        @Id
+        @SequenceGenerator(name = "order_seq", sequenceName = "orders_seq", allocationSize = 5, initialValue = 10)
+        @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_seq")
+        private Long id;
+    }
+
+    @Entity
+    @Table(name = "native_ids")
+    static class NativeId {
+        @Id
+        @GenericGenerator(name = "native_generator", strategy = "native")
+        @GeneratedValue(generator = "native_generator")
+        private Long id;
+    }
+
+    @Entity
+    @Table(name = "unknown_generator_ids")
+    static class UnknownGeneratorId {
+        @Id
+        @GeneratedValue(generator = "missing_generator")
+        private Long id;
+    }
+
+    @Entity
+    @Table(name = "unsupported_generator_ids")
+    static class UnsupportedGeneratorId {
+        @Id
+        @GenericGenerator(name = "custom_generator", strategy = "uuid2")
+        @GeneratedValue(generator = "custom_generator")
+        private Long id;
+    }
+
+    @Entity
+    @Table(name = "identity_with_sequence_generator_ids")
+    static class IdentityWithSequenceGeneratorId {
+        @Id
+        @SequenceGenerator(name = "seq", sequenceName = "identity_seq")
+        @GeneratedValue(generator = "seq")
+        private Long id;
+    }
+
+    @Entity
+    @Table(name = "generated_uuid_ids")
+    static class GeneratedUuidId {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private UUID id;
     }
 
@@ -221,6 +293,74 @@ class EntityModelRegistryTest {
         assertEquals("app", model.schemaName());
         assertEquals("schema_items", model.tableName());
         assertTrue(model.hasSchema());
+    }
+
+    @Test
+    void generatedValueIdentityMapsToIdentityGeneration() {
+        EntityModel model = new EntityModelRegistry().register(IdentityId.class);
+
+        assertEquals(IdGenerationKind.IDENTITY, model.primaryKey().idGeneration().kind());
+        assertTrue(model.primaryKey().autoIncrement());
+    }
+
+    @Test
+    void generatedValueSequenceMapsToSequenceGeneration() {
+        EntityModel model = new EntityModelRegistry().register(SequenceId.class);
+
+        assertEquals(IdGenerationKind.SEQUENCE, model.primaryKey().idGeneration().kind());
+        assertEquals("sequence_ids_id_seq", model.primaryKey().idGeneration().sequenceName().isBlank()
+                ? model.tableName() + "_" + model.primaryKey().columnName() + "_seq"
+                : model.primaryKey().idGeneration().sequenceName());
+    }
+
+    @Test
+    void namedSequenceGeneratorMetadataIsCaptured() {
+        EntityModel model = new EntityModelRegistry().register(NamedSequenceId.class);
+        IdGeneration generation = model.primaryKey().idGeneration();
+
+        assertEquals(IdGenerationKind.SEQUENCE, generation.kind());
+        assertEquals("order_seq", generation.generatorName());
+        assertEquals("orders_seq", generation.sequenceName());
+        assertEquals(5, generation.allocationSize());
+        assertEquals(10, generation.initialValue());
+    }
+
+    @Test
+    void genericNativeGeneratorMapsToIdentityGeneration() {
+        EntityModel model = new EntityModelRegistry().register(NativeId.class);
+        IdGeneration generation = model.primaryKey().idGeneration();
+
+        assertEquals(IdGenerationKind.IDENTITY, generation.kind());
+        assertEquals("native_generator", generation.generatorName());
+        assertTrue(model.primaryKey().autoIncrement());
+    }
+
+    @Test
+    void rejectsUnknownGeneratedValueGenerator() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        assertThrows(MicroOrmException.class, () -> registry.register(UnknownGeneratorId.class));
+    }
+
+    @Test
+    void rejectsUnsupportedGenericGeneratorStrategy() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        assertThrows(MicroOrmException.class, () -> registry.register(UnsupportedGeneratorId.class));
+    }
+
+    @Test
+    void rejectsSequenceGeneratorWithoutSequenceStrategy() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        assertThrows(MicroOrmException.class, () -> registry.register(IdentityWithSequenceGeneratorId.class));
+    }
+
+    @Test
+    void rejectsGeneratedValueOnUuidId() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        assertThrows(MicroOrmException.class, () -> registry.register(GeneratedUuidId.class));
     }
 
     @Test

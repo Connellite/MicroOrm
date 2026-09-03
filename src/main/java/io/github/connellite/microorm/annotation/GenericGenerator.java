@@ -1,0 +1,17 @@
+package io.github.connellite.microorm.annotation;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/** Declares a named generic generator. MicroOrm supports {@code strategy = "native"}. */
+@Target({ElementType.FIELD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface GenericGenerator {
+    /** Generator name referenced by {@link GeneratedValue#generator()}. */
+    String name();
+
+    /** Generator strategy. Supported value: {@code native}. */
+    String strategy();
+}

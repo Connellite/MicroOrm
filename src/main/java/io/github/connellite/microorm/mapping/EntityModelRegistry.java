@@ -134,14 +134,15 @@ public final class EntityModelRegistry {
                 if (pk != null) {
                     throw new MicroOrmException("Multiple @Id fields on " + entityClass.getName());
                 }
-                validateIdField(entityClass, f, idAnn, converter);
+                IdGeneration idGeneration = IdGenerationAnnotations.resolve(entityClass, f);
+                validateIdField(entityClass, f, idGeneration, converter);
                 SqlIdentifier col = toPhysicalColumn(columnIdentifier(f, colAnn));
                 boolean nullable = colAnn != null && colAnn.nullable();
                 pk = newEntityField(
                         f,
                         col,
                         true,
-                        idAnn.autoIncrement(),
+                        idGeneration,
                         nullable,
                         colAnn != null && colAnn.unique(),
                         colAnn != null && colAnn.indexed(),
@@ -160,7 +161,7 @@ public final class EntityModelRegistry {
                         f,
                         col,
                         false,
-                        false,
+                        IdGeneration.none(),
                         nullable,
                         colAnn != null && colAnn.unique(),
                         colAnn != null && colAnn.indexed(),
@@ -298,7 +299,7 @@ public final class EntityModelRegistry {
         return type.getAnnotation(Entity.class) != null || packageInfo != null && packageInfo.getAnnotation(Entity.class) != null;
     }
 
-    private static void validateIdField(Class<?> entityClass, Field field, Id idAnn, ConverterMetadata converter) {
+    private static void validateIdField(Class<?> entityClass, Field field, IdGeneration idGeneration, ConverterMetadata converter) {
         validateFieldType(entityClass, field, converter);
         Class<?> type = ReflectionUtil.primitiveToWrapper(converter == null ? field.getType() : converter.databaseType());
         boolean numeric = Number.class.isAssignableFrom(type);
@@ -307,8 +308,8 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("@Id field must be numeric or UUID on "
                     + entityClass.getName() + "." + field.getName());
         }
-        if (idAnn.autoIncrement() && !numeric) {
-            throw new MicroOrmException("@Id(autoIncrement = true) requires a numeric field on "
+        if (idGeneration.generated() && !numeric) {
+            throw new MicroOrmException("@GeneratedValue requires a numeric @Id field on "
                     + entityClass.getName() + "." + field.getName());
         }
     }
@@ -463,7 +464,7 @@ public final class EntityModelRegistry {
             Field field,
             SqlIdentifier column,
             boolean id,
-            boolean autoIncrement,
+            IdGeneration idGeneration,
             boolean nullable,
             boolean unique,
             boolean indexed,
@@ -478,7 +479,7 @@ public final class EntityModelRegistry {
                     .javaField(field)
                     .columnIdentifier(column)
                     .id(id)
-                    .autoIncrement(autoIncrement)
+                    .idGeneration(idGeneration)
                     .nullable(nullable)
                     .unique(unique)
                     .indexed(indexed)
@@ -493,7 +494,7 @@ public final class EntityModelRegistry {
                 .javaField(field)
                 .columnIdentifier(column)
                 .id(id)
-                .autoIncrement(autoIncrement)
+                .idGeneration(idGeneration)
                 .nullable(nullable)
                 .unique(unique)
                 .indexed(indexed)

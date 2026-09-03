@@ -1,10 +1,12 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.MssqlSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.sql.MssqlSqlGenerator;
 import io.github.connellite.microorm.sql.SqlGenerator;
+import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.DefaultJdbcValueMapper;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.UuidStorage;
@@ -43,6 +45,30 @@ public final class MssqlDialect extends AbstractDialect {
     @Override
     public JdbcValueMapper valueMapper() {
         return valueMapper;
+    }
+
+    @Override
+    public boolean supportsSequences() {
+        return true;
+    }
+
+    @Override
+    public String createSequenceDdl(EntityModel model, EntityField pk) {
+        String sequenceName = sequenceSqlName(model, pk);
+        String configuredName = pk.idGeneration().sequenceName();
+        String catalogName = catalogName(SqlIdentifier.parse(configuredName.isBlank()
+                ? model.tableName() + "_" + pk.columnName() + "_seq"
+                : configuredName));
+        return "IF NOT EXISTS (SELECT 1 FROM sys.sequences WHERE name = N'"
+                + catalogName.replace("'", "''")
+                + "') CREATE SEQUENCE " + sequenceName
+                + " AS BIGINT START WITH " + pk.idGeneration().initialValue()
+                + " INCREMENT BY " + pk.idGeneration().allocationSize();
+    }
+
+    @Override
+    public String nextSequenceValueSql(EntityModel model, EntityField pk) {
+        return "SELECT NEXT VALUE FOR " + sequenceSqlName(model, pk);
     }
 
     @Override

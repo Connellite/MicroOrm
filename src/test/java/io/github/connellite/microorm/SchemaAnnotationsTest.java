@@ -5,6 +5,8 @@ import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.ColumnDefault;
 import io.github.connellite.microorm.annotation.Comment;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Index;
 import io.github.connellite.microorm.annotation.Table;
@@ -37,7 +39,8 @@ class SchemaAnnotationsTest {
             },
             uniqueConstraints = @UniqueConstraint(name = "uk_schema_orders_code", columnNames = "code"))
     public static class SchemaOrder {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false, length = 32)
@@ -58,7 +61,8 @@ class SchemaAnnotationsTest {
             indexes = @Index(name = "idx_schema_orders_sync_status", columnList = "status"),
             uniqueConstraints = @UniqueConstraint(name = "uk_schema_orders_sync_code", columnNames = "code"))
     public static class SchemaOrderSync {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false, length = 32)

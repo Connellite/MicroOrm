@@ -2,10 +2,12 @@ package io.github.connellite.microorm;
 
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.GeneratedValue;
+import io.github.connellite.microorm.annotation.GenerationType;
+import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Param;
 import io.github.connellite.microorm.annotation.Procedure;
 import io.github.connellite.microorm.annotation.Table;
-import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.repository.EntityRepository;
@@ -35,7 +37,8 @@ class RepositoryTest {
     @Entity
     @Table(name = "repository_items")
     public static class RepositoryItem {
-        @Id(autoIncrement = true)
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
         private long id;
 
         @Column(nullable = false)
