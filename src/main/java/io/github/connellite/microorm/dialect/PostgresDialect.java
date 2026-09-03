@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.dialect;
 
-import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.PostgresSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -57,15 +57,15 @@ public final class PostgresDialect extends AbstractDialect {
     }
 
     @Override
-    public String createSequenceDdl(EntityModel model, EntityField pk) {
-        return "CREATE SEQUENCE IF NOT EXISTS " + sequenceSqlName(model, pk)
-                + " START WITH " + pk.idGeneration().initialValue()
-                + " INCREMENT BY " + pk.idGeneration().allocationSize();
+    public String createSequenceDdl(SequenceTarget target) {
+        return "CREATE SEQUENCE IF NOT EXISTS " + sequenceSqlName(target)
+                + " START WITH " + target.generation().initialValue()
+                + " INCREMENT BY " + target.generation().allocationSize();
     }
 
     @Override
-    public String nextSequenceValueSql(EntityModel model, EntityField pk) {
-        return "SELECT nextval('" + sequenceLiteralName(model, pk) + "')";
+    public String nextSequenceValueSql(SequenceTarget target) {
+        return "SELECT nextval('" + sequenceLiteralName(target) + "')";
     }
 
     @Override

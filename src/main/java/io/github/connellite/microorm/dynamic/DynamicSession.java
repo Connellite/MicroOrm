@@ -3,11 +3,15 @@ package io.github.connellite.microorm.dynamic;
 import io.github.connellite.microorm.connection.ConnectionProvider;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
+import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.jdbc.SqlExecutor;
 import io.github.connellite.microorm.sql.BoundStatement;
+import io.github.connellite.microorm.sql.Query;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -74,8 +78,30 @@ public final class DynamicSession implements AutoCloseable {
      * @return affected row count
      */
     public int insert(String tableName, Map<String, ?> values) {
-        BoundStatement stmt = sql.insert(registry.get(tableName), values);
+        DynamicTable table = registry.get(tableName);
+        BoundStatement stmt = sql.insert(table, withGeneratedIds(table, values));
         return SqlExecutor.executeUpdate(connection, stmt);
+    }
+
+    /**
+     * Inserts one row and returns the primary key value. Generated keys are allocated or read
+     * according to the table's primary key generation strategy.
+     */
+    public Object insertReturningId(String tableName, Map<String, ?> values) {
+        DynamicTable table = registry.get(tableName);
+        Map<String, Object> effectiveValues = withGeneratedIds(table, values);
+        Column pk = table.primaryKey();
+        boolean readIdentityKey = pk.autoIncrement() && isUnsetGeneratedPk(values.get(pk.name()));
+        BoundStatement stmt = sql.insert(table, effectiveValues);
+        if (readIdentityKey) {
+            return SqlExecutor.executeDynamicInsertReturningKey(connection, stmt, pk, dialect);
+        }
+        SqlExecutor.executeUpdate(connection, stmt);
+        Object id = effectiveValues.get(pk.name());
+        if (id == null || isUnsetGeneratedPk(id)) {
+            throw new MicroOrmException("Primary key value is required for dynamic table '" + table.name() + "'");
+        }
+        return id;
     }
 
     /**
@@ -132,6 +158,33 @@ public final class DynamicSession implements AutoCloseable {
     /** Shared registry of runtime table definitions. */
     public DynamicTableRegistry registry() {
         return registry;
+    }
+
+    private Map<String, Object> withGeneratedIds(DynamicTable table, Map<String, ?> values) {
+        Objects.requireNonNull(values, "values");
+        Map<String, Object> effectiveValues = new LinkedHashMap<>(values);
+        Column pk = table.primaryKey();
+        if (pk.sequenceGenerated() && isUnsetGeneratedPk(effectiveValues.get(pk.name()))) {
+            if (!dialect.supportsSequences()) {
+                throw new MicroOrmException("GenerationType.SEQUENCE is not supported by "
+                        + dialect.getClass().getSimpleName() + " for dynamic table '" + table.name() + "'");
+            }
+            SequenceTarget target = new SequenceTarget(null, table.tableIdentifier(), pk.columnIdentifier(), pk.idGeneration());
+            Object rawId = SqlExecutor.queryScalar(connection, Query.of(dialect.nextSequenceValueSql(target)), Object.class);
+            Object id = valueBinder.fromJdbc(pk, rawId);
+            if (id == null) {
+                throw new MicroOrmException("Sequence returned NULL for dynamic table '" + table.name() + "'");
+            }
+            effectiveValues.put(pk.name(), id);
+        }
+        return effectiveValues;
+    }
+
+    private static boolean isUnsetGeneratedPk(Object value) {
+        if (value == null) {
+            return true;
+        }
+        return value instanceof Number number && number.longValue() == 0L;
     }
 
     @Override

@@ -1,6 +1,8 @@
 package io.github.connellite.microorm.dynamic;
 
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.generation.IdGenerationKind;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,7 +45,7 @@ class DynamicTableTest {
     void registryReturnsRegisteredTable() {
         DynamicTableRegistry registry = new DynamicTableRegistry();
         DynamicTable table = DynamicTable.builder("items")
-                .column("id", LogicalType.LONG, c -> c.primaryKey().autoIncrement())
+                .column("id", LogicalType.LONG, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
                 .build();
         registry.register(table);
 
@@ -55,5 +57,65 @@ class DynamicTableTest {
     void registryThrowsForUnknownTable() {
         DynamicTableRegistry registry = new DynamicTableRegistry();
         assertThrows(MicroOrmException.class, () -> registry.get("missing"));
+    }
+
+    @Test
+    void generatedValueIdentityStoresGenerationMetadata() {
+        DynamicTable table = DynamicTable.builder("items")
+                .column("id", LogicalType.LONG, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
+                .build();
+
+        assertEquals(IdGenerationKind.IDENTITY, table.primaryKey().idGeneration().kind());
+        assertTrue(table.primaryKey().autoIncrement());
+    }
+
+    @Test
+    void generatedValueSequenceStoresGenerationMetadata() {
+        DynamicTable table = DynamicTable.builder("items")
+                .column("id", LogicalType.LONG, c -> c.primaryKey()
+                        .sequenceGenerator("item_seq", g -> g.sequenceName("items_seq").allocationSize(5).initialValue(10))
+                        .generatedValue(GenerationType.SEQUENCE, "item_seq"))
+                .build();
+
+        assertEquals(IdGenerationKind.SEQUENCE, table.primaryKey().idGeneration().kind());
+        assertEquals("item_seq", table.primaryKey().idGeneration().generatorName());
+        assertEquals("items_seq", table.primaryKey().idGeneration().sequenceName());
+        assertEquals(5, table.primaryKey().idGeneration().allocationSize());
+        assertEquals(10, table.primaryKey().idGeneration().initialValue());
+    }
+
+    @Test
+    void genericNativeGeneratorStoresIdentityGenerationMetadata() {
+        DynamicTable table = DynamicTable.builder("items")
+                .column("id", LogicalType.LONG, c -> c.primaryKey()
+                        .genericGenerator("native_generator", "native")
+                        .generatedValue("native_generator"))
+                .build();
+
+        assertEquals(IdGenerationKind.IDENTITY, table.primaryKey().idGeneration().kind());
+        assertEquals("native_generator", table.primaryKey().idGeneration().generatorName());
+    }
+
+    @Test
+    void rejectsGeneratedValueOnNonPrimaryKey() {
+        assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.LONG, c -> c.generatedValue(GenerationType.IDENTITY))
+                .build());
+    }
+
+    @Test
+    void rejectsGeneratedValueOnUnsupportedType() {
+        assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.UUID, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
+                .build());
+    }
+
+    @Test
+    void rejectsUnsupportedGenericGenerator() {
+        assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.LONG, c -> c.primaryKey()
+                        .genericGenerator("custom", "uuid2")
+                        .generatedValue("custom"))
+                .build());
     }
 }

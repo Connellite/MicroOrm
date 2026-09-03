@@ -11,6 +11,8 @@ import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.SequenceGenerator;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Transient;
+import io.github.connellite.microorm.generation.IdGeneration;
+import io.github.connellite.microorm.generation.IdGenerationKind;
 import io.github.connellite.microorm.schema.PackageAnnotatedEntity;
 import org.junit.jupiter.api.Test;
 

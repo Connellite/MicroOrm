@@ -5,6 +5,7 @@ import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.GenericGenerator;
 import io.github.connellite.microorm.annotation.SequenceGenerator;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.generation.IdGeneration;
 
 import java.lang.reflect.Field;
 import java.util.Objects;
@@ -81,13 +82,13 @@ final class IdGenerationAnnotations {
     private static GenericGenerator findGenericGenerator(Class<?> entityClass, Field field, String name) {
         GenericGenerator fieldGenerator = field.getAnnotation(GenericGenerator.class);
         GenericGenerator typeGenerator = entityClass.getAnnotation(GenericGenerator.class);
-        return named(name, fieldGenerator) ? fieldGenerator : named(name, typeGenerator) ? typeGenerator : null;
+        return named(name, fieldGenerator) ? fieldGenerator : (named(name, typeGenerator) ? typeGenerator : null);
     }
 
     private static SequenceGenerator findSequenceGenerator(Class<?> entityClass, Field field, String name) {
         SequenceGenerator fieldGenerator = field.getAnnotation(SequenceGenerator.class);
         SequenceGenerator typeGenerator = entityClass.getAnnotation(SequenceGenerator.class);
-        return named(name, fieldGenerator) ? fieldGenerator : named(name, typeGenerator) ? typeGenerator : null;
+        return named(name, fieldGenerator) ? fieldGenerator : (named(name, typeGenerator) ? typeGenerator : null);
     }
 
     private static SequenceGenerator findUnnamedSequenceGenerator(Class<?> entityClass, Field field) {

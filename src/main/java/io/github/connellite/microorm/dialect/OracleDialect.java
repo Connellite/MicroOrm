@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.dialect;
 
-import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.OracleSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -57,18 +57,18 @@ public final class OracleDialect extends AbstractDialect {
     }
 
     @Override
-    public String createSequenceDdl(EntityModel model, EntityField pk) {
-        String configuredName = pk.idGeneration().sequenceName();
+    public String createSequenceDdl(SequenceTarget target) {
+        String configuredName = target.generation().sequenceName();
         String sequenceName = configuredName.isBlank()
-                ? model.tableName() + "_" + pk.columnName() + "_seq"
+                ? target.tableName() + "_" + target.primaryKeyName() + "_seq"
                 : configuredName;
         String catalogSequenceName = catalogName(SqlIdentifier.parse(sequenceName));
-        String ownerPredicate = model.hasSchema()
-                ? "sequence_owner = '" + model.catalogSchemaName(this).replace("'", "''") + "'"
-                : "sequence_owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')";
-        String createSequence = "CREATE SEQUENCE " + sequenceSqlName(model, pk)
-                + " START WITH " + pk.idGeneration().initialValue()
-                + " INCREMENT BY " + pk.idGeneration().allocationSize();
+        String ownerPredicate = target.schemaIdentifier() == null
+                ? "sequence_owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"
+                : "sequence_owner = '" + catalogName(target.schemaIdentifier()).replace("'", "''") + "'";
+        String createSequence = "CREATE SEQUENCE " + sequenceSqlName(target)
+                + " START WITH " + target.generation().initialValue()
+                + " INCREMENT BY " + target.generation().allocationSize();
         return "DECLARE sequence_count NUMBER; BEGIN SELECT COUNT(*) INTO sequence_count FROM all_sequences WHERE "
                 + ownerPredicate + " AND sequence_name = '" + catalogSequenceName.replace("'", "''") + "'; "
                 + "IF sequence_count = 0 THEN EXECUTE IMMEDIATE '" + createSequence.replace("'", "''")
@@ -76,8 +76,8 @@ public final class OracleDialect extends AbstractDialect {
     }
 
     @Override
-    public String nextSequenceValueSql(EntityModel model, EntityField pk) {
-        return "SELECT " + sequenceSqlName(model, pk) + ".NEXTVAL FROM dual";
+    public String nextSequenceValueSql(SequenceTarget target) {
+        return "SELECT " + sequenceSqlName(target) + ".NEXTVAL FROM dual";
     }
 
     @Override

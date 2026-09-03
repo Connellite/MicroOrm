@@ -22,6 +22,7 @@ module io.github.connellite.microorm {
     exports io.github.connellite.microorm.dynamic;
     exports io.github.connellite.microorm.dynamic.schema;
     exports io.github.connellite.microorm.exception;
+    exports io.github.connellite.microorm.generation;
 
     opens io.github.connellite.microorm to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.annotation to io.github.connellite.ExtraLib;
@@ -40,4 +41,5 @@ module io.github.connellite.microorm {
     opens io.github.connellite.microorm.dynamic to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.dynamic.schema to io.github.connellite.ExtraLib;
     opens io.github.connellite.microorm.exception to io.github.connellite.ExtraLib;
+    opens io.github.connellite.microorm.generation to io.github.connellite.ExtraLib;
 }

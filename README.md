@@ -214,6 +214,34 @@ orm.withDynamicSession(session -> {
 });
 ```
 
+Dynamic tables can also use generated numeric ids:
+
+```java
+DynamicTable docs = DynamicTable.builder("docs")
+        .table("documents")
+        .column("id", LogicalType.LONG, c -> c.primaryKey()
+                .generatedValue(GenerationType.IDENTITY))
+        .column("name", LogicalType.STRING, Column.Builder::notNull)
+        .build();
+
+orm.dynamicRegistry().register(docs);
+orm.withDynamicSession(session -> {
+    session.createTable("docs");
+    Object id = session.insertReturningId("docs", Map.of("name", "alpha"));
+    return session.selectOne("docs", Map.of("id", id));
+});
+```
+
+For sequence-backed dynamic ids, use `GenerationType.SEQUENCE`; PostgreSQL, Oracle, and SQL Server support sequences. `@GenericGenerator(strategy = "native")` has a fluent dynamic equivalent:
+
+```java
+DynamicTable docs = DynamicTable.builder("docs")
+        .column("id", LogicalType.LONG, c -> c.primaryKey()
+                .genericGenerator("native_generator", "native")
+                .generatedValue("native_generator"))
+        .build();
+```
+
 See `io.github.connellite.microorm.dynamic` in the Javadoc for details.
 
 ## Requirements

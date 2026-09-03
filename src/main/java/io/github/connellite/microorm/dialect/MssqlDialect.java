@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.dialect;
 
-import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.MssqlSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -53,22 +53,22 @@ public final class MssqlDialect extends AbstractDialect {
     }
 
     @Override
-    public String createSequenceDdl(EntityModel model, EntityField pk) {
-        String sequenceName = sequenceSqlName(model, pk);
-        String configuredName = pk.idGeneration().sequenceName();
+    public String createSequenceDdl(SequenceTarget target) {
+        String sequenceName = sequenceSqlName(target);
+        String configuredName = target.generation().sequenceName();
         String catalogName = catalogName(SqlIdentifier.parse(configuredName.isBlank()
-                ? model.tableName() + "_" + pk.columnName() + "_seq"
+                ? target.tableName() + "_" + target.primaryKeyName() + "_seq"
                 : configuredName));
         return "IF NOT EXISTS (SELECT 1 FROM sys.sequences WHERE name = N'"
                 + catalogName.replace("'", "''")
                 + "') CREATE SEQUENCE " + sequenceName
-                + " AS BIGINT START WITH " + pk.idGeneration().initialValue()
-                + " INCREMENT BY " + pk.idGeneration().allocationSize();
+                + " AS BIGINT START WITH " + target.generation().initialValue()
+                + " INCREMENT BY " + target.generation().allocationSize();
     }
 
     @Override
-    public String nextSequenceValueSql(EntityModel model, EntityField pk) {
-        return "SELECT NEXT VALUE FOR " + sequenceSqlName(model, pk);
+    public String nextSequenceValueSql(SequenceTarget target) {
+        return "SELECT NEXT VALUE FOR " + sequenceSqlName(target);
     }
 
     @Override

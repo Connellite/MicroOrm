@@ -1,10 +1,12 @@
-package io.github.connellite.microorm.mapping;
+package io.github.connellite.microorm.generation;
 
-/**
- * Metadata describing how a primary key value is generated.
- */
-public record IdGeneration(IdGenerationKind kind, String generatorName, String sequenceName, int allocationSize,
-                           int initialValue) {
+/** Metadata describing how a primary key value is generated. */
+public record IdGeneration(
+        IdGenerationKind kind,
+        String generatorName,
+        String sequenceName,
+        int allocationSize,
+        int initialValue) {
 
     public static final int DEFAULT_ALLOCATION_SIZE = 1;
     public static final int DEFAULT_INITIAL_VALUE = 1;

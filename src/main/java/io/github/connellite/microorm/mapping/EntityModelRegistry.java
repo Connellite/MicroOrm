@@ -22,6 +22,7 @@ import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.annotation.UniqueConstraint;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
+import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;

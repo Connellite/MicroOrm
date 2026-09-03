@@ -8,6 +8,7 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.DynamicValueBinder;
@@ -39,6 +40,30 @@ public final class SqlExecutor {
         LogHolder.logger.debug(() -> formatSql("update", stmt));
         try (NamedPreparedStatement nps = prepare(connection, stmt)) {
             return nps.executeUpdate();
+        } catch (SQLException e) {
+            throw MicroOrmException.wrap(e);
+        }
+    }
+
+    public static Object executeDynamicInsertReturningKey(
+            Connection connection,
+            BoundStatement stmt,
+            Column primaryKey,
+            Dialect dialect) {
+        LogHolder.logger.debug(() -> formatSql("dynamic-insert", stmt));
+        try (NamedPreparedStatement nps = prepareDynamicInsertReturning(connection, stmt.sql(), primaryKey, dialect)) {
+            nps.setAll(stmt.parameters());
+            nps.executeUpdate();
+            try (ResultSet keys = nps.unwrap().getGeneratedKeys()) {
+                if (!keys.next()) {
+                    throw new MicroOrmException("INSERT did not return generated keys for dynamic table");
+                }
+                Object key = keys.getObject(1);
+                if (key == null || keys.wasNull()) {
+                    throw new MicroOrmException("Generated key was NULL for dynamic table");
+                }
+                return new DynamicValueBinder(dialect).fromJdbc(primaryKey, key);
+            }
         } catch (SQLException e) {
             throw MicroOrmException.wrap(e);
         }
@@ -320,6 +345,20 @@ public final class SqlExecutor {
             throws SQLException {
         if (model.primaryKey().autoIncrement() && JdbcDatabaseSupport.requiresGeneratedKeyColumnNames(connection)) {
             return NamedPreparedStatement.of(connection, sql, JdbcDatabaseSupport.oracleGeneratedKeyColumnNames(model));
+        }
+        return NamedPreparedStatement.of(connection, sql, Statement.RETURN_GENERATED_KEYS);
+    }
+
+    private static NamedPreparedStatement prepareDynamicInsertReturning(
+            Connection connection,
+            String sql,
+            Column primaryKey,
+            Dialect dialect) throws SQLException {
+        if (JdbcDatabaseSupport.requiresGeneratedKeyColumnNames(connection)) {
+            return NamedPreparedStatement.of(
+                    connection,
+                    sql,
+                    new String[] {dialect.jdbcColumnLabel(primaryKey.columnIdentifier())});
         }
         return NamedPreparedStatement.of(connection, sql, Statement.RETURN_GENERATED_KEYS);
     }

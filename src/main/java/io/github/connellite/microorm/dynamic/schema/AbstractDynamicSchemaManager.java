@@ -5,6 +5,7 @@ import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.util.Logger;
 import io.github.connellite.microorm.util.LoggerFactory;
@@ -34,6 +35,7 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
 
     @Override
     public void createTable(Connection connection, DynamicTable table) throws SQLException {
+        createSequences(connection, table);
         if (!existingColumns(connection, table).isEmpty()) {
             createIndexes(connection, table);
             return;
@@ -51,6 +53,7 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
             createTable(connection, table);
             return;
         }
+        createSequences(connection, table);
         try (Statement st = connection.createStatement()) {
             for (Column column : table.columns()) {
                 if (existingColumns.contains(normalize(dialect.catalogName(column.columnIdentifier())))) {
@@ -116,6 +119,21 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
     protected abstract String baseTypeForLogical(LogicalType type, int length);
 
     protected abstract String autoIncrementPrimaryKeyDefinition(Column column);
+
+    protected void createSequences(Connection connection, DynamicTable table) throws SQLException {
+        Column pk = table.primaryKey();
+        if (!pk.sequenceGenerated()) {
+            return;
+        }
+        if (!dialect.supportsSequences()) {
+            throw new MicroOrmException("GenerationType.SEQUENCE is not supported by "
+                    + dialect.getClass().getSimpleName() + " for dynamic table '" + table.name() + "'");
+        }
+        SequenceTarget target = new SequenceTarget(null, table.tableIdentifier(), pk.columnIdentifier(), pk.idGeneration());
+        try (Statement st = connection.createStatement()) {
+            executeSql(st, dialect.createSequenceDdl(target));
+        }
+    }
 
     protected Set<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
         Set<String> columns = new HashSet<>();

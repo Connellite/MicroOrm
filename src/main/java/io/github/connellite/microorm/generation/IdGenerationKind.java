@@ -1,4 +1,4 @@
-package io.github.connellite.microorm.mapping;
+package io.github.connellite.microorm.generation;
 
 /** Internal primary key generation mode. */
 public enum IdGenerationKind {

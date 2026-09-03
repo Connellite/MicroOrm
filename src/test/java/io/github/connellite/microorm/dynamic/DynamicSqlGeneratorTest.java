@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.dynamic;
 
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dialect.MssqlDialect;
 import io.github.connellite.microorm.dialect.MysqlDialect;
@@ -59,6 +60,32 @@ class DynamicSqlGeneratorTest {
         assertTrue(stmt.sql().contains(":name"));
         assertEquals(id.toString(), stmt.parameters().get("id"));
         assertEquals("alpha", stmt.parameters().get("name"));
+    }
+
+    @Test
+    void identityInsertOmitsUnsetGeneratedPrimaryKey() {
+        DynamicTable generatedTable = DynamicTable.builder("items")
+                .column("id", LogicalType.LONG, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
+                .column("name", LogicalType.STRING, Column.Builder::notNull)
+                .build();
+
+        BoundStatement stmt = sql.insert(generatedTable, Map.of("name", "alpha"));
+
+        assertEquals("INSERT INTO items (name) VALUES (:name)", stmt.sql());
+        assertEquals(Map.of("name", "alpha"), stmt.parameters());
+    }
+
+    @Test
+    void identityInsertIncludesExplicitPrimaryKey() {
+        DynamicTable generatedTable = DynamicTable.builder("items")
+                .column("id", LogicalType.LONG, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
+                .column("name", LogicalType.STRING, Column.Builder::notNull)
+                .build();
+
+        BoundStatement stmt = sql.insert(generatedTable, Map.of("id", 42L, "name", "alpha"));
+
+        assertTrue(stmt.sql().contains(":id"));
+        assertEquals(42L, stmt.parameters().get("id"));
     }
 
     @Test

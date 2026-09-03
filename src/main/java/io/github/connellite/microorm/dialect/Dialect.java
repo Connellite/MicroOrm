@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.dialect;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.sql.SqlGenerator;
@@ -44,29 +45,61 @@ public interface Dialect {
 
     /** DDL that creates the sequence used by a {@link io.github.connellite.microorm.annotation.GenerationType#SEQUENCE} id. */
     default String createSequenceDdl(EntityModel model, EntityField pk) {
+        return createSequenceDdl(new SequenceTarget(model.schemaIdentifier(), model.tableIdentifier(), pk.columnIdentifier(), pk.idGeneration()));
+    }
+
+    /** DDL that creates the sequence used by a sequence-backed primary key. */
+    default String createSequenceDdl(SequenceTarget target) {
         throw unsupportedSequences();
     }
 
     /** Query that returns the next sequence value for a {@link io.github.connellite.microorm.annotation.GenerationType#SEQUENCE} id. */
     default String nextSequenceValueSql(EntityModel model, EntityField pk) {
+        return nextSequenceValueSql(new SequenceTarget(
+                model.schemaIdentifier(),
+                model.tableIdentifier(),
+                pk.columnIdentifier(),
+                pk.idGeneration()));
+    }
+
+    /** Query that returns the next value for a sequence-backed primary key. */
+    default String nextSequenceValueSql(SequenceTarget target) {
         throw unsupportedSequences();
     }
 
     /** Renders the physical sequence name, using the entity schema when present. */
     default String sequenceSqlName(EntityModel model, EntityField pk) {
-        String configuredName = pk.idGeneration().sequenceName();
+        return sequenceSqlName(new SequenceTarget(
+                model.schemaIdentifier(),
+                model.tableIdentifier(),
+                pk.columnIdentifier(),
+                pk.idGeneration()));
+    }
+
+    /** Renders the physical sequence name, using the target schema when present. */
+    default String sequenceSqlName(SequenceTarget target) {
+        String configuredName = target.generation().sequenceName();
         String sequenceName = configuredName.isBlank()
-                ? model.tableName() + "_" + pk.columnName() + "_seq"
+                ? target.tableName() + "_" + target.primaryKeyName() + "_seq"
                 : configuredName;
         SqlIdentifier sequenceIdentifier = SqlIdentifier.parse(sequenceName);
         SqlGenerator.validateIdentifier(sequenceIdentifier.text(), "sequence");
         String rendered = sqlName(sequenceIdentifier);
-        return model.hasSchema() ? sqlName(model.schemaIdentifier()) + "." + rendered : rendered;
+        return target.schemaIdentifier() == null ? rendered : sqlName(target.schemaIdentifier()) + "." + rendered;
     }
 
     /** Sequence name for SQL string literals such as PostgreSQL {@code nextval('...')}. */
     default String sequenceLiteralName(EntityModel model, EntityField pk) {
-        return sequenceSqlName(model, pk).replace("'", "''");
+        return sequenceLiteralName(new SequenceTarget(
+                model.schemaIdentifier(),
+                model.tableIdentifier(),
+                pk.columnIdentifier(),
+                pk.idGeneration()));
+    }
+
+    /** Sequence name for SQL string literals such as PostgreSQL {@code nextval('...')}. */
+    default String sequenceLiteralName(SequenceTarget target) {
+        return sequenceSqlName(target).replace("'", "''");
     }
 
     /** Creates the entity table and indexes when missing. */

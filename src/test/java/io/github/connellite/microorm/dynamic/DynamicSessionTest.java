@@ -3,14 +3,17 @@ package io.github.connellite.microorm.dynamic;
 import io.github.connellite.microorm.MicroOrm;
 import io.github.connellite.microorm.DialectTestSupport;
 import io.github.connellite.microorm.annotation.Entity;
-import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.Id;
+import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.session.Session;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +44,54 @@ class DynamicSessionTest {
                 .build();
         orm.dynamicRegistry().register(table);
         return orm;
+    }
+
+    @Test
+    void insertReturningIdReturnsGeneratedIdentityKey() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(generatedIdTable(GenerationType.IDENTITY));
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("generated_items");
+
+                Object id = session.insertReturningId("generated_items", Map.of("name", "alpha"));
+
+                assertNumberEquals(1, id);
+                Map<String, Object> row = session.selectOne("generated_items", Map.of("id", id)).orElseThrow();
+                assertEquals("alpha", row.get("name"));
+            }
+        }
+    }
+
+    @Test
+    void insertReturningIdReturnsExplicitPrimaryKey() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(generatedIdTable(GenerationType.IDENTITY));
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("generated_items");
+
+                Object id = session.insertReturningId("generated_items", Map.of("id", 42L, "name", "explicit"));
+
+                assertEquals(42L, id);
+                Map<String, Object> row = session.selectOne("generated_items", Map.of("id", id)).orElseThrow();
+                assertEquals("explicit", row.get("name"));
+            }
+        }
+    }
+
+    @Test
+    void sqliteRejectsDynamicSequenceGeneratedIds() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(generatedIdTable(GenerationType.SEQUENCE));
+            try (DynamicSession session = orm.openDynamicSession()) {
+                MicroOrmException error = assertThrows(
+                        MicroOrmException.class,
+                        () -> session.createTable("generated_items"));
+                assertTrue(error.getMessage().contains("GenerationType.SEQUENCE"));
+            }
+        }
     }
 
     @ParameterizedTest(name = "{0}")
@@ -147,6 +198,13 @@ class DynamicSessionTest {
 
     private static void assertNumberEquals(int expected, Object actual) {
         assertEquals(expected, ((Number) actual).intValue());
+    }
+
+    private static DynamicTable generatedIdTable(GenerationType strategy) {
+        return DynamicTable.builder("generated_items")
+                .column("id", LogicalType.LONG, c -> c.primaryKey().generatedValue(strategy))
+                .column("name", LogicalType.STRING, Column.Builder::notNull)
+                .build();
     }
 
     private static Stream<DialectTestSupport.DialectFixture> dialects() {

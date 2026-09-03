@@ -2,6 +2,7 @@ package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.generation.IdGeneration;
 
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
