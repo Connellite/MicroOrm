@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Typed facade over entity methods already provided by {@link io.github.connellite.microorm.session.Session}.
@@ -61,11 +62,27 @@ public interface EntityRepository<T, ID> {
     /** Returns all rows. */
     List<T> selectRows();
 
+    /**
+     * Lazy row stream; must be closed (try-with-resources) to release JDBC resources.
+     * Prefer {@link #selectRows()} when the full result fits in memory.
+     */
+    Stream<T> streamRows();
+
     /** Returns rows matching simple field filters. */
     List<T> selectRows(Map<String, ?> filters);
 
+    /**
+     * Lazy filtered row stream; must be closed (try-with-resources).
+     */
+    Stream<T> streamRows(Map<String, ?> filters);
+
     /** Returns rows matching an entity query. */
     List<T> selectRows(EntitySelect<T> query);
+
+    /**
+     * Lazy entity-query stream; must be closed (try-with-resources).
+     */
+    Stream<T> streamRows(EntitySelect<T> query);
 
     /** Returns exactly one row matching an entity query. */
     T selectOne(EntitySelect<T> query);
@@ -75,6 +92,11 @@ public interface EntityRepository<T, ID> {
 
     /** Returns rows from a custom SQL query mapped to the entity type. */
     List<T> selectRows(Query query);
+
+    /**
+     * Lazy custom-query row stream; must be closed (try-with-resources).
+     */
+    Stream<T> streamRows(Query query);
 
     /** Returns exactly one row from a custom SQL query. */
     T selectOne(Query query);

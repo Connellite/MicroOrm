@@ -23,6 +23,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -77,6 +78,10 @@ class RepositoryTest {
         @io.github.connellite.microorm.annotation.Query(
                 "SELECT id, name FROM repository_items WHERE name IN (:names)")
         List<RepositoryItem> findNativeByNames(@Param("names") List<String> names);
+
+        @io.github.connellite.microorm.annotation.Query(
+                "SELECT id, name FROM repository_items WHERE name = :name")
+        Stream<RepositoryItem> streamNativeByName(@Param("name") String name);
 
         @io.github.connellite.microorm.annotation.Query(
                 "UPDATE repository_items SET name = :name WHERE id = :id")
@@ -184,6 +189,43 @@ class RepositoryTest {
                 assertEquals(1, rows.size());
                 assertNotNull(rows.get(0));
                 assertEquals("tx", rows.get(0).getName());
+
+                try (Stream<RepositoryItem> streamed = repository.streamRows()) {
+                    assertEquals(List.of("tx"), streamed.map(RepositoryItem::getName).toList());
+                }
+                try (Stream<RepositoryItem> streamed = repository.streamRows(Map.of("name", "tx"))) {
+                    assertEquals("tx", streamed.findFirst().orElseThrow().getName());
+                }
+                try (Stream<RepositoryItem> streamed = repository.streamRows(EntitySelect.of(RepositoryItem.class)
+                        .where(EntitySelect.field(RepositoryItem::getName).eq("tx")))) {
+                    assertEquals(1, streamed.count());
+                }
+                try (Stream<RepositoryItem> streamed = repository.streamRows(Query.of(
+                        "SELECT id, name FROM repository_items WHERE name = :name").set("name", "tx"))) {
+                    assertEquals("tx", streamed.findFirst().orElseThrow().getName());
+                }
+                try (Stream<RepositoryItem> streamed = repository.streamNativeByName("tx")) {
+                    assertEquals("tx", streamed.findFirst().orElseThrow().getName());
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void onDemandRepositoryKeepsSessionOpenUntilStreamCloses(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "repository_items");
+            MicroOrm orm = dialect.createOrm(connection);
+            RepositoryItemRepository repository = orm.repository(RepositoryItemRepository.class);
+            repository.createEntity();
+            repository.insertRow(new RepositoryItem("streamed"));
+
+            try (Stream<RepositoryItem> streamed = repository.streamRows()) {
+                assertEquals(List.of("streamed"), streamed.map(RepositoryItem::getName).toList());
+            }
+            try (Stream<RepositoryItem> streamed = repository.streamNativeByName("streamed")) {
+                assertEquals("streamed", streamed.findFirst().orElseThrow().getName());
             }
         }
     }

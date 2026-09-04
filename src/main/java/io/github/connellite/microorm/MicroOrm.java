@@ -11,6 +11,7 @@ import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
 import io.github.connellite.microorm.dynamic.DynamicSession;
 import io.github.connellite.microorm.dynamic.DynamicTableRegistry;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.SpringPhysicalNamingStrategy;
 import io.github.connellite.microorm.repository.EntityRepository;
@@ -21,6 +22,8 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * Entry point for MicroOrm. Choose a dialect factory, {@link #register(Class[]) register} entity classes,
@@ -154,11 +157,53 @@ public final class MicroOrm {
 
     /**
      * Creates an on-demand typed repository proxy. Each repository method opens and closes its own session.
+     * A returned {@link Stream} keeps that session open until the stream is closed.
      * <p>
      * Use {@link Session#repository(Class)} when multiple repository calls must share one transaction or lazy-load context.
      */
     public <R extends EntityRepository<?, ?>> R repository(Class<R> repositoryType) {
-        return RepositoryProxyFactory.create(repositoryType, operation -> withSession(operation::apply));
+        return RepositoryProxyFactory.create(repositoryType, this::executeKeepingStreamOpen);
+    }
+
+    private Object executeKeepingStreamOpen(RepositoryProxyFactory.RepositoryOperation<?> operation) throws SQLException {
+        Session session = openSession();
+        try {
+            Object result = operation.apply(session);
+            if (result instanceof Stream<?> stream) {
+                return closeSessionAfter(stream, session);
+            }
+            closeSession(session);
+            return result;
+        } catch (RuntimeException | SQLException e) {
+            closeSessionQuietly(session, e);
+            throw e;
+        }
+    }
+
+    private static <T> Stream<T> closeSessionAfter(Stream<T> stream, Session session) {
+        return StreamSupport.stream(stream.spliterator(), stream.isParallel()).onClose(() -> {
+            try {
+                stream.close();
+            } finally {
+                closeSession(session);
+            }
+        });
+    }
+
+    private static void closeSession(Session session) {
+        try {
+            session.close();
+        } catch (SQLException e) {
+            throw MicroOrmException.wrap(e);
+        }
+    }
+
+    private static void closeSessionQuietly(Session session, Exception primary) {
+        try {
+            session.close();
+        } catch (SQLException | RuntimeException closeError) {
+            primary.addSuppressed(closeError);
+        }
     }
 
     /** Callback for {@link #withSession(SessionAction)}. */

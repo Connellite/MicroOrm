@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Creates dynamic proxies for {@link EntityRepository} interfaces.
@@ -189,6 +190,7 @@ public final class RepositoryProxyFactory {
                     }
                     case "deleteAllRows" -> session.deleteAllRows(entityType);
                     case "selectRows" -> session.selectRows(entityType);
+                    case "streamRows" -> session.streamRows(entityType);
                     default -> unsupported(method);
                 };
             }
@@ -223,8 +225,14 @@ public final class RepositoryProxyFactory {
                 if ("selectRows".equals(name) && Map.class.isAssignableFrom(parameters[0])) {
                     return session.selectRows(entityType, (Map<String, ?>) arg);
                 }
+                if ("streamRows".equals(name) && Map.class.isAssignableFrom(parameters[0])) {
+                    return session.streamRows(entityType, (Map<String, ?>) arg);
+                }
                 if ("selectRows".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
                     return session.selectRows((EntitySelect<?>) arg);
+                }
+                if ("streamRows".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
+                    return session.streamRows((EntitySelect<?>) arg);
                 }
                 if ("selectOne".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
                     return session.selectOne((EntitySelect<?>) arg);
@@ -234,6 +242,9 @@ public final class RepositoryProxyFactory {
                 }
                 if ("selectRows".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
                     return session.selectRows(entityType, (Query) arg);
+                }
+                if ("streamRows".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
+                    return session.streamRows(entityType, (Query) arg);
                 }
                 if ("selectOne".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
                     return session.selectOne(entityType, (Query) arg);
@@ -272,6 +283,9 @@ public final class RepositoryProxyFactory {
             }
             if (List.class.isAssignableFrom(returnType)) {
                 return session.selectRows(entityType, query);
+            }
+            if (Stream.class.isAssignableFrom(returnType)) {
+                return session.streamRows(entityType, query);
             }
             if (Optional.class.isAssignableFrom(returnType)) {
                 return session.findOne(entityType, query);
