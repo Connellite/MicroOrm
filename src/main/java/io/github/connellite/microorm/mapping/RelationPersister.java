@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.mapping;
 
+import io.github.connellite.microorm.annotation.CascadeType;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.relation.EagerRef;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
@@ -14,54 +16,101 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Persists entity graphs with lazy or eager relation wrappers.
- * <p>
- * Flush order follows Hibernate's {@code ActionQueue} (inserts, then updates, then collection sync, then deletes)
- * so foreign-key constraints stay valid without disabling them:
- * <a href="https://github.com/hibernate/hibernate-orm/blob/main/hibernate-core/src/main/java/org/hibernate/action/internal/AbstractEntityInsertAction.java">
- * Hibernate ORM insert/update ordering</a>,
- * <a href="https://vladmihalcea.com/the-best-way-to-map-a-onetomany-association-with-jpa-and-hibernate/">
- * Vlad Mihalcea — propagate FK via the {@code @ManyToOne} owning side</a>.
- * <p>
- * Cyclic object graphs (e.g. document ↔ files) are handled with a two-pass insert: rows are inserted with
- * nullable FKs left {@code NULL} when the target has no primary key yet, then deferred {@code UPDATE}s
- * assign the FK once both sides exist (same approach as Hibernate with deferrable / two-phase flush).
+ * Persist / merge / remove for relation graphs, following Hibernate's cascade points
+ * and ActionQueue flush order so foreign-key constraints stay valid:
+ * <ul>
+ *   <li>{@code persist}: cascade many-to-one before insert (parents first), then insert,
+ *       then cascade collections (children after the FK owner exists)</li>
+ *   <li>nullable FKs to a not-yet-inserted target are left {@code NULL} and updated after
+ *       both rows exist (Hibernate unresolved entity-insert / two-pass cycle handling)</li>
+ *   <li>required FKs to a transient or still-pending target fail like Hibernate
+ *       {@code TransientPropertyValueException} instead of inserting a violating row</li>
+ *   <li>{@code remove}: delete cascaded children first, then the owner</li>
+ * </ul>
+ * {@code insertRow} is persist, {@code updateRow} is merge, {@code deleteRow} is remove.
+ * Associations cascade only when {@link CascadeType} is set; {@code orphanRemoval} is independent.
+ *
+ * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/AbstractSaveEventListener.java#L264">AbstractSaveEventListener.performSaveOrReplicate</a>
+ * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/CascadePoint.java">CascadePoint</a>
+ * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/Cascade.java#L72">Cascade.cascade</a>
+ * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java">ActionQueue</a>
  */
 public final class RelationPersister {
 
     private RelationPersister() {
     }
 
+    /**
+     * Hibernate persist of a transient instance.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultPersistEventListener.java#L61">DefaultPersistEventListener.onPersist</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultPersistEventListener.java#L139">entityIsTransient</a>
+     */
     public static <T> T insert(RelationPersistSession session, T entity) {
         List<DeferredFkUpdate> deferred = new ArrayList<>();
         Set<Object> inProgress = Collections.newSetFromMap(new IdentityHashMap<>());
         Set<Object> inserted = Collections.newSetFromMap(new IdentityHashMap<>());
-        persistInsert(session, entity, inProgress, inserted, deferred);
+        persist(session, entity, inProgress, inserted, deferred);
         applyDeferredFkUpdates(session, deferred);
         return entity;
     }
 
+    /**
+     * Hibernate merge of a managed / already-persisted instance, then association cascades.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultMergeEventListener.java#L257">DefaultMergeEventListener.entityIsPersistent</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultMergeEventListener.java#L618">cascadeOnMerge</a>
+     */
     public static int update(RelationPersistSession session, Object entity) {
         EntityModel model = session.registry().get(entity.getClass());
         int rows = session.updateEntityRow(entity, model, List.of());
         List<DeferredFkUpdate> deferred = new ArrayList<>();
         Set<Object> inProgress = Collections.newSetFromMap(new IdentityHashMap<>());
-        syncOneToManyCollections(session, entity, model, inProgress, Collections.newSetFromMap(new IdentityHashMap<>()), deferred, true);
+        Set<Object> inserted = Collections.newSetFromMap(new IdentityHashMap<>());
+        inProgress.add(entity);
+        inserted.add(entity);
+        mergeAssociations(session, entity, model, inProgress, inserted, deferred);
         applyDeferredFkUpdates(session, deferred);
         return rows;
     }
 
+    /**
+     * Hibernate remove: cascade collections first, delete the owner, then cascade many-to-one.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultDeleteEventListener.java#L363">DefaultDeleteEventListener.deleteEntity</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultDeleteEventListener.java#L491">cascadeBeforeDelete</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultDeleteEventListener.java#L518">cascadeAfterDelete</a>
+     */
     public static int delete(RelationPersistSession session, Object entity) {
         EntityModel model = session.registry().get(entity.getClass());
         session.requirePkSet(entity, model);
         Object ownerPk = session.pkValue(entity, model);
         for (OneToManyField relation : model.oneToManyRelations()) {
-            session.deleteChildrenByOwner(relation, ownerPk);
+            if (relation.cascades(CascadeType.REMOVE) || relation.orphanRemoval()) {
+                session.deleteChildrenByOwner(relation, ownerPk);
+            }
         }
-        return session.deleteEntityRow(entity, model);
+        int deleted = session.deleteEntityRow(entity, model);
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (!relation.cascades(CascadeType.REMOVE)) {
+                continue;
+            }
+            EntityRef<?> ref = EntityRef.get(relation, entity);
+            Object attached = ref == null ? null : ref.attachedEntity();
+            if (attached != null) {
+                delete(session, attached);
+            }
+        }
+        return deleted;
     }
 
-    private static void persistInsert(
+    /**
+     * Hibernate {@code performSaveOrReplicate}: {@code cascadeBeforeSave} → insert → {@code cascadeAfterSave}.
+     * {@code inProgress} is the {@code Status.SAVING} placeholder that stops recursive persist of the same instance.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/AbstractSaveEventListener.java#L264">AbstractSaveEventListener.performSaveOrReplicate</a>
+     */
+    private static void persist(
             RelationPersistSession session,
             Object entity,
             Set<Object> inProgress,
@@ -70,66 +119,209 @@ public final class RelationPersister {
         if (!inProgress.add(entity)) {
             return;
         }
+        if (inserted.contains(entity)) {
+            return;
+        }
         EntityModel model = session.registry().get(entity.getClass());
+        cascadePersistManyToOnes(session, entity, model, inProgress, inserted, deferred);
+        session.assignGeneratedIdsIfNeeded(entity, model);
+        session.insertEntityRow(entity, model, deferred, inserted, inProgress);
+        inserted.add(entity);
+        cascadePersistCollections(session, entity, model, inProgress, inserted, deferred);
+    }
 
+    /**
+     * Hibernate {@code cascadeBeforeSave}: persist many-to-one before the owner insert
+     * ({@code CascadePoint.BEFORE_INSERT_AFTER_DELETE}). A required transient target without
+     * {@code CascadeType.PERSIST} fails like {@code TransientPropertyValueException}.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/AbstractSaveEventListener.java#L471">AbstractSaveEventListener.cascadeBeforeSave</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/CascadePoint.java#L23">CascadePoint.BEFORE_INSERT_AFTER_DELETE</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/TransientPropertyValueException.java">TransientPropertyValueException</a>
+     */
+    private static void cascadePersistManyToOnes(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
         for (ManyToOneField relation : model.manyToOneRelations()) {
             EntityRef<?> ref = EntityRef.get(relation, entity);
             if (ref == null) {
                 continue;
             }
             Object attached = ref.attachedEntity();
-            if (attached == null || inserted.contains(attached)) {
+            if (attached == null || inserted.contains(attached) || inProgress.contains(attached)) {
                 continue;
             }
             EntityModel targetModel = session.registry().get(relation.targetEntityClass());
-            if (!RelationValues.isNew(attached, targetModel)) {
+            boolean transientTarget = RelationValues.isNew(attached, targetModel);
+            if (!relation.cascades(CascadeType.PERSIST)) {
+                if (transientTarget) {
+                    throw new MicroOrmException("Not-null property references a transient value - "
+                            + "transient instance must be saved before current operation: "
+                            + model.entityClass().getName() + "." + relation.javaField().getName());
+                }
                 continue;
             }
-            persistInsert(session, attached, inProgress, inserted, deferred);
+            if (transientTarget) {
+                persist(session, attached, inProgress, inserted, deferred);
+                continue;
+            }
+            if (!session.existsByPrimaryKey(attached, targetModel)) {
+                persist(session, attached, inProgress, inserted, deferred);
+            }
         }
-
-        if (!inserted.contains(entity)) {
-            session.assignGeneratedIdsIfNeeded(entity, model);
-            session.insertEntityRow(entity, model, deferred);
-            inserted.add(entity);
-        }
-
-        syncOneToManyCollections(session, entity, model, inProgress, inserted, deferred, false);
     }
 
-    private static void syncOneToManyCollections(
+    /**
+     * Hibernate {@code cascadeAfterSave}: persist collections after the owner exists
+     * ({@code CascadePoint.AFTER_INSERT_BEFORE_DELETE}).
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/AbstractSaveEventListener.java#L502">AbstractSaveEventListener.cascadeAfterSave</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/CascadePoint.java#L17">CascadePoint.AFTER_INSERT_BEFORE_DELETE</a>
+     */
+    private static void cascadePersistCollections(
             RelationPersistSession session,
             Object owner,
             EntityModel ownerModel,
             Set<Object> inProgress,
             Set<Object> inserted,
-            List<DeferredFkUpdate> deferred,
-            boolean reconcileOrphans) {
-        Object ownerPk = session.pkValue(owner, ownerModel);
-
+            List<DeferredFkUpdate> deferred) {
         for (OneToManyField relation : ownerModel.oneToManyRelations()) {
+            if (!relation.cascades(CascadeType.PERSIST)) {
+                continue;
+            }
             EntityCollection<?> collection = EntityCollection.get(relation, owner);
             if (collection == null || !collection.isMaterialized()) {
                 continue;
             }
             EntityModel childModel = session.registry().get(relation.targetEntityClass());
             ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
-            Set<Object> desiredChildPks = new HashSet<>();
             for (Object child : collection.elementsOrEmpty()) {
                 setRefToOwner(inverse, child, owner);
-                if (!inserted.contains(child)) {
-                    persistInsert(session, child, inProgress, inserted, deferred);
-                } else {
-                    session.updateEntityRow(child, childModel, deferred);
+                if (inserted.contains(child) || inProgress.contains(child)) {
+                    continue;
                 }
-                desiredChildPks.add(session.pkValue(child, childModel));
-            }
-            if (reconcileOrphans && !RelationValues.isNew(owner, ownerModel)) {
-                session.deleteOrphanChildren(relation, ownerPk, desiredChildPks, childModel);
+                persist(session, child, inProgress, inserted, deferred);
             }
         }
     }
 
+    /**
+     * Hibernate {@code cascadeOnMerge} ({@code CascadePoint.BEFORE_MERGE}): many-to-one then collections.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultMergeEventListener.java#L618">DefaultMergeEventListener.cascadeOnMerge</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/CascadePoint.java#L62">CascadePoint.BEFORE_MERGE</a>
+     */
+    private static void mergeAssociations(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (!relation.cascades(CascadeType.MERGE)) {
+                continue;
+            }
+            EntityRef<?> ref = EntityRef.get(relation, entity);
+            Object attached = ref == null ? null : ref.attachedEntity();
+            if (attached == null || inserted.contains(attached)) {
+                continue;
+            }
+            merge(session, attached, inProgress, inserted, deferred);
+        }
+        for (OneToManyField relation : model.oneToManyRelations()) {
+            boolean mergeChildren = relation.cascades(CascadeType.MERGE);
+            if (mergeChildren || relation.orphanRemoval()) {
+                syncMergeCollection(
+                        session,
+                        entity,
+                        model,
+                        relation,
+                        inProgress,
+                        inserted,
+                        deferred,
+                        relation.orphanRemoval(),
+                        mergeChildren);
+            }
+        }
+    }
+
+    /**
+     * Hibernate merge of an associated instance: transient or missing row → persist, else update.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultMergeEventListener.java#L273">DefaultMergeEventListener.entityIsTransient</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultMergeEventListener.java#L257">entityIsPersistent</a>
+     */
+    private static void merge(
+            RelationPersistSession session,
+            Object entity,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        if (inserted.contains(entity)) {
+            return;
+        }
+        EntityModel model = session.registry().get(entity.getClass());
+        if (RelationValues.isNew(entity, model) || !session.existsByPrimaryKey(entity, model)) {
+            persist(session, entity, inProgress, inserted, deferred);
+            return;
+        }
+        if (!inProgress.add(entity)) {
+            return;
+        }
+        session.updateEntityRow(entity, model, deferred);
+        inserted.add(entity);
+        mergeAssociations(session, entity, model, inProgress, inserted, deferred);
+    }
+
+    /**
+     * Hibernate collection merge plus {@code Cascade.deleteOrphans} when {@code orphanRemoval} is set.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/Cascade.java#L630">Cascade.deleteOrphans</a>
+     */
+    private static void syncMergeCollection(
+            RelationPersistSession session,
+            Object owner,
+            EntityModel ownerModel,
+            OneToManyField relation,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred,
+            boolean orphanRemoval,
+            boolean mergeChildren) {
+        EntityCollection<?> collection = EntityCollection.get(relation, owner);
+        if (collection == null || !collection.isMaterialized()) {
+            return;
+        }
+        EntityModel childModel = session.registry().get(relation.targetEntityClass());
+        ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
+        Set<Object> desiredChildPks = new HashSet<>();
+        for (Object child : collection.elementsOrEmpty()) {
+            setRefToOwner(inverse, child, owner);
+            if (mergeChildren) {
+                merge(session, child, inProgress, inserted, deferred);
+            }
+            Object childPk = session.pkValue(child, childModel);
+            if (childPk != null) {
+                desiredChildPks.add(childPk);
+            }
+        }
+        if (orphanRemoval && !RelationValues.isNew(owner, ownerModel)) {
+            session.deleteOrphanChildren(relation, session.pkValue(owner, ownerModel), desiredChildPks, childModel);
+        }
+    }
+
+    /**
+     * Second pass for cyclic graphs: write a nullable FK after both rows exist
+     * (Hibernate unresolved entity-insert actions).
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java#L267">ActionQueue unresolved entity inserts</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java#L453">checkNoUnresolvedActionsAfterOperation</a>
+     */
     private static void applyDeferredFkUpdates(RelationPersistSession session, List<DeferredFkUpdate> deferred) {
         for (DeferredFkUpdate update : deferred) {
             session.updateJoinColumn(update.entity(), update.model(), update.relation());

@@ -20,7 +20,14 @@ public interface RelationPersistSession {
 
     Object pkValue(Object entity, EntityModel model);
 
-    void insertEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred);
+    boolean existsByPrimaryKey(Object entity, EntityModel model);
+
+    void insertEntityRow(
+            Object entity,
+            EntityModel model,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress);
 
     int updateEntityRow(Object entity, EntityModel model);
 

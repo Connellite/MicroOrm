@@ -210,7 +210,13 @@ public final class EntityModelRegistry {
                 : toPhysicalColumn(SqlIdentifier.unquoted(field.getName() + "_id"));
         boolean nullable = joinColumn == null || joinColumn.nullable();
         Class<?> fkType = primaryKeyJavaType(targetType);
-        return new ManyToOneField(field, targetType, column, nullable, fkType);
+        return new ManyToOneField(
+                field,
+                targetType,
+                column,
+                nullable,
+                fkType,
+                field.getAnnotation(ManyToOne.class).cascade());
     }
 
     private static Class<?> primaryKeyJavaType(Class<?> entityClass) {
@@ -237,7 +243,12 @@ public final class EntityModelRegistry {
         Class<?> childType = resolveCollectionTarget(entityClass, field);
         requireEntity(childType);
         validateInverseManyToOne(childType, mappedBy, entityClass);
-        return new OneToManyField(field, childType, mappedBy);
+        return new OneToManyField(
+                field,
+                childType,
+                mappedBy,
+                oneToMany.cascade(),
+                oneToMany.orphanRemoval());
     }
 
     private static void validateInverseManyToOne(Class<?> childClass, String mappedByField, Class<?> ownerClass) {

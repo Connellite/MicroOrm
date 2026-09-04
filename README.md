@@ -158,7 +158,7 @@ public class Order {
     @JoinColumn(name = "customer_id")
     private LazyRef<Customer> customer;
 
-    @OneToMany(mappedBy = "order")
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private LazyCollection<OrderItem> lines;
 }
 
@@ -176,10 +176,15 @@ public class OrderItem {
 
 - **`LazyRef` / `LazyCollection`** — load related rows on first `get()` while the session is open
 - **`EagerRef` / `EagerCollection`** — materialize related rows when the owner is hydrated
+- **Cascade** — same defaults as JPA/Hibernate: nothing is cascaded unless you set `cascade` (`PERSIST`, `MERGE`, `REMOVE`, or `ALL`)
+- **`orphanRemoval`** — deletes children that disappear from a materialized `@OneToMany` collection, independently of cascade
+- **Existing references** — `LazyRef.toId(...)` or `LazyRef.to(alreadyPersisted)` write the FK only and do not update the target unless that association cascades `MERGE`
+
+`insertRow` is persist, `updateRow` is merge, `deleteRow` is remove.
+
+Persist order follows Hibernate: many-to-one parents are saved first, then the row, then collections. Required FKs to a transient target fail like `PropertyValueException` instead of inserting a violating row. Cyclic nullable FKs are written in a second update after both rows exist.
 
 For writes, attach entities with `LazyRef.to(entity)` or reference existing rows with `LazyRef.toId(Customer.class, id)`. Collections can be built with `LazyCollection.builder()` before insert/update.
-
-Relation graphs (including cyclic references) are persisted through `session.insertRow` / `updateRow`.
 
 ## Repositories
 

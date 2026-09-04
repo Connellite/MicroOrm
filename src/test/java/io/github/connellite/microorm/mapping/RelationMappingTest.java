@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.annotation.CascadeType;
 import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RelationMappingTest {
@@ -62,6 +64,9 @@ class RelationMappingTest {
         assertEquals(1, orderModel.oneToManyRelations().size());
         assertEquals("order", orderModel.oneToManyRelations().get(0).mappedBy());
         assertEquals(OrderItem.class, orderModel.oneToManyRelations().get(0).targetEntityClass());
+        assertFalse(orderModel.manyToOneRelations().get(0).cascades(CascadeType.PERSIST));
+        assertFalse(orderModel.oneToManyRelations().get(0).cascades(CascadeType.ALL));
+        assertFalse(orderModel.oneToManyRelations().get(0).orphanRemoval());
     }
 
     @Entity

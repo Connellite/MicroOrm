@@ -13,4 +13,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ManyToOne {
+    /** Operations cascaded to the referenced entity. Empty by default, like JPA. */
+    CascadeType[] cascade() default {};
 }

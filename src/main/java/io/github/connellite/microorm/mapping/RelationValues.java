@@ -76,7 +76,11 @@ public final class RelationValues {
         return EntityHydrator.getFieldValue(attached, targetModel.primaryKey());
     }
 
-    /** {@code true} when the entity primary key is unset (new row for insert). */
+    /**
+     * Hibernate {@code ForeignKeys.isTransient}: unset PK means the instance is new.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java#L298">ForeignKeys.isTransient</a>
+     */
     public static boolean isNew(Object entity, EntityModel model) {
         return EntityHydrator.isUnsetPk(entity, model.primaryKey());
     }

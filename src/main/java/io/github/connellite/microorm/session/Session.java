@@ -716,13 +716,33 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     }
 
     @Override
-    public void insertEntityRow(Object entity, EntityModel model, List<RelationPersister.DeferredFkUpdate> deferred) {
+    /**
+     * Hibernate {@code ForeignKeys.isTransient} / persister lookup for an assigned identifier:
+     * {@code false} when the PK is unset, otherwise a database exists-check (no persistence context).
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java#L298">ForeignKeys.isTransient</a>
+     */
+    public boolean existsByPrimaryKey(Object entity, EntityModel model) {
+        Object id = pkValue(entity, model);
+        if (EntityHydrator.isUnsetPkValue(id, model.primaryKey())) {
+            return false;
+        }
+        return existsById(model.entityClass(), id);
+    }
+
+    @Override
+    public void insertEntityRow(
+            Object entity,
+            EntityModel model,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress) {
         requireMutable(model, "insertEntityRow");
         assignGeneratedIdsIfNeeded(entity, model);
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
         RelationSqlGenerator.RelationInsertParts parts =
-                relationSql().buildRelationInsert(model, entity, omitPk, registry, deferred);
+                relationSql().buildRelationInsert(model, entity, omitPk, registry, deferred, inserted, inProgress);
         BoundStatement bs = BoundStatement.of(parts.sql(), parts.parameters());
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         SqlExecutor.executeInsertReturning(connection, bs, model, entity);
@@ -794,6 +814,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
     }
 
     @Override
+    /**
+     * Hibernate {@code cascadeBeforeDelete}: remove collection children before the owner.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultDeleteEventListener.java#L491">DefaultDeleteEventListener.cascadeBeforeDelete</a>
+     */
     public void deleteChildrenByOwner(OneToManyField relation, Object ownerPk) {
         EntityModel childModel = registry.get(relation.targetEntityClass());
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
@@ -807,11 +832,22 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 dialect.valueMapper(),
                 lazyLoadContext(),
                 registry)) {
-            rows.forEach(child -> deleteEntityRow(child, childModel));
+            rows.forEach(child -> {
+                if (childModel.hasRelations()) {
+                    RelationPersister.delete(this, child);
+                } else {
+                    deleteEntityRow(child, childModel);
+                }
+            });
         }
     }
 
     @Override
+    /**
+     * Hibernate {@code Cascade.deleteOrphans}: delete collection elements no longer referenced by the owner.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/Cascade.java#L630">Cascade.deleteOrphans</a>
+     */
     public void deleteOrphanChildren(
             OneToManyField relation,
             Object ownerPk,

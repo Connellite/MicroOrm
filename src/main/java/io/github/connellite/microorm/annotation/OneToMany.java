@@ -16,4 +16,13 @@ import java.lang.annotation.Target;
 public @interface OneToMany {
     /** Name of the {@link ManyToOne} field on the child entity that points back to this entity. */
     String mappedBy();
+
+    /** Operations cascaded to collection elements. Empty by default, like JPA. */
+    CascadeType[] cascade() default {};
+
+    /**
+     * When {@code true}, children removed from a materialized collection (or deleted with the owner)
+     * are deleted. Independent of {@link #cascade()}, like JPA {@code orphanRemoval}.
+     */
+    boolean orphanRemoval() default false;
 }

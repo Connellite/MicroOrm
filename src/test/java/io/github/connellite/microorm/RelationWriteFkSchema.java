@@ -58,18 +58,21 @@ final class RelationWriteFkSchema {
                     "DROP TABLE IF EXISTS write_head_files",
                     "DROP TABLE IF EXISTS write_doc_heads",
                     "DROP TABLE IF EXISTS write_files",
-                    "DROP TABLE IF EXISTS write_documents");
+                    "DROP TABLE IF EXISTS write_documents",
+                    "DROP TABLE IF EXISTS write_folders");
             case POSTGRES -> List.of(
                     "DROP TABLE IF EXISTS write_head_files CASCADE",
                     "DROP TABLE IF EXISTS write_doc_heads CASCADE",
                     "DROP TABLE IF EXISTS write_files CASCADE",
-                    "DROP TABLE IF EXISTS write_documents CASCADE");
+                    "DROP TABLE IF EXISTS write_documents CASCADE",
+                    "DROP TABLE IF EXISTS write_folders CASCADE");
             case MYSQL -> List.of(
                     "SET FOREIGN_KEY_CHECKS = 0",
                     "DROP TABLE IF EXISTS write_head_files",
                     "DROP TABLE IF EXISTS write_doc_heads",
                     "DROP TABLE IF EXISTS write_files",
                     "DROP TABLE IF EXISTS write_documents",
+                    "DROP TABLE IF EXISTS write_folders",
                     "SET FOREIGN_KEY_CHECKS = 1");
             case MSSQL -> List.of(
                     """
@@ -87,12 +90,18 @@ final class RelationWriteFkSchema {
                     "IF OBJECT_ID('write_head_files', 'U') IS NOT NULL DROP TABLE write_head_files",
                     "IF OBJECT_ID('write_doc_heads', 'U') IS NOT NULL DROP TABLE write_doc_heads",
                     "IF OBJECT_ID('write_files', 'U') IS NOT NULL DROP TABLE write_files",
-                    "IF OBJECT_ID('write_documents', 'U') IS NOT NULL DROP TABLE write_documents");
+                    """
+                    IF OBJECT_ID('fk_write_documents_folder', 'F') IS NOT NULL
+                        ALTER TABLE write_documents DROP CONSTRAINT fk_write_documents_folder
+                    """,
+                    "IF OBJECT_ID('write_documents', 'U') IS NOT NULL DROP TABLE write_documents",
+                    "IF OBJECT_ID('write_folders', 'U') IS NOT NULL DROP TABLE write_folders");
             case ORACLE -> List.of(
                     oracleDropTable("write_head_files"),
                     oracleDropTable("write_doc_heads"),
                     oracleDropTable("write_files"),
-                    oracleDropTable("write_documents"));
+                    oracleDropTable("write_documents"),
+                    oracleDropTable("write_folders"));
         };
     }
 
@@ -122,9 +131,19 @@ final class RelationWriteFkSchema {
     private static List<String> sqliteCreate() {
         return List.of(
                 """
+                CREATE TABLE write_folders (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    item_count INTEGER NOT NULL
+                )
+                """,
+                """
                 CREATE TABLE write_documents (
                     id TEXT NOT NULL PRIMARY KEY,
-                    title TEXT NOT NULL
+                    title TEXT NOT NULL,
+                    folder_id TEXT,
+                    CONSTRAINT fk_write_documents_folder
+                        FOREIGN KEY (folder_id) REFERENCES write_folders(id)
                 )
                 """,
                 """
@@ -176,9 +195,19 @@ final class RelationWriteFkSchema {
     private static List<String> postgresCreate() {
         return List.of(
                 """
+                CREATE TABLE write_folders (
+                    id UUID NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    item_count INTEGER NOT NULL
+                )
+                """,
+                """
                 CREATE TABLE write_documents (
                     id UUID NOT NULL PRIMARY KEY,
-                    title TEXT NOT NULL
+                    title TEXT NOT NULL,
+                    folder_id UUID,
+                    CONSTRAINT fk_write_documents_folder
+                        FOREIGN KEY (folder_id) REFERENCES write_folders(id)
                 )
                 """,
                 """
@@ -215,9 +244,19 @@ final class RelationWriteFkSchema {
     private static List<String> mysqlCreate() {
         return List.of(
                 """
+                CREATE TABLE write_folders (
+                    id BINARY(16) NOT NULL PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    item_count INT NOT NULL
+                ) ENGINE=InnoDB
+                """,
+                """
                 CREATE TABLE write_documents (
                     id BINARY(16) NOT NULL PRIMARY KEY,
-                    title VARCHAR(255) NOT NULL
+                    title VARCHAR(255) NOT NULL,
+                    folder_id BINARY(16),
+                    CONSTRAINT fk_write_documents_folder
+                        FOREIGN KEY (folder_id) REFERENCES write_folders(id)
                 ) ENGINE=InnoDB
                 """,
                 """
@@ -254,9 +293,19 @@ final class RelationWriteFkSchema {
     private static List<String> mssqlCreate() {
         return List.of(
                 """
+                CREATE TABLE write_folders (
+                    id BINARY(16) NOT NULL PRIMARY KEY,
+                    name NVARCHAR(255) NOT NULL,
+                    item_count INT NOT NULL
+                )
+                """,
+                """
                 CREATE TABLE write_documents (
                     id BINARY(16) NOT NULL PRIMARY KEY,
-                    title NVARCHAR(255) NOT NULL
+                    title NVARCHAR(255) NOT NULL,
+                    folder_id BINARY(16),
+                    CONSTRAINT fk_write_documents_folder
+                        FOREIGN KEY (folder_id) REFERENCES write_folders(id)
                 )
                 """,
                 """
@@ -293,9 +342,19 @@ final class RelationWriteFkSchema {
     private static List<String> oracleCreate() {
         return List.of(
                 """
+                CREATE TABLE write_folders (
+                    id RAW(16) NOT NULL PRIMARY KEY,
+                    name VARCHAR2(255) NOT NULL,
+                    item_count NUMBER(10) NOT NULL
+                )
+                """,
+                """
                 CREATE TABLE write_documents (
                     id RAW(16) NOT NULL PRIMARY KEY,
-                    title VARCHAR2(255) NOT NULL
+                    title VARCHAR2(255) NOT NULL,
+                    folder_id RAW(16),
+                    CONSTRAINT fk_write_documents_folder
+                        FOREIGN KEY (folder_id) REFERENCES write_folders(id)
                 )
                 """,
                 """

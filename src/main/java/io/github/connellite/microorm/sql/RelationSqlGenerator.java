@@ -7,6 +7,7 @@ import io.github.connellite.microorm.mapping.RelationPersister;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Optional SQL capability required for persisting entity relation graphs.
@@ -21,6 +22,27 @@ public interface RelationSqlGenerator {
             boolean omitPk,
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred);
+
+    default RelationInsertParts buildRelationInsert(
+            EntityModel model,
+            Object entity,
+            boolean omitPk,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted) {
+        return buildRelationInsert(model, entity, omitPk, registry, deferred);
+    }
+
+    default RelationInsertParts buildRelationInsert(
+            EntityModel model,
+            Object entity,
+            boolean omitPk,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress) {
+        return buildRelationInsert(model, entity, omitPk, registry, deferred, inserted);
+    }
 
     BoundStatement update(
             EntityModel model,

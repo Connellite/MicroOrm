@@ -1,10 +1,12 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
+import io.github.connellite.microorm.annotation.CascadeType;
 import io.github.connellite.microorm.exception.MicroOrmException;
 
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.util.Set;
 
 /** Metadata for a {@link io.github.connellite.microorm.annotation.OneToMany} collection wrapper field. */
 public final class OneToManyField {
@@ -13,11 +15,24 @@ public final class OneToManyField {
     private final VarHandle varHandle;
     private final Class<?> targetEntityClass;
     private final String mappedBy;
+    private final Set<CascadeType> cascade;
+    private final boolean orphanRemoval;
 
     public OneToManyField(Field javaField, Class<?> targetEntityClass, String mappedBy) {
+        this(javaField, targetEntityClass, mappedBy, new CascadeType[0], false);
+    }
+
+    public OneToManyField(
+            Field javaField,
+            Class<?> targetEntityClass,
+            String mappedBy,
+            CascadeType[] cascade,
+            boolean orphanRemoval) {
         this.javaField = javaField;
         this.targetEntityClass = targetEntityClass;
         this.mappedBy = mappedBy;
+        this.cascade = Cascades.copyCascade(cascade);
+        this.orphanRemoval = orphanRemoval;
         try {
             this.varHandle = MethodHandleReflectionUtil.varHandle(javaField);
         } catch (IllegalAccessException e) {
@@ -39,5 +54,13 @@ public final class OneToManyField {
 
     public String mappedBy() {
         return mappedBy;
+    }
+
+    public boolean orphanRemoval() {
+        return orphanRemoval;
+    }
+
+    public boolean cascades(CascadeType type) {
+        return Cascades.enabled(cascade, type);
     }
 }

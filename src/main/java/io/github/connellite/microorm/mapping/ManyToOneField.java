@@ -1,10 +1,12 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
+import io.github.connellite.microorm.annotation.CascadeType;
 import io.github.connellite.microorm.exception.MicroOrmException;
 
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.util.Set;
 
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
@@ -17,6 +19,7 @@ public final class ManyToOneField {
     private final SqlIdentifier joinColumnIdentifier;
     private final boolean nullable;
     private final Class<?> foreignKeyJavaType;
+    private final Set<CascadeType> cascade;
 
     public ManyToOneField(
             Field javaField,
@@ -33,11 +36,22 @@ public final class ManyToOneField {
             SqlIdentifier joinColumnIdentifier,
             boolean nullable,
             Class<?> foreignKeyJavaType) {
+        this(javaField, targetEntityClass, joinColumnIdentifier, nullable, foreignKeyJavaType, new CascadeType[0]);
+    }
+
+    public ManyToOneField(
+            Field javaField,
+            Class<?> targetEntityClass,
+            SqlIdentifier joinColumnIdentifier,
+            boolean nullable,
+            Class<?> foreignKeyJavaType,
+            CascadeType[] cascade) {
         this.javaField = javaField;
         this.targetEntityClass = targetEntityClass;
         this.joinColumnIdentifier = joinColumnIdentifier;
         this.nullable = nullable;
         this.foreignKeyJavaType = foreignKeyJavaType;
+        this.cascade = Cascades.copyCascade(cascade);
         try {
             this.varHandle = MethodHandleReflectionUtil.varHandle(javaField);
         } catch (IllegalAccessException e) {
@@ -71,5 +85,9 @@ public final class ManyToOneField {
 
     public Class<?> foreignKeyJavaType() {
         return foreignKeyJavaType;
+    }
+
+    public boolean cascades(CascadeType type) {
+        return Cascades.enabled(cascade, type);
     }
 }

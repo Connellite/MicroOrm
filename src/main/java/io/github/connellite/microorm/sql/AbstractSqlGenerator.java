@@ -90,6 +90,29 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             boolean omitPk,
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred) {
+        return buildRelationInsert(model, entity, omitPk, registry, deferred, null);
+    }
+
+    @Override
+    public RelationInsertParts buildRelationInsert(
+            EntityModel model,
+            Object entity,
+            boolean omitPk,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted) {
+        return buildRelationInsert(model, entity, omitPk, registry, deferred, inserted, Set.of());
+    }
+
+    @Override
+    public RelationInsertParts buildRelationInsert(
+            EntityModel model,
+            Object entity,
+            boolean omitPk,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress) {
         Map<String, Object> named = new LinkedHashMap<>();
         Set<String> omitJoinColumns = new HashSet<>();
         for (EntityField f : model.fields()) {
@@ -99,7 +122,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             named.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            Object value = resolveJoinColumnForWrite(entity, model, relation, registry, deferred);
+            Object value = resolveJoinColumnForWrite(entity, model, relation, registry, deferred, inserted, inProgress);
             if (value == null && relation.nullable()) {
                 omitJoinColumns.add(relation.joinColumn());
             } else {
@@ -145,8 +168,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
         if (registry != null) {
             for (ManyToOneField relation : model.manyToOneRelations()) {
-                sets.add(dialect.sqlName(relation.joinColumnIdentifier()) + " = :" + relation.joinColumn());
-                params.put(relation.joinColumn(), resolveJoinColumnForWrite(entity, model, relation, registry, deferred));
+                Object joinValue = resolveJoinColumnForWrite(
+                        entity, model, relation, registry, deferred, null, null);
+                appendJoinColumnAssignment(sets, params, relation, joinValue);
             }
         }
         if (sets.isEmpty()) {
@@ -168,21 +192,48 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         requireMutable(model, "updateJoinColumn");
         EntityField pk = model.primaryKey();
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put(relation.joinColumn(), joinColumnJdbcValue(entity, relation, registry));
+        List<String> sets = new ArrayList<>();
+        appendJoinColumnAssignment(sets, params, relation, joinColumnJdbcValue(entity, relation, registry));
         String pkName = pk.columnName();
         params.put(pkName, dialect.valueMapper().toJdbcValue(pk, EntityHydrator.getFieldValue(entity, pk)));
         String sql = "UPDATE " + model.sqlTableName(dialect)
-                + " SET " + dialect.sqlName(relation.joinColumnIdentifier()) + " = :" + relation.joinColumn()
+                + " SET " + sets.get(0)
                 + " WHERE " + dialect.sqlName(pk.columnIdentifier()) + " = :" + pkName;
         return BoundStatement.of(sql, params);
     }
 
+    /**
+     * SQL Server rejects {@code setObject(null)} for {@code BINARY} UUID columns (binds as nvarchar).
+     * Emit a literal {@code NULL} instead of a typed parameter.
+     */
+    private void appendJoinColumnAssignment(
+            List<String> sets,
+            Map<String, Object> params,
+            ManyToOneField relation,
+            Object joinValue) {
+        if (joinValue == null) {
+            sets.add(dialect.sqlName(relation.joinColumnIdentifier()) + " = NULL");
+            return;
+        }
+        sets.add(dialect.sqlName(relation.joinColumnIdentifier()) + " = :" + relation.joinColumn());
+        params.put(relation.joinColumn(), joinValue);
+    }
+
+    /**
+     * Hibernate two-pass insert: a nullable FK to a not-yet-inserted target is deferred;
+     * a required transient target throws like {@code TransientPropertyValueException}.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java#L267">ActionQueue unresolved entity inserts</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/TransientPropertyValueException.java">TransientPropertyValueException</a>
+     */
     private Object resolveJoinColumnForWrite(
             Object entity,
             EntityModel model,
             ManyToOneField relation,
             EntityModelRegistry registry,
-            List<RelationPersister.DeferredFkUpdate> deferred) {
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress) {
         EntityRef<?> ref = EntityRef.get(relation, entity);
         if (ref == null) {
             if (!relation.nullable()) {
@@ -192,15 +243,20 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             return null;
         }
         Object attached = ref.attachedEntity();
-        if (attached != null) {
+        if (attached != null && inserted != null) {
             EntityModel targetModel = registry.get(relation.targetEntityClass());
-            if (RelationValues.isNew(attached, targetModel)) {
+            boolean alreadyInserted = inserted.contains(attached);
+            boolean pendingInGraph = inProgress != null && inProgress.contains(attached) && !alreadyInserted;
+            boolean unresolved = RelationValues.isNew(attached, targetModel) || pendingInGraph
+                    || (relation.nullable() && !alreadyInserted);
+            if (unresolved) {
                 if (deferred != null && relation.nullable()) {
                     deferred.add(new RelationPersister.DeferredFkUpdate(entity, model, relation));
                     return null;
                 }
-                throw new MicroOrmException("Cannot persist required @ManyToOne '" + relation.javaField().getName()
-                        + "' before referenced entity has a primary key: " + model.entityClass().getName());
+                throw new MicroOrmException("Not-null property references a transient value - "
+                        + "transient instance must be saved before current operation: "
+                        + model.entityClass().getName() + "." + relation.javaField().getName());
             }
         }
         EntityModel targetModel = registry.get(relation.targetEntityClass());
