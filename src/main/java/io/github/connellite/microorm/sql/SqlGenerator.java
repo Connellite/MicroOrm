@@ -4,6 +4,7 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.query.EntityDelete;
 import io.github.connellite.microorm.query.EntityInsert;
@@ -59,6 +60,18 @@ public interface SqlGenerator {
 
     BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue);
 
+    BoundStatement selectByJoinTable(
+            EntityModel targetModel,
+            ManyToManyField owning,
+            boolean inverse,
+            Object filterValue);
+
+    BoundStatement insertJoinTableRow(ManyToManyField owning, Object ownerValue, Object targetValue);
+
+    BoundStatement deleteJoinTableByOwner(ManyToManyField owning, Object ownerValue);
+
+    BoundStatement deleteJoinTableByTarget(ManyToManyField owning, Object targetValue);
+
     /** Validates table and column names on a built {@link EntityModel}. */
     static void validateColumnNames(EntityModel model) {
         validateIdentifier(model.tableIdentifier().text(), "table");
@@ -67,6 +80,14 @@ public interface SqlGenerator {
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
             validateIdentifier(relation.joinColumnIdentifier().text(), "column / parameter");
+        }
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            if (!relation.owning()) {
+                continue;
+            }
+            validateIdentifier(relation.joinTable(), "table");
+            validateIdentifier(relation.ownerJoinColumn(), "column / parameter");
+            validateIdentifier(relation.targetJoinColumn(), "column / parameter");
         }
     }
 

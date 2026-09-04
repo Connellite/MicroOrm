@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.relation;
 
-import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.CollectionRelation;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,13 +35,13 @@ public final class EagerCollection<T> extends EntityCollection<T> {
     }
 
     /** Sets an {@link EagerCollection} on an entity field (VarHandle helper for mapped collection fields). */
-    public static <T> void set(OneToManyField field, Object owner, EagerCollection<T> value) {
+    public static <T> void set(CollectionRelation field, Object owner, EagerCollection<T> value) {
         EntityCollection.set(field, owner, value);
     }
 
     /** Reads an {@link EagerCollection} from an entity field (VarHandle helper for mapped collection fields). */
     @SuppressWarnings("unchecked")
-    public static <T> EagerCollection<T> get(OneToManyField field, Object owner) {
+    public static <T> EagerCollection<T> get(CollectionRelation field, Object owner) {
         return (EagerCollection<T>) EntityCollection.get(field, owner);
     }
 

@@ -347,5 +347,36 @@ class SessionValidationTest {
         public BoundStatement selectByJoinColumn(EntityModel model, String joinColumn, Object joinValue) {
             return delegate.selectByJoinColumn(model, joinColumn, joinValue);
         }
+
+        @Override
+        public BoundStatement selectByJoinTable(
+                EntityModel targetModel,
+                io.github.connellite.microorm.mapping.ManyToManyField owning,
+                boolean inverse,
+                Object filterValue) {
+            return delegate.selectByJoinTable(targetModel, owning, inverse, filterValue);
+        }
+
+        @Override
+        public BoundStatement insertJoinTableRow(
+                io.github.connellite.microorm.mapping.ManyToManyField owning,
+                Object ownerValue,
+                Object targetValue) {
+            return delegate.insertJoinTableRow(owning, ownerValue, targetValue);
+        }
+
+        @Override
+        public BoundStatement deleteJoinTableByOwner(
+                io.github.connellite.microorm.mapping.ManyToManyField owning,
+                Object ownerValue) {
+            return delegate.deleteJoinTableByOwner(owning, ownerValue);
+        }
+
+        @Override
+        public BoundStatement deleteJoinTableByTarget(
+                io.github.connellite.microorm.mapping.ManyToManyField owning,
+                Object targetValue) {
+            return delegate.deleteJoinTableByTarget(owning, targetValue);
+        }
     }
 }

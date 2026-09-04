@@ -62,6 +62,11 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected String dropJoinTableDdl(io.github.connellite.microorm.mapping.ManyToManyField relation) {
+        return "DROP TABLE IF EXISTS " + relation.sqlJoinTableName(dialect);
+    }
+
+    @Override
     protected List<String> commentDdl(EntityModel model) {
         List<String> ddl = new ArrayList<>();
         if (!model.comment().isBlank()) {

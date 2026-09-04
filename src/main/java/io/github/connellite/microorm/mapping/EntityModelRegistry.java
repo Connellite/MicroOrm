@@ -13,6 +13,8 @@ import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Immutable;
 import io.github.connellite.microorm.annotation.Index;
 import io.github.connellite.microorm.annotation.JoinColumn;
+import io.github.connellite.microorm.annotation.JoinTable;
+import io.github.connellite.microorm.annotation.ManyToMany;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.OneToMany;
@@ -109,6 +111,7 @@ public final class EntityModelRegistry {
         List<EntityField> fields = new ArrayList<>();
         List<ManyToOneField> manyToOneRelations = new ArrayList<>();
         List<OneToManyField> oneToManyRelations = new ArrayList<>();
+        List<ManyToManyField> manyToManyRelations = new ArrayList<>();
         EntityField pk = null;
         for (Field f : mappedFields(entityClass)) {
             if (Modifier.isStatic(f.getModifiers())) {
@@ -122,8 +125,12 @@ public final class EntityModelRegistry {
                 manyToOneRelations.add(buildManyToOne(entityClass, f));
                 continue;
             }
-            if (isOneToManyCollection(f)) {
-                oneToManyRelations.add(buildOneToMany(entityClass, f));
+            if (isRelationCollection(f)) {
+                if (f.getAnnotation(ManyToMany.class) != null) {
+                    manyToManyRelations.add(buildManyToMany(entityClass, table, f));
+                } else {
+                    oneToManyRelations.add(buildOneToMany(entityClass, f));
+                }
                 continue;
             }
             Id idAnn = f.getAnnotation(Id.class);
@@ -186,6 +193,7 @@ public final class EntityModelRegistry {
                 .primaryKey(pk)
                 .manyToOneRelations(manyToOneRelations)
                 .oneToManyRelations(oneToManyRelations)
+                .manyToManyRelations(manyToManyRelations)
                 .immutable(immutable)
                 .subselectSql(subselectAnn == null ? null : subselectAnn.value())
                 .comment(tableComment(entityClass))
@@ -295,8 +303,129 @@ public final class EntityModelRegistry {
         return EntityRef.class.isAssignableFrom(field.getType());
     }
 
-    private static boolean isOneToManyCollection(Field field) {
+    private static boolean isRelationCollection(Field field) {
         return EntityCollection.class.isAssignableFrom(field.getType());
+    }
+
+    private ManyToManyField buildManyToMany(Class<?> entityClass, SqlIdentifier ownerTable, Field field) {
+        ManyToMany manyToMany = field.getAnnotation(ManyToMany.class);
+        if (manyToMany == null) {
+            throw new MicroOrmException("Relation collection field requires @OneToMany or @ManyToMany on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        if (field.getAnnotation(OneToMany.class) != null) {
+            throw new MicroOrmException("Field cannot declare both @OneToMany and @ManyToMany on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        Class<?> targetType = resolveCollectionTarget(entityClass, field);
+        requireEntity(targetType);
+        String mappedBy = manyToMany.mappedBy();
+        if (!mappedBy.isBlank()) {
+            if (field.getAnnotation(JoinTable.class) != null) {
+                throw new MicroOrmException("@JoinTable is only allowed on the owning @ManyToMany on "
+                        + entityClass.getName() + "." + field.getName());
+            }
+            validateInverseManyToMany(targetType, mappedBy, entityClass);
+            return new ManyToManyField(
+                    field,
+                    targetType,
+                    mappedBy,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    manyToMany.cascade());
+        }
+        JoinTable joinTable = field.getAnnotation(JoinTable.class);
+        SqlIdentifier targetTable = entityTableIdentifier(targetType);
+        String joinTableName = joinTable != null && !joinTable.name().isBlank()
+                ? joinTable.name()
+                : ownerTable.text() + "_" + targetTable.text();
+        SqlIdentifier joinTableId = toPhysicalTable(SqlIdentifier.parse(joinTableName));
+        SqlIdentifier joinSchema = joinTable != null && !joinTable.schema().isBlank()
+                ? SqlIdentifier.parse(joinTable.schema())
+                : null;
+        SqlIdentifier ownerColumn = firstJoinColumnName(joinTable == null ? null : joinTable.joinColumns())
+                .map(name -> toPhysicalColumn(SqlIdentifier.parse(name)))
+                .orElseGet(() -> toPhysicalColumn(SqlIdentifier.unquoted(ownerTable.text() + "_" + entityPkColumn(entityClass))));
+        SqlIdentifier targetColumn = firstJoinColumnName(joinTable == null ? null : joinTable.inverseJoinColumns())
+                .map(name -> toPhysicalColumn(SqlIdentifier.parse(name)))
+                .orElseGet(() -> toPhysicalColumn(SqlIdentifier.unquoted(targetTable.text() + "_" + entityPkColumn(targetType))));
+        SqlGenerator.validateIdentifier(joinTableId.text(), "table");
+        if (joinSchema != null) {
+            SqlGenerator.validateIdentifier(joinSchema.text(), "schema");
+        }
+        SqlGenerator.validateIdentifier(ownerColumn.text(), "column / parameter");
+        SqlGenerator.validateIdentifier(targetColumn.text(), "column / parameter");
+        return new ManyToManyField(
+                field,
+                targetType,
+                "",
+                joinTableId,
+                joinSchema,
+                ownerColumn,
+                targetColumn,
+                primaryKeyJavaType(entityClass),
+                primaryKeyJavaType(targetType),
+                manyToMany.cascade());
+    }
+
+    private static java.util.Optional<String> firstJoinColumnName(JoinColumn[] columns) {
+        if (columns == null || columns.length == 0 || columns[0].name().isBlank()) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(columns[0].name());
+    }
+
+    private SqlIdentifier entityTableIdentifier(Class<?> entityClass) {
+        Table tableAnn = entityClass.getAnnotation(Table.class);
+        String tableName = tableAnn == null ? "" : tableAnn.name();
+        if (tableName.isBlank()) {
+            return toPhysicalTable(SqlIdentifier.unquoted(entityClass.getSimpleName()));
+        }
+        return toPhysicalTable(SqlIdentifier.parse(tableName));
+    }
+
+    private static String entityPkColumn(Class<?> entityClass) {
+        for (Field f : mappedFields(entityClass)) {
+            if (f.getAnnotation(Id.class) != null) {
+                Column colAnn = f.getAnnotation(Column.class);
+                if (colAnn != null && !colAnn.name().isBlank()) {
+                    return colAnn.name();
+                }
+                return f.getName();
+            }
+        }
+        throw new MicroOrmException("Missing @Id on " + entityClass.getName());
+    }
+
+    private static void validateInverseManyToMany(Class<?> targetClass, String mappedByField, Class<?> ownerClass) {
+        Field inverse;
+        try {
+            inverse = mappedField(targetClass, mappedByField);
+        } catch (NoSuchFieldException e) {
+            throw new MicroOrmException("mappedBy field '" + mappedByField + "' not found on " + targetClass.getName(), e);
+        }
+        ManyToMany manyToMany = inverse.getAnnotation(ManyToMany.class);
+        if (manyToMany == null) {
+            throw new MicroOrmException("mappedBy field must have @ManyToMany on "
+                    + targetClass.getName() + "." + mappedByField);
+        }
+        if (!manyToMany.mappedBy().isBlank()) {
+            throw new MicroOrmException("mappedBy field must be the owning @ManyToMany on "
+                    + targetClass.getName() + "." + mappedByField);
+        }
+        if (!isRelationCollection(inverse)) {
+            throw new MicroOrmException("mappedBy field must be LazyCollection or EagerCollection on "
+                    + targetClass.getName() + "." + mappedByField);
+        }
+        Class<?> inverseTarget = resolveCollectionTarget(targetClass, inverse);
+        if (inverseTarget != ownerClass) {
+            throw new MicroOrmException("mappedBy @ManyToMany must reference " + ownerClass.getName()
+                    + " on " + targetClass.getName() + "." + mappedByField);
+        }
     }
 
     private static void requireEntity(Class<?> type) {

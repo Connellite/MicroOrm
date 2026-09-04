@@ -2,6 +2,7 @@ package io.github.connellite.microorm.session;
 
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
@@ -44,4 +45,10 @@ public interface RelationPersistSession {
             Object ownerPk,
             Set<Object> retainedChildPks,
             EntityModel childModel);
+
+    void replaceJoinTableLinks(ManyToManyField owning, Object ownerPk, Set<Object> targetPks);
+
+    void deleteJoinTableLinks(ManyToManyField owning, Object ownerPk);
+
+    void deleteJoinTableLinksByTarget(ManyToManyField owning, Object targetPk);
 }

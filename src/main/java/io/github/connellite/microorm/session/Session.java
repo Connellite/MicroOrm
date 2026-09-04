@@ -10,6 +10,7 @@ import io.github.connellite.microorm.mapping.LifecycleCallbacks;
 import io.github.connellite.microorm.mapping.LifecycleEvent;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
@@ -874,6 +875,37 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 }
             });
         }
+    }
+
+    /**
+     * Hibernate collection recreate: replace join-table rows for the owning {@code @ManyToMany}.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/persister/collection/AbstractCollectionPersister.java">AbstractCollectionPersister</a>
+     */
+    @Override
+    public void replaceJoinTableLinks(ManyToManyField owning, Object ownerPk, Set<Object> targetPks) {
+        deleteJoinTableLinks(owning, ownerPk);
+        EntityModel ownerModel = registry.get(owning.javaField().getDeclaringClass());
+        EntityModel targetModel = registry.get(owning.targetEntityClass());
+        Object ownerJdbc = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
+        for (Object targetPk : targetPks) {
+            Object targetJdbc = dialect.valueMapper().toJdbcValue(targetModel.primaryKey(), targetPk);
+            SqlExecutor.executeUpdate(connection, sql.insertJoinTableRow(owning, ownerJdbc, targetJdbc));
+        }
+    }
+
+    @Override
+    public void deleteJoinTableLinks(ManyToManyField owning, Object ownerPk) {
+        EntityModel ownerModel = registry.get(owning.javaField().getDeclaringClass());
+        Object ownerJdbc = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
+        SqlExecutor.executeUpdate(connection, sql.deleteJoinTableByOwner(owning, ownerJdbc));
+    }
+
+    @Override
+    public void deleteJoinTableLinksByTarget(ManyToManyField owning, Object targetPk) {
+        EntityModel targetModel = registry.get(owning.targetEntityClass());
+        Object targetJdbc = dialect.valueMapper().toJdbcValue(targetModel.primaryKey(), targetPk);
+        SqlExecutor.executeUpdate(connection, sql.deleteJoinTableByTarget(owning, targetJdbc));
     }
 
     private Object normalizePk(EntityModel model, Object value) {

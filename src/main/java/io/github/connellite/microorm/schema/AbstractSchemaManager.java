@@ -8,6 +8,7 @@ import io.github.connellite.microorm.util.Logger;
 import io.github.connellite.microorm.util.LoggerFactory;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.TableCheck;
 import io.github.connellite.microorm.mapping.TableIndex;
@@ -42,12 +43,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         createSequences(connection, model);
         if (!existingColumns(connection, model).isEmpty()) {
             createSchemaObjects(connection, model);
+            createJoinTables(connection, model);
             return;
         }
         try (Statement st = connection.createStatement()) {
             executeSql(st, buildCreateTableDdl(model));
         }
         createSchemaObjects(connection, model);
+        createJoinTables(connection, model);
     }
 
     @Override
@@ -76,11 +79,13 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             }
         }
         createSchemaObjects(connection, model);
+        createJoinTables(connection, model);
     }
 
     @Override
     public void dropTable(Connection connection, EntityModel model) throws SQLException {
         requirePhysicalMutableTable(model, "dropTable");
+        dropJoinTables(connection, model);
         if (existingColumns(connection, model).isEmpty()) {
             return;
         }
@@ -337,6 +342,61 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected String dropTableDdl(EntityModel model) {
         return "DROP TABLE " + model.sqlTableName(dialect);
+    }
+
+    protected void createJoinTables(Connection connection, EntityModel model) throws SQLException {
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            if (!relation.owning() || physicalTableExists(connection, relation)) {
+                continue;
+            }
+            try (Statement st = connection.createStatement()) {
+                executeSql(st, buildCreateJoinTableDdl(relation));
+            }
+        }
+    }
+
+    protected void dropJoinTables(Connection connection, EntityModel model) throws SQLException {
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            if (!relation.owning() || !physicalTableExists(connection, relation)) {
+                continue;
+            }
+            try (Statement st = connection.createStatement()) {
+                executeSql(st, dropJoinTableDdl(relation));
+            }
+        }
+    }
+
+    protected String buildCreateJoinTableDdl(ManyToManyField relation) {
+        return "CREATE TABLE " + relation.sqlJoinTableName(dialect) + " ("
+                + dialect.sqlName(relation.ownerJoinColumnIdentifier()) + " "
+                + baseTypeForJava(relation.ownerForeignKeyJavaType(), 0) + " NOT NULL, "
+                + dialect.sqlName(relation.targetJoinColumnIdentifier()) + " "
+                + baseTypeForJava(relation.targetForeignKeyJavaType(), 0) + " NOT NULL, "
+                + "PRIMARY KEY ("
+                + dialect.sqlName(relation.ownerJoinColumnIdentifier()) + ", "
+                + dialect.sqlName(relation.targetJoinColumnIdentifier()) + "))";
+    }
+
+    protected String dropJoinTableDdl(ManyToManyField relation) {
+        return "DROP TABLE " + relation.sqlJoinTableName(dialect);
+    }
+
+    protected boolean physicalTableExists(Connection connection, ManyToManyField relation) throws SQLException {
+        String schema = relation.joinTableSchemaIdentifier() == null
+                ? null
+                : dialect.catalogName(relation.joinTableSchemaIdentifier());
+        String table = dialect.catalogName(relation.joinTableIdentifier());
+        if (tableExists(connection, schema, table)) {
+            return true;
+        }
+        return tableExists(connection, schema, table.toUpperCase(Locale.ROOT));
+    }
+
+    protected boolean tableExists(Connection connection, String schema, String table) throws SQLException {
+        try (ResultSet rs = connection.getMetaData().getTables(
+                connection.getCatalog(), schema, table, new String[] {"TABLE"})) {
+            return rs.next();
+        }
     }
 
     private static void requirePhysicalMutableTable(EntityModel model, String operation) {

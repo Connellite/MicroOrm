@@ -15,7 +15,9 @@
  * {@link io.github.connellite.microorm.annotation.UniqueConstraint}, and
  * {@link io.github.connellite.microorm.annotation.Check},
  * association markers {@link io.github.connellite.microorm.annotation.ManyToOne} /
- * {@link io.github.connellite.microorm.annotation.OneToMany} with
+ * {@link io.github.connellite.microorm.annotation.OneToMany} /
+ * {@link io.github.connellite.microorm.annotation.ManyToMany} with
+ * {@link io.github.connellite.microorm.annotation.JoinTable} and
  * {@link io.github.connellite.microorm.annotation.CascadeType}, read-only mapping markers
  * {@link io.github.connellite.microorm.annotation.Immutable} /
  * {@link io.github.connellite.microorm.annotation.Subselect}, and JPA-style lifecycle callbacks such as

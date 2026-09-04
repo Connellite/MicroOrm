@@ -10,6 +10,8 @@ import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.LifecycleCallbacks;
 import io.github.connellite.microorm.mapping.LifecycleEvent;
+import io.github.connellite.microorm.mapping.CollectionRelation;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.relation.EagerCollection;
@@ -145,13 +147,24 @@ public final class EntityHydrator {
             }
         }
         for (OneToManyField relation : model.oneToManyRelations()) {
-            if (EagerCollection.class.isAssignableFrom(relation.javaField().getType())) {
-                EagerCollection<?> collection = EagerCollection.of(ownerId, lazyContext.loadCollection(relation, ownerId));
-                EagerCollection.set(relation, entity, collection);
-            } else {
-                LazyCollection<?> collection = LazyCollection.of(lazyContext, relation, ownerId);
-                LazyCollection.set(relation, entity, collection);
-            }
+            attachCollection(entity, ownerId, relation, lazyContext);
+        }
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            attachCollection(entity, ownerId, relation, lazyContext);
+        }
+    }
+
+    private static void attachCollection(
+            Object entity,
+            Object ownerId,
+            CollectionRelation relation,
+            LazyLoadContext lazyContext) {
+        if (EagerCollection.class.isAssignableFrom(relation.javaField().getType())) {
+            EagerCollection<?> collection = EagerCollection.of(ownerId, lazyContext.loadCollection(relation, ownerId));
+            EagerCollection.set(relation, entity, collection);
+        } else {
+            LazyCollection<?> collection = LazyCollection.of(lazyContext, relation, ownerId);
+            LazyCollection.set(relation, entity, collection);
         }
     }
 

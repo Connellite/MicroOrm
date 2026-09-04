@@ -3,6 +3,7 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.type.UuidStorage;
 
 import java.util.ArrayList;
@@ -51,6 +52,12 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
     @Override
     protected String autoIncrementPrimaryKeyDefinition(EntityField field) {
         return baseType(field) + " IDENTITY(1,1) PRIMARY KEY";
+    }
+
+    @Override
+    protected String dropJoinTableDdl(ManyToManyField relation) {
+        return "IF OBJECT_ID('" + relation.joinTable() + "', 'U') IS NOT NULL DROP TABLE "
+                + relation.sqlJoinTableName(dialect);
     }
 
     @Override

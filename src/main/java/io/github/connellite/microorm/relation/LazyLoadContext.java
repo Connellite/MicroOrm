@@ -1,7 +1,7 @@
 package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
-import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.CollectionRelation;
 
 import java.util.List;
 
@@ -23,9 +23,9 @@ public interface LazyLoadContext {
     <T> T loadById(Class<T> type, Object id);
 
     /**
-     * Loads all child entities for a collection relation (inverse side of {@code mappedBy}).
+     * Loads all child entities for a {@code @OneToMany} or {@code @ManyToMany} collection.
      */
-    <T> List<T> loadCollection(OneToManyField relation, Object ownerId);
+    <T> List<T> loadCollection(CollectionRelation relation, Object ownerId);
 
     /**
      * Validates that lazy loading runs inside an open session.

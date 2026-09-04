@@ -3,6 +3,7 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.UuidStorage;
 
@@ -26,6 +27,11 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
     @Override
     protected String dropTableDdl(EntityModel model) {
         return "DROP TABLE IF EXISTS " + model.sqlTableName(dialect);
+    }
+
+    @Override
+    protected String dropJoinTableDdl(ManyToManyField relation) {
+        return "DROP TABLE IF EXISTS " + relation.sqlJoinTableName(dialect);
     }
 
     @Override

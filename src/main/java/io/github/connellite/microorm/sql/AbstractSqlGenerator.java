@@ -6,6 +6,7 @@ import io.github.connellite.microorm.jdbc.EntityHydrator;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.RelationPersister;
@@ -493,6 +494,58 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 params);
     }
 
+    @Override
+    public BoundStatement selectByJoinTable(
+            EntityModel targetModel,
+            ManyToManyField owning,
+            boolean inverse,
+            Object filterValue) {
+        SqlIdentifier filterColumn = inverse ? owning.targetJoinColumnIdentifier() : owning.ownerJoinColumnIdentifier();
+        SqlIdentifier targetLink = inverse ? owning.ownerJoinColumnIdentifier() : owning.targetJoinColumnIdentifier();
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("join_filter", filterValue);
+        String joinTable = owning.sqlJoinTableName(dialect);
+        String sql = selectAllSql(targetModel)
+                + " INNER JOIN " + joinTable + " jt ON "
+                + targetModel.sqlTableQualifier(dialect) + "." + dialect.sqlName(targetModel.primaryKey().columnIdentifier())
+                + " = jt." + dialect.sqlName(targetLink)
+                + " WHERE jt." + dialect.sqlName(filterColumn) + " = :join_filter";
+        return BoundStatement.of(sql, params);
+    }
+
+    @Override
+    public BoundStatement insertJoinTableRow(ManyToManyField owning, Object ownerValue, Object targetValue) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("owner_fk", ownerValue);
+        params.put("target_fk", targetValue);
+        String sql = "INSERT INTO " + owning.sqlJoinTableName(dialect)
+                + " (" + dialect.sqlName(owning.ownerJoinColumnIdentifier())
+                + ", " + dialect.sqlName(owning.targetJoinColumnIdentifier())
+                + ") VALUES (:owner_fk, :target_fk)";
+        return BoundStatement.of(sql, params);
+    }
+
+    @Override
+    public BoundStatement deleteJoinTableByOwner(ManyToManyField owning, Object ownerValue) {
+        return deleteJoinTableByColumn(owning, owning.ownerJoinColumnIdentifier(), ownerValue);
+    }
+
+    @Override
+    public BoundStatement deleteJoinTableByTarget(ManyToManyField owning, Object targetValue) {
+        return deleteJoinTableByColumn(owning, owning.targetJoinColumnIdentifier(), targetValue);
+    }
+
+    private BoundStatement deleteJoinTableByColumn(
+            ManyToManyField owning,
+            SqlIdentifier column,
+            Object value) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("join_filter", value);
+        String sql = "DELETE FROM " + owning.sqlJoinTableName(dialect)
+                + " WHERE " + dialect.sqlName(column) + " = :join_filter";
+        return BoundStatement.of(sql, params);
+    }
+
     private static SqlIdentifier resolveJoinColumn(EntityModel model, String joinColumn) {
         for (ManyToOneField relation : model.manyToOneRelations()) {
             if (relation.joinColumn().equals(joinColumn)) {
@@ -808,6 +861,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         for (OneToManyField relation : model.oneToManyRelations()) {
             registry.register(relation.targetEntityClass());
         }
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            registry.register(relation.targetEntityClass());
+        }
     }
 
     private JoinContext buildJoinContext(EntityModel model, EntitySelect<?> query, EntityModelRegistry registry) {
@@ -841,6 +897,16 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 ManyToOneField inverse = childModel.manyToOneByFieldName(oneToMany.mappedBy());
                 bindings.put(join.relationName(), new JoinBinding(alias, childModel));
                 sql.add(renderOneToManyJoin(model, inverse, childModel, alias, join.type()));
+                hasOneToManyJoin = true;
+                continue;
+            }
+            ManyToManyField manyToMany = findManyToMany(model, join.relationName());
+            if (manyToMany != null) {
+                EntityModel targetModel = registry.get(manyToMany.targetEntityClass());
+                ManyToManyField owning = manyToMany.owningSide(registry);
+                String linkAlias = "jl" + index;
+                bindings.put(join.relationName(), new JoinBinding(alias, targetModel));
+                sql.add(renderManyToManyJoin(model, manyToMany, owning, targetModel, linkAlias, alias, join.type()));
                 hasOneToManyJoin = true;
                 continue;
             }
@@ -906,8 +972,41 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         return null;
     }
 
+    private String renderManyToManyJoin(
+            EntityModel rootModel,
+            ManyToManyField relation,
+            ManyToManyField owning,
+            EntityModel targetModel,
+            String linkAlias,
+            String alias,
+            JoinType joinType) {
+        String joinTable = owning.sqlJoinTableName(dialect);
+        String linkSql = joinType.sql() + " " + joinTable + " " + linkAlias;
+        if (joinType == JoinType.CROSS) {
+            return linkSql + " " + joinType.sql() + " " + targetModel.sqlTableName(dialect) + " " + alias;
+        }
+        boolean inverse = !relation.owning();
+        SqlIdentifier rootLink = inverse ? owning.targetJoinColumnIdentifier() : owning.ownerJoinColumnIdentifier();
+        SqlIdentifier targetLink = inverse ? owning.ownerJoinColumnIdentifier() : owning.targetJoinColumnIdentifier();
+        return linkSql + " ON "
+                + rootModel.sqlTableQualifier(dialect) + "." + dialect.sqlName(rootModel.primaryKey().columnIdentifier())
+                + " = " + linkAlias + "." + dialect.sqlName(rootLink)
+                + " " + joinType.sql() + " " + targetModel.sqlTableName(dialect) + " " + alias
+                + " ON " + alias + "." + dialect.sqlName(targetModel.primaryKey().columnIdentifier())
+                + " = " + linkAlias + "." + dialect.sqlName(targetLink);
+    }
+
     private static OneToManyField findOneToMany(EntityModel model, String relationName) {
         for (OneToManyField relation : model.oneToManyRelations()) {
+            if (relation.javaField().getName().equals(relationName)) {
+                return relation;
+            }
+        }
+        return null;
+    }
+
+    private static ManyToManyField findManyToMany(EntityModel model, String relationName) {
+        for (ManyToManyField relation : model.manyToManyRelations()) {
             if (relation.javaField().getName().equals(relationName)) {
                 return relation;
             }

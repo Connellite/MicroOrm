@@ -90,6 +90,11 @@ public final class RelationPersister {
                 session.deleteChildrenByOwner(relation, ownerPk);
             }
         }
+        List<Object> cascadedManyToMany = collectManyToManyRemoveTargets(session, entity, model);
+        unlinkManyToMany(session, entity, model, ownerPk);
+        for (Object child : cascadedManyToMany) {
+            delete(session, child);
+        }
         int deleted = session.deleteEntityRow(entity, model);
         for (ManyToOneField relation : model.manyToOneRelations()) {
             if (!relation.cascades(CascadeType.REMOVE)) {
@@ -207,6 +212,53 @@ public final class RelationPersister {
                 persist(session, child, inProgress, inserted, deferred);
             }
         }
+        persistManyToMany(session, owner, ownerModel, inProgress, inserted, deferred);
+    }
+
+    /**
+     * Hibernate collection persist after the owner exists, then recreate join-table rows
+     * on the owning side ({@code AbstractCollectionPersister}).
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/persister/collection/AbstractCollectionPersister.java">AbstractCollectionPersister</a>
+     */
+    private static void persistManyToMany(
+            RelationPersistSession session,
+            Object owner,
+            EntityModel ownerModel,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        for (ManyToManyField relation : ownerModel.manyToManyRelations()) {
+            EntityCollection<?> collection = EntityCollection.get(relation, owner);
+            if (collection == null || !collection.isMaterialized()) {
+                continue;
+            }
+            EntityModel childModel = session.registry().get(relation.targetEntityClass());
+            Set<Object> targetPks = new HashSet<>();
+            for (Object child : collection.elementsOrEmpty()) {
+                boolean transientTarget = RelationValues.isNew(child, childModel);
+                if (relation.cascades(CascadeType.PERSIST)) {
+                    if (!inserted.contains(child) && !inProgress.contains(child)
+                            && (transientTarget || !session.existsByPrimaryKey(child, childModel))) {
+                        persist(session, child, inProgress, inserted, deferred);
+                    }
+                } else if (transientTarget) {
+                    throw new MicroOrmException("Not-null property references a transient value - "
+                            + "transient instance must be saved before current operation: "
+                            + ownerModel.entityClass().getName() + "." + relation.javaField().getName());
+                }
+                Object childPk = session.pkValue(child, childModel);
+                if (childPk == null) {
+                    throw new MicroOrmException("Not-null property references a transient value - "
+                            + "transient instance must be saved before current operation: "
+                            + ownerModel.entityClass().getName() + "." + relation.javaField().getName());
+                }
+                targetPks.add(childPk);
+            }
+            if (relation.owning()) {
+                session.replaceJoinTableLinks(relation, session.pkValue(owner, ownerModel), targetPks);
+            }
+        }
     }
 
     /**
@@ -248,6 +300,84 @@ public final class RelationPersister {
                         mergeChildren);
             }
         }
+        mergeManyToMany(session, entity, model, inProgress, inserted, deferred);
+    }
+
+    /**
+     * Hibernate merge of a {@code @ManyToMany}: cascade elements, then recreate join rows on the owning side.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultMergeEventListener.java#L618">DefaultMergeEventListener.cascadeOnMerge</a>
+     */
+    private static void mergeManyToMany(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            EntityCollection<?> collection = EntityCollection.get(relation, entity);
+            if (collection == null || !collection.isMaterialized()) {
+                continue;
+            }
+            EntityModel childModel = session.registry().get(relation.targetEntityClass());
+            boolean mergeChildren = relation.cascades(CascadeType.MERGE);
+            Set<Object> targetPks = new HashSet<>();
+            for (Object child : collection.elementsOrEmpty()) {
+                if (mergeChildren) {
+                    merge(session, child, inProgress, inserted, deferred);
+                } else if (RelationValues.isNew(child, childModel)) {
+                    throw new MicroOrmException("Not-null property references a transient value - "
+                            + "transient instance must be saved before current operation: "
+                            + model.entityClass().getName() + "." + relation.javaField().getName());
+                }
+                Object childPk = session.pkValue(child, childModel);
+                if (childPk != null) {
+                    targetPks.add(childPk);
+                }
+            }
+            if (relation.owning()) {
+                session.replaceJoinTableLinks(relation, session.pkValue(entity, model), targetPks);
+            }
+        }
+    }
+
+    /**
+     * Hibernate collection remove: delete join-table rows before the owner.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultDeleteEventListener.java#L491">DefaultDeleteEventListener.cascadeBeforeDelete</a>
+     */
+    private static void unlinkManyToMany(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Object ownerPk) {
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            ManyToManyField owning = relation.owningSide(session.registry());
+            if (relation.owning()) {
+                session.deleteJoinTableLinks(owning, ownerPk);
+            } else {
+                session.deleteJoinTableLinksByTarget(owning, ownerPk);
+            }
+        }
+    }
+
+    private static List<Object> collectManyToManyRemoveTargets(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model) {
+        List<Object> targets = new ArrayList<>();
+        for (ManyToManyField relation : model.manyToManyRelations()) {
+            if (!relation.cascades(CascadeType.REMOVE)) {
+                continue;
+            }
+            EntityCollection<?> collection = EntityCollection.get(relation, entity);
+            if (collection == null) {
+                continue;
+            }
+            targets.addAll(collection.get());
+        }
+        return targets;
     }
 
     /**

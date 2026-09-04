@@ -10,7 +10,7 @@ Lightweight annotation-driven JDBC ORM for Java 17+, built on [ExtraLib](https:/
 - CRUD, batch insert, map-based filtered select, streaming reads, custom `Query`
 - **`EntitySelect`**: fluent type-safe selects with `WHERE`, `ORDER BY`, `LIMIT`/`OFFSET`, relation joins, subqueries, `DISTINCT`, `GROUP BY`, and `HAVING`
 - **CRUD DSL**: `EntityInsert`, `EntityUpdate`, and `EntityDelete` for SQL-oriented typed mutations
-- **Associations**: `@ManyToOne` / `@OneToMany` with lazy (`LazyRef`, `LazyCollection`) or eager (`EagerRef`, `EagerCollection`) loading
+- **Associations**: `@ManyToOne` / `@OneToMany` / `@ManyToMany` with lazy (`LazyRef`, `LazyCollection`) or eager (`EagerRef`, `EagerCollection`) loading
 - Schema helpers: `createEntity`, `syncEntity` (add nullable columns), `dropEntity`
 - **Dynamic tables**: runtime-defined schema and Map-based CRUD without entity classes
 - Dialects: SQLite, PostgreSQL, MySQL, MSSQL, Oracle
@@ -172,12 +172,36 @@ public class OrderItem {
     @JoinColumn(name = "order_id")
     private LazyRef<Order> order;
 }
+
+@Entity
+@Table(name = "authors")
+public class Author {
+    @Id
+    private UUID id;
+
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(name = "author_books",
+            joinColumns = @JoinColumn(name = "author_id"),
+            inverseJoinColumns = @JoinColumn(name = "book_id"))
+    private LazyCollection<Book> books;
+}
+
+@Entity
+@Table(name = "books")
+public class Book {
+    @Id
+    private UUID id;
+
+    @ManyToMany(mappedBy = "books")
+    private LazyCollection<Author> authors;
+}
 ```
 
 - **`LazyRef` / `LazyCollection`** — load related rows on first `get()` while the session is open
 - **`EagerRef` / `EagerCollection`** — materialize related rows when the owner is hydrated
 - **Cascade** — same defaults as JPA/Hibernate: nothing is cascaded unless you set `cascade` (`PERSIST`, `MERGE`, `REMOVE`, or `ALL`)
 - **`orphanRemoval`** — deletes children that disappear from a materialized `@OneToMany` collection, independently of cascade
+- **`@ManyToMany`** — owning side writes the join table (`@JoinTable` or generated `{ownerTable}_{targetTable}`); inverse side uses `mappedBy` and does not insert join rows
 - **Existing references** — `LazyRef.toId(...)` or `LazyRef.to(alreadyPersisted)` write the FK only and do not update the target unless that association cascades `MERGE`
 
 `insertRow` is persist, `updateRow` is merge, `deleteRow` is remove.
@@ -344,7 +368,7 @@ Entity classes on the classpath (unnamed module) do not need the `add-reads` fla
 ## Limitations (alpha)
 
 - Single-column primary keys only (numeric or UUID)
-- Associations: `@ManyToOne` and `@OneToMany` only (no `@OneToOne`, `@ManyToMany`, or embeddables)
+- Associations: `@ManyToOne`, `@OneToMany`, and `@ManyToMany` (no `@OneToOne` or embeddables)
 - No migrations framework or entity inheritance strategies
 - `Session` is not thread-safe — one session per thread
 - Supported field types: numeric primitives/wrappers, `boolean`, `String`, `UUID`, `float`/`double`

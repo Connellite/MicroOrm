@@ -9,7 +9,7 @@ import java.lang.reflect.Field;
 import java.util.Set;
 
 /** Metadata for a {@link io.github.connellite.microorm.annotation.OneToMany} collection wrapper field. */
-public final class OneToManyField {
+public final class OneToManyField implements CollectionRelation {
 
     private final Field javaField;
     private final VarHandle varHandle;

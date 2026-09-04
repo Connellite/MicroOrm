@@ -1,12 +1,12 @@
 package io.github.connellite.microorm.relation;
 
-import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.CollectionRelation;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
 import java.util.List;
 
 /**
- * Base class for one-to-many relation wrappers declared on {@code @OneToMany} fields.
+ * Base class for collection relation wrappers declared on {@code @OneToMany} or {@code @ManyToMany} fields.
  * <p>
  * Concrete types are {@link LazyCollection} (loads children on first {@link #get()} while the owning
  * {@link io.github.connellite.microorm.session.Session} is open) and {@link EagerCollection}
@@ -59,12 +59,12 @@ public abstract class EntityCollection<T> {
 
     /** Reads a relation collection wrapper from a mapped entity field. */
     @SuppressWarnings("unchecked")
-    public static <T> EntityCollection<T> get(OneToManyField field, Object owner) {
+    public static <T> EntityCollection<T> get(CollectionRelation field, Object owner) {
         return (EntityCollection<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
     }
 
     /** Sets a relation collection wrapper on a mapped entity field. */
-    public static void set(OneToManyField field, Object owner, EntityCollection<?> value) {
+    public static void set(CollectionRelation field, Object owner, EntityCollection<?> value) {
         MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
     }
 }

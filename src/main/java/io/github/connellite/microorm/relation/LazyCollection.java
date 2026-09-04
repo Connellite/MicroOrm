@@ -1,6 +1,6 @@
 package io.github.connellite.microorm.relation;
 
-import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.CollectionRelation;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,9 +16,9 @@ import java.util.Objects;
 public final class LazyCollection<T> extends EntityCollection<T> {
 
     private final LazyLoadContext context;
-    private final OneToManyField relation;
+    private final CollectionRelation relation;
 
-    private LazyCollection(LazyLoadContext context, OneToManyField relation, Object ownerId, List<T> loaded) {
+    private LazyCollection(LazyLoadContext context, CollectionRelation relation, Object ownerId, List<T> loaded) {
         super(ownerId, loaded, false);
         this.context = context;
         this.relation = relation;
@@ -28,7 +28,7 @@ public final class LazyCollection<T> extends EntityCollection<T> {
      * Creates a lazy collection for the inverse side of a {@code mappedBy} relation.
      * Children are queried by {@code ownerId} on first {@link #get()}.
      */
-    public static <T> LazyCollection<T> of(LazyLoadContext context, OneToManyField relation, Object ownerId) {
+    public static <T> LazyCollection<T> of(LazyLoadContext context, CollectionRelation relation, Object ownerId) {
         Objects.requireNonNull(relation, "relation");
         return new LazyCollection<>(context, relation, ownerId, null);
     }
@@ -48,19 +48,19 @@ public final class LazyCollection<T> extends EntityCollection<T> {
     }
 
     /** Sets a {@link LazyCollection} on an entity field (VarHandle helper for mapped collection fields). */
-    public static <T> void set(OneToManyField field, Object owner, LazyCollection<T> value) {
+    public static <T> void set(CollectionRelation field, Object owner, LazyCollection<T> value) {
         EntityCollection.set(field, owner, value);
     }
 
     /** Reads a {@link LazyCollection} from an entity field (VarHandle helper for mapped collection fields). */
     @SuppressWarnings("unchecked")
-    public static <T> LazyCollection<T> get(OneToManyField field, Object owner) {
+    public static <T> LazyCollection<T> get(CollectionRelation field, Object owner) {
         return (LazyCollection<T>) EntityCollection.get(field, owner);
     }
 
     /**
      * Returns all child entities, loading them on first access when this collection was created with
-     * {@link #of(LazyLoadContext, OneToManyField, Object)}.
+     * {@link #of(LazyLoadContext, CollectionRelation, Object)}.
      */
     @Override
     public List<T> get() {

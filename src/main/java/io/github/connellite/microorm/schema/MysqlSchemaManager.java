@@ -5,6 +5,9 @@ import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.type.UuidStorage;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.UUID;
 
 public final class MysqlSchemaManager extends AbstractSchemaManager {
@@ -54,6 +57,11 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected String dropJoinTableDdl(io.github.connellite.microorm.mapping.ManyToManyField relation) {
+        return "DROP TABLE IF EXISTS " + relation.sqlJoinTableName(dialect);
+    }
+
+    @Override
     protected String buildCreateTableDdl(EntityModel model) {
         String ddl = super.buildCreateTableDdl(model);
         return model.comment().isBlank() ? ddl : ddl + " COMMENT=" + sqlStringLiteral(model.comment());
@@ -72,5 +80,13 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
     @Override
     protected String metadataSchema(EntityModel model) {
         return null;
+    }
+
+    @Override
+    protected boolean tableExists(Connection connection, String schema, String table) throws SQLException {
+        String catalog = schema != null ? schema : connection.getCatalog();
+        try (ResultSet rs = connection.getMetaData().getTables(catalog, null, table, new String[] {"TABLE"})) {
+            return rs.next();
+        }
     }
 }

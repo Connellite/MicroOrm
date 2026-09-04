@@ -5,6 +5,8 @@ import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.jdbc.SqlExecutor;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
+import io.github.connellite.microorm.mapping.CollectionRelation;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.relation.LazyLoadContext;
@@ -60,18 +62,40 @@ final class SessionLazyContext implements LazyLoadContext {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> List<T> loadCollection(OneToManyField relation, Object ownerId) {
+    public <T> List<T> loadCollection(CollectionRelation relation, Object ownerId) {
         ensureOpen();
         LogHolder.logger.trace(() -> "Lazy loading collection " + relation.javaField().getName()
                 + " for owner id " + ownerId);
-        EntityModel childModel = registry.get(relation.targetEntityClass());
-        ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
+        if (relation instanceof ManyToManyField manyToMany) {
+            return loadManyToMany(manyToMany, ownerId);
+        }
+        OneToManyField oneToMany = (OneToManyField) relation;
+        EntityModel childModel = registry.get(oneToMany.targetEntityClass());
+        ManyToOneField inverse = childModel.manyToOneByFieldName(oneToMany.mappedBy());
         EntityModel ownerModel = registry.get(inverse.targetEntityClass());
         Object jdbcValue = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerId);
         try (var rows = SqlExecutor.queryEntitiesStream(
                 connection,
                 sql.selectByJoinColumn(childModel, inverse.joinColumn(), jdbcValue),
                 childModel,
+                dialect,
+                dialect.valueMapper(),
+                this,
+                registry)) {
+            return (List<T>) rows.toList();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> loadManyToMany(ManyToManyField relation, Object ownerId) {
+        ManyToManyField owning = relation.owningSide(registry);
+        EntityModel targetModel = registry.get(relation.targetEntityClass());
+        EntityModel ownerModel = registry.get(relation.javaField().getDeclaringClass());
+        Object jdbcValue = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerId);
+        try (var rows = SqlExecutor.queryEntitiesStream(
+                connection,
+                sql.selectByJoinTable(targetModel, owning, !relation.owning(), jdbcValue),
+                targetModel,
                 dialect,
                 dialect.valueMapper(),
                 this,

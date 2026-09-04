@@ -6,6 +6,8 @@ import io.github.connellite.microorm.annotation.Entity;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.JoinColumn;
+import io.github.connellite.microorm.annotation.JoinTable;
+import io.github.connellite.microorm.annotation.ManyToMany;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.relation.LazyCollection;
@@ -17,6 +19,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RelationMappingTest {
 
@@ -76,6 +79,67 @@ class RelationMappingTest {
         private UUID id;
 
         private LazyRef<Customer> customer;
+    }
+
+    @Entity
+    @Table(name = "rel_authors")
+    static class Author {
+        @Id
+        private UUID id;
+
+        @ManyToMany
+        @JoinTable(
+                name = "rel_author_books",
+                joinColumns = @JoinColumn(name = "author_id"),
+                inverseJoinColumns = @JoinColumn(name = "book_id"))
+        private LazyCollection<Book> books;
+    }
+
+    @Entity
+    @Table(name = "rel_books")
+    static class Book {
+        @Id
+        private UUID id;
+
+        @ManyToMany(mappedBy = "books")
+        private LazyCollection<Author> authors;
+    }
+
+    @Test
+    void registerBuildsManyToManyMetadata() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel authorModel = registry.register(Author.class);
+        EntityModel bookModel = registry.register(Book.class);
+
+        assertEquals(1, authorModel.manyToManyRelations().size());
+        ManyToManyField owning = authorModel.manyToManyRelations().get(0);
+        assertEquals("rel_author_books", owning.joinTable());
+        assertEquals("author_id", owning.ownerJoinColumn());
+        assertEquals("book_id", owning.targetJoinColumn());
+        assertEquals(Book.class, owning.targetEntityClass());
+        assertTrue(owning.owning());
+        assertFalse(owning.cascades(CascadeType.PERSIST));
+
+        ManyToManyField inverse = bookModel.manyToManyRelations().get(0);
+        assertFalse(inverse.owning());
+        assertEquals("books", inverse.mappedBy());
+        assertEquals(owning.joinTable(), inverse.owningSide(registry).joinTable());
+    }
+
+    @Entity
+    @Table(name = "bad_m2m")
+    static class MissingManyToMany {
+        @Id
+        private UUID id;
+
+        private LazyCollection<Book> books;
+    }
+
+    @Test
+    void rejectsCollectionWithoutRelationAnnotation() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        registry.register(Book.class);
+        assertThrows(MicroOrmException.class, () -> registry.register(MissingManyToMany.class));
     }
 
     @Test
