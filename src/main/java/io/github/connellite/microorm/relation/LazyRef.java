@@ -1,11 +1,12 @@
 package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 
 import java.util.Objects;
 
 /**
- * Lazy many-to-one reference to a related entity. The target row is loaded on first {@link #get()}
+ * Lazy to-one reference to a related entity. The target row is loaded on first {@link #get()}
  * while the owning {@link io.github.connellite.microorm.session.Session} is open.
  * <p>
  * For writes use {@link #to(Object)} to reference a managed or new entity, or {@link #toId(Class, Object)}
@@ -14,10 +15,21 @@ import java.util.Objects;
 public final class LazyRef<T> extends EntityRef<T> {
 
     private final LazyLoadContext context;
+    private final OneToOneField inverseRelation;
 
     private LazyRef(LazyLoadContext context, Class<T> targetType, Object foreignKey, T loaded) {
+        this(context, targetType, foreignKey, loaded, null);
+    }
+
+    private LazyRef(
+            LazyLoadContext context,
+            Class<T> targetType,
+            Object foreignKey,
+            T loaded,
+            OneToOneField inverseRelation) {
         super(targetType, foreignKey, loaded);
         this.context = context;
+        this.inverseRelation = inverseRelation;
     }
 
     /**
@@ -50,14 +62,35 @@ public final class LazyRef<T> extends EntityRef<T> {
         return new LazyRef<>(null, targetType, id, null);
     }
 
+    /**
+     * Creates a lazy inverse {@code @OneToOne} that loads the related row by the owning join column
+     * on first {@link #get()}.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> LazyRef<T> ofInverse(LazyLoadContext context, OneToOneField relation, Object ownerId) {
+        Objects.requireNonNull(relation, "relation");
+        return new LazyRef<>(context, (Class<T>) relation.targetEntityClass(), ownerId, null, relation);
+    }
+
     /** Sets a {@link LazyRef} on an entity field (VarHandle helper for mapped {@code LazyRef} fields). */
     public static <T> void set(ManyToOneField field, Object owner, LazyRef<T> value) {
+        EntityRef.set(field, owner, value);
+    }
+
+    /** Sets a {@link LazyRef} on a mapped {@code @OneToOne} field. */
+    public static <T> void set(OneToOneField field, Object owner, LazyRef<T> value) {
         EntityRef.set(field, owner, value);
     }
 
     /** Reads a {@link LazyRef} from an entity field (VarHandle helper for mapped {@code LazyRef} fields). */
     @SuppressWarnings("unchecked")
     public static <T> LazyRef<T> get(ManyToOneField field, Object owner) {
+        return (LazyRef<T>) EntityRef.get(field, owner);
+    }
+
+    /** Reads a {@link LazyRef} from a mapped {@code @OneToOne} field. */
+    @SuppressWarnings("unchecked")
+    public static <T> LazyRef<T> get(OneToOneField field, Object owner) {
         return (LazyRef<T>) EntityRef.get(field, owner);
     }
 
@@ -71,6 +104,14 @@ public final class LazyRef<T> extends EntityRef<T> {
         T attached = attachedEntity();
         if (attached != null) {
             return attached;
+        }
+        if (inverseRelation != null) {
+            if (foreignKey() == null) {
+                return null;
+            }
+            LazyLoadContext.ensureOpen(context);
+            attach(context.loadInverseOneToOne(inverseRelation, foreignKey()));
+            return attachedEntity();
         }
         if (foreignKey() == null) {
             return null;

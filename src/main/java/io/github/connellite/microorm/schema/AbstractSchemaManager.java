@@ -123,6 +123,9 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         if (!relation.nullable()) {
             sb.append(" NOT NULL");
         }
+        if (relation.unique()) {
+            sb.append(" UNIQUE");
+        }
         return sb.toString();
     }
 

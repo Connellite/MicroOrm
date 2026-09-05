@@ -16,9 +16,10 @@ import java.util.List;
  * @param schemaIdentifier   optional physical schema/catalog name (with quoting hint)
  * @param fields             scalar columns (includes the primary key)
  * @param primaryKey         the {@link io.github.connellite.microorm.annotation.Id} field
- * @param manyToOneRelations {@link ManyToOneField} descriptors
+ * @param manyToOneRelations {@link ManyToOneField} descriptors (includes owning {@code @OneToOne} FKs)
  * @param oneToManyRelations {@link OneToManyField} descriptors
  * @param manyToManyRelations {@link ManyToManyField} descriptors
+ * @param oneToOneRelations {@link OneToOneField} descriptors
  * @param immutable          whether only select operations are allowed
  * @param subselectSql       SQL subselect source, or {@code null} for physical tables
  * @param comment            optional table comment
@@ -35,6 +36,7 @@ public record EntityModel(
         List<ManyToOneField> manyToOneRelations,
         List<OneToManyField> oneToManyRelations,
         List<ManyToManyField> manyToManyRelations,
+        List<OneToOneField> oneToOneRelations,
         boolean immutable,
         String subselectSql,
         String comment,
@@ -88,7 +90,7 @@ public record EntityModel(
             boolean immutable,
             String subselectSql) {
         this(entityClass, tableIdentifier, schemaIdentifier, fields, primaryKey, manyToOneRelations, oneToManyRelations,
-                List.of(), immutable, subselectSql, "", List.of(), List.of(), List.of());
+                List.of(), List.of(), immutable, subselectSql, "", List.of(), List.of(), List.of());
     }
 
     @Builder
@@ -101,6 +103,7 @@ public record EntityModel(
             List<ManyToOneField> manyToOneRelations,
             List<OneToManyField> oneToManyRelations,
             List<ManyToManyField> manyToManyRelations,
+            List<OneToOneField> oneToOneRelations,
             boolean immutable,
             String subselectSql,
             String comment,
@@ -115,6 +118,7 @@ public record EntityModel(
         this.manyToOneRelations = List.copyOf(manyToOneRelations);
         this.oneToManyRelations = List.copyOf(oneToManyRelations);
         this.manyToManyRelations = List.copyOf(manyToManyRelations == null ? List.of() : manyToManyRelations);
+        this.oneToOneRelations = List.copyOf(oneToOneRelations == null ? List.of() : oneToOneRelations);
         this.immutable = immutable;
         this.subselectSql = subselectSql == null || subselectSql.isBlank() ? null : subselectSql;
         this.comment = comment == null ? "" : comment;
@@ -197,10 +201,12 @@ public record EntityModel(
     }
 
     /**
-     * {@code true} when the entity declares {@code @ManyToOne}, {@code @OneToMany}, or {@code @ManyToMany} fields.
+     * {@code true} when the entity declares {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     * or {@code @ManyToMany} fields.
      */
     public boolean hasRelations() {
-        return !manyToOneRelations.isEmpty() || !oneToManyRelations.isEmpty() || !manyToManyRelations.isEmpty();
+        return !manyToOneRelations.isEmpty() || !oneToManyRelations.isEmpty()
+                || !manyToManyRelations.isEmpty() || !oneToOneRelations.isEmpty();
     }
 
     /**
@@ -225,5 +231,17 @@ public record EntityModel(
             }
         }
         throw new MicroOrmException("No @ManyToMany field '" + fieldName + "' on " + entityClass.getName());
+    }
+
+    /**
+     * Returns {@link OneToOneField} metadata for a Java field name.
+     */
+    public OneToOneField oneToOneByFieldName(String fieldName) {
+        for (OneToOneField relation : oneToOneRelations) {
+            if (relation.javaField().getName().equals(fieldName)) {
+                return relation;
+            }
+        }
+        throw new MicroOrmException("No @OneToOne field '" + fieldName + "' on " + entityClass.getName());
     }
 }

@@ -5,7 +5,8 @@ package io.github.connellite.microorm.query;
  * <p>
  * When {@code type} is {@code null}, {@link JoinType#INNER} is used.
  *
- * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+ * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+ *                     or {@code @ManyToMany} relation
  * @param type SQL join type
  */
 public record Join(String relationName, JoinType type) {

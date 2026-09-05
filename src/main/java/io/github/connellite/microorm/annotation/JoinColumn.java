@@ -6,9 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Foreign-key column for a {@link ManyToOne} association. Stored on the owning entity table;
- * the referenced entity is exposed via {@link io.github.connellite.microorm.relation.LazyRef}
- * or {@link io.github.connellite.microorm.relation.EagerRef}.
+ * Foreign-key column for a {@link ManyToOne} or owning {@link OneToOne} association.
+ * Stored on the owning entity table; the referenced entity is exposed via
+ * {@link io.github.connellite.microorm.relation.LazyRef} or
+ * {@link io.github.connellite.microorm.relation.EagerRef}.
  */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)

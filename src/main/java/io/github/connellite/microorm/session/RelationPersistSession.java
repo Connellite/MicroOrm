@@ -5,6 +5,7 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 
 import java.util.List;
@@ -45,6 +46,18 @@ public interface RelationPersistSession {
             Object ownerPk,
             Set<Object> retainedChildPks,
             EntityModel childModel);
+
+    void deleteInverseOneToOne(OneToOneField relation, Object ownerPk);
+
+    void deleteOrphanInverseOneToOne(
+            OneToOneField relation,
+            Object ownerPk,
+            Set<Object> retainedTargetPks,
+            EntityModel targetModel);
+
+    Object currentForeignKey(EntityModel model, ManyToOneField relation, Object ownerPk);
+
+    <T> T selectByPrimaryKey(Class<T> type, Object id);
 
     void replaceJoinTableLinks(ManyToManyField owning, Object ownerPk, Set<Object> targetPks);
 

@@ -2,6 +2,7 @@ package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.CollectionRelation;
+import io.github.connellite.microorm.mapping.OneToOneField;
 
 import java.util.List;
 
@@ -26,6 +27,13 @@ public interface LazyLoadContext {
      * Loads all child entities for a {@code @OneToMany} or {@code @ManyToMany} collection.
      */
     <T> List<T> loadCollection(CollectionRelation relation, Object ownerId);
+
+    /**
+     * Loads the related entity for an inverse {@code @OneToOne} by the owning join column.
+     *
+     * @return the row, or {@code null} when no row matches
+     */
+    <T> T loadInverseOneToOne(OneToOneField relation, Object ownerId);
 
     /**
      * Validates that lazy loading runs inside an open session.

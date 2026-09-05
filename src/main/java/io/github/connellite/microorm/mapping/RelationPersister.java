@@ -12,7 +12,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -63,13 +65,15 @@ public final class RelationPersister {
      */
     public static int update(RelationPersistSession session, Object entity) {
         EntityModel model = session.registry().get(entity.getClass());
-        int rows = session.updateEntityRow(entity, model, List.of());
+        Map<OneToOneField, Object> previousOwningFks = snapshotOwningOneToOneForeignKeys(session, entity, model);
         List<DeferredFkUpdate> deferred = new ArrayList<>();
         Set<Object> inProgress = Collections.newSetFromMap(new IdentityHashMap<>());
         Set<Object> inserted = Collections.newSetFromMap(new IdentityHashMap<>());
         inProgress.add(entity);
+        mergeOwningToOnes(session, entity, model, inProgress, inserted, deferred);
+        int rows = session.updateEntityRow(entity, model, deferred);
         inserted.add(entity);
-        mergeAssociations(session, entity, model, inProgress, inserted, deferred);
+        mergeAssociations(session, entity, model, inProgress, inserted, deferred, previousOwningFks);
         applyDeferredFkUpdates(session, deferred);
         return rows;
     }
@@ -85,6 +89,14 @@ public final class RelationPersister {
         EntityModel model = session.registry().get(entity.getClass());
         session.requirePkSet(entity, model);
         Object ownerPk = session.pkValue(entity, model);
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            if (relation.owning()) {
+                continue;
+            }
+            if (relation.cascades(CascadeType.REMOVE) || relation.orphanRemoval()) {
+                session.deleteInverseOneToOne(relation, ownerPk);
+            }
+        }
         for (OneToManyField relation : model.oneToManyRelations()) {
             if (relation.cascades(CascadeType.REMOVE) || relation.orphanRemoval()) {
                 session.deleteChildrenByOwner(relation, ownerPk);
@@ -101,6 +113,17 @@ public final class RelationPersister {
                 continue;
             }
             EntityRef<?> ref = EntityRef.get(relation, entity);
+            Object attached = ref == null ? null : ref.attachedEntity();
+            if (attached != null) {
+                delete(session, attached);
+            }
+        }
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            if (!relation.owning() || !relation.orphanRemoval() || relation.cascades(CascadeType.REMOVE)) {
+                continue;
+            }
+            ManyToOneField join = model.manyToOneByFieldName(relation.javaField().getName());
+            EntityRef<?> ref = EntityRef.get(join, entity);
             Object attached = ref == null ? null : ref.attachedEntity();
             if (attached != null) {
                 delete(session, attached);
@@ -213,6 +236,49 @@ public final class RelationPersister {
             }
         }
         persistManyToMany(session, owner, ownerModel, inProgress, inserted, deferred);
+        persistInverseOneToOnes(session, owner, ownerModel, inProgress, inserted, deferred);
+    }
+
+    /**
+     * Inverse {@code @OneToOne} is persisted after the owner exists so the owning join column
+     * can point at the owner primary key.
+     */
+    private static void persistInverseOneToOnes(
+            RelationPersistSession session,
+            Object owner,
+            EntityModel ownerModel,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        for (OneToOneField relation : ownerModel.oneToOneRelations()) {
+            if (relation.owning()) {
+                continue;
+            }
+            EntityRef<?> ref = EntityRef.get(relation, owner);
+            if (ref == null) {
+                continue;
+            }
+            Object child = ref.attachedEntity();
+            if (child == null) {
+                continue;
+            }
+            EntityModel childModel = session.registry().get(relation.targetEntityClass());
+            ManyToOneField owning = childModel.manyToOneByFieldName(relation.mappedBy());
+            setRefToOwner(owning, child, owner);
+            boolean transientTarget = RelationValues.isNew(child, childModel);
+            if (relation.cascades(CascadeType.PERSIST)) {
+                if (!inserted.contains(child) && !inProgress.contains(child)
+                        && (transientTarget || !session.existsByPrimaryKey(child, childModel))) {
+                    persist(session, child, inProgress, inserted, deferred);
+                } else if (!transientTarget) {
+                    session.updateJoinColumn(child, childModel, owning);
+                }
+            } else if (transientTarget) {
+                throw new MicroOrmException("Not-null property references a transient value - "
+                        + "transient instance must be saved before current operation: "
+                        + ownerModel.entityClass().getName() + "." + relation.javaField().getName());
+            }
+        }
     }
 
     /**
@@ -274,6 +340,17 @@ public final class RelationPersister {
             Set<Object> inProgress,
             Set<Object> inserted,
             List<DeferredFkUpdate> deferred) {
+        mergeAssociations(session, entity, model, inProgress, inserted, deferred, Map.of());
+    }
+
+    private static void mergeAssociations(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred,
+            Map<OneToOneField, Object> previousOwningFks) {
         for (ManyToOneField relation : model.manyToOneRelations()) {
             if (!relation.cascades(CascadeType.MERGE)) {
                 continue;
@@ -301,6 +378,129 @@ public final class RelationPersister {
             }
         }
         mergeManyToMany(session, entity, model, inProgress, inserted, deferred);
+        mergeInverseOneToOnes(session, entity, model, inProgress, inserted, deferred);
+        deleteOwningOneToOneOrphans(session, entity, model, previousOwningFks);
+    }
+
+    private static void mergeInverseOneToOnes(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            if (relation.owning()) {
+                continue;
+            }
+            boolean mergeChild = relation.cascades(CascadeType.MERGE);
+            if (!mergeChild && !relation.orphanRemoval()) {
+                continue;
+            }
+            EntityRef<?> ref = EntityRef.get(relation, entity);
+            Object attached = ref == null ? null : ref.attachedEntity();
+            EntityModel childModel = session.registry().get(relation.targetEntityClass());
+            ManyToOneField owning = childModel.manyToOneByFieldName(relation.mappedBy());
+            Set<Object> retained = new HashSet<>();
+            if (attached != null && !RelationValues.isNew(attached, childModel)) {
+                Object childPk = session.pkValue(attached, childModel);
+                if (childPk != null) {
+                    retained.add(childPk);
+                }
+            }
+            if (relation.orphanRemoval() && !RelationValues.isNew(entity, model)) {
+                session.deleteOrphanInverseOneToOne(
+                        relation, session.pkValue(entity, model), retained, childModel);
+            }
+            if (attached == null) {
+                continue;
+            }
+            setRefToOwner(owning, attached, entity);
+            if (mergeChild) {
+                merge(session, attached, inProgress, inserted, deferred);
+            } else if (RelationValues.isNew(attached, childModel)) {
+                throw new MicroOrmException("Not-null property references a transient value - "
+                        + "transient instance must be saved before current operation: "
+                        + model.entityClass().getName() + "." + relation.javaField().getName());
+            } else {
+                session.updateJoinColumn(attached, childModel, owning);
+            }
+        }
+    }
+
+    /**
+     * Merge owning to-one targets before the owner row update so a new target primary key
+     * is available for the join column.
+     */
+    private static void mergeOwningToOnes(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Set<Object> inProgress,
+            Set<Object> inserted,
+            List<DeferredFkUpdate> deferred) {
+        for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (!relation.cascades(CascadeType.MERGE) && !relation.cascades(CascadeType.PERSIST)) {
+                continue;
+            }
+            EntityRef<?> ref = EntityRef.get(relation, entity);
+            Object attached = ref == null ? null : ref.attachedEntity();
+            if (attached == null || inserted.contains(attached)) {
+                continue;
+            }
+            merge(session, attached, inProgress, inserted, deferred);
+        }
+    }
+
+    private static Map<OneToOneField, Object> snapshotOwningOneToOneForeignKeys(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model) {
+        if (RelationValues.isNew(entity, model)) {
+            return Map.of();
+        }
+        Object ownerPk = session.pkValue(entity, model);
+        Map<OneToOneField, Object> previous = new LinkedHashMap<>();
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            if (!relation.owning() || !relation.orphanRemoval()) {
+                continue;
+            }
+            ManyToOneField join = model.manyToOneByFieldName(relation.javaField().getName());
+            previous.put(relation, session.currentForeignKey(model, join, ownerPk));
+        }
+        return previous;
+    }
+
+    private static void deleteOwningOneToOneOrphans(
+            RelationPersistSession session,
+            Object entity,
+            EntityModel model,
+            Map<OneToOneField, Object> previousOwningFks) {
+        if (previousOwningFks == null || previousOwningFks.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<OneToOneField, Object> entry : previousOwningFks.entrySet()) {
+            Object previousFk = entry.getValue();
+            if (previousFk == null) {
+                continue;
+            }
+            OneToOneField relation = entry.getKey();
+            ManyToOneField join = model.manyToOneByFieldName(relation.javaField().getName());
+            EntityRef<?> ref = EntityRef.get(join, entity);
+            Object currentFk = ref == null ? null : RelationValues.resolveRawForeignKey(ref, join, session.registry());
+            if (previousFk.equals(currentFk)) {
+                continue;
+            }
+            EntityModel targetModel = session.registry().get(join.targetEntityClass());
+            Object previous = session.selectByPrimaryKey(join.targetEntityClass(), previousFk);
+            if (previous != null) {
+                if (targetModel.hasRelations()) {
+                    delete(session, previous);
+                } else {
+                    session.deleteEntityRow(previous, targetModel);
+                }
+            }
+        }
     }
 
     /**
@@ -403,9 +603,11 @@ public final class RelationPersister {
         if (!inProgress.add(entity)) {
             return;
         }
+        Map<OneToOneField, Object> previousOwningFks = snapshotOwningOneToOneForeignKeys(session, entity, model);
+        mergeOwningToOnes(session, entity, model, inProgress, inserted, deferred);
         session.updateEntityRow(entity, model, deferred);
         inserted.add(entity);
-        mergeAssociations(session, entity, model, inProgress, inserted, deferred);
+        mergeAssociations(session, entity, model, inProgress, inserted, deferred, previousOwningFks);
     }
 
     /**

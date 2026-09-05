@@ -195,12 +195,34 @@ public class Book {
     @ManyToMany(mappedBy = "books")
     private LazyCollection<Author> authors;
 }
+
+@Entity
+@Table(name = "users")
+public class User {
+    @Id
+    private UUID id;
+
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "profile_id")
+    private LazyRef<Profile> profile;
+}
+
+@Entity
+@Table(name = "profiles")
+public class Profile {
+    @Id
+    private UUID id;
+
+    @OneToOne(mappedBy = "profile")
+    private LazyRef<User> user;
+}
 ```
 
 - **`LazyRef` / `LazyCollection`** — load related rows on first `get()` while the session is open
 - **`EagerRef` / `EagerCollection`** — materialize related rows when the owner is hydrated
 - **Cascade** — same defaults as JPA/Hibernate: nothing is cascaded unless you set `cascade` (`PERSIST`, `MERGE`, `REMOVE`, or `ALL`)
-- **`orphanRemoval`** — deletes children that disappear from a materialized `@OneToMany` collection, independently of cascade
+- **`orphanRemoval`** — deletes children that disappear from a materialized `@OneToMany` collection or `@OneToOne` reference, independently of cascade
+- **`@OneToOne`** — owning side stores a unique FK (`@JoinColumn` or `{field}_id`); inverse side uses `mappedBy` and does not write a join column
 - **`@ManyToMany`** — owning side writes the join table (`@JoinTable` or generated `{ownerTable}_{targetTable}`); inverse side uses `mappedBy` and does not insert join rows
 - **Existing references** — `LazyRef.toId(...)` or `LazyRef.to(alreadyPersisted)` write the FK only and do not update the target unless that association cascades `MERGE`
 

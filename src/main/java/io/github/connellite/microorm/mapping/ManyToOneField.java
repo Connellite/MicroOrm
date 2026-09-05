@@ -20,6 +20,7 @@ public final class ManyToOneField {
     private final boolean nullable;
     private final Class<?> foreignKeyJavaType;
     private final Set<CascadeType> cascade;
+    private final boolean unique;
 
     public ManyToOneField(
             Field javaField,
@@ -46,12 +47,24 @@ public final class ManyToOneField {
             boolean nullable,
             Class<?> foreignKeyJavaType,
             CascadeType[] cascade) {
+        this(javaField, targetEntityClass, joinColumnIdentifier, nullable, foreignKeyJavaType, cascade, false);
+    }
+
+    public ManyToOneField(
+            Field javaField,
+            Class<?> targetEntityClass,
+            SqlIdentifier joinColumnIdentifier,
+            boolean nullable,
+            Class<?> foreignKeyJavaType,
+            CascadeType[] cascade,
+            boolean unique) {
         this.javaField = javaField;
         this.targetEntityClass = targetEntityClass;
         this.joinColumnIdentifier = joinColumnIdentifier;
         this.nullable = nullable;
         this.foreignKeyJavaType = foreignKeyJavaType;
         this.cascade = Cascades.copyCascade(cascade);
+        this.unique = unique;
         try {
             this.varHandle = MethodHandleReflectionUtil.varHandle(javaField);
         } catch (IllegalAccessException e) {
@@ -85,6 +98,10 @@ public final class ManyToOneField {
 
     public Class<?> foreignKeyJavaType() {
         return foreignKeyJavaType;
+    }
+
+    public boolean unique() {
+        return unique;
     }
 
     public boolean cascades(CascadeType type) {

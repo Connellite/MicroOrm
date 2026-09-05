@@ -13,7 +13,9 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.mapping.RelationPersister;
+import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.query.EntityDelete;
 import io.github.connellite.microorm.query.EntityInsert;
 import io.github.connellite.microorm.query.EntitySelect;
@@ -875,6 +877,77 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 }
             });
         }
+    }
+
+    @Override
+    public void deleteInverseOneToOne(OneToOneField relation, Object ownerPk) {
+        EntityModel targetModel = registry.get(relation.targetEntityClass());
+        ManyToOneField owning = targetModel.manyToOneByFieldName(relation.mappedBy());
+        EntityModel ownerModel = registry.get(owning.targetEntityClass());
+        Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
+        try (Stream<?> rows = SqlExecutor.queryEntitiesStream(
+                connection,
+                sql.selectByJoinColumn(targetModel, owning.joinColumn(), jdbcOwnerPk),
+                targetModel,
+                dialect,
+                dialect.valueMapper(),
+                lazyLoadContext(),
+                registry)) {
+            rows.forEach(target -> {
+                if (targetModel.hasRelations()) {
+                    RelationPersister.delete(this, target);
+                } else {
+                    deleteEntityRow(target, targetModel);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void deleteOrphanInverseOneToOne(
+            OneToOneField relation,
+            Object ownerPk,
+            Set<Object> retainedTargetPks,
+            EntityModel targetModel) {
+        ManyToOneField owning = targetModel.manyToOneByFieldName(relation.mappedBy());
+        EntityModel ownerModel = registry.get(owning.targetEntityClass());
+        Object jdbcOwnerPk = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerPk);
+        Set<Object> normalizedRetained = retainedTargetPks.stream()
+                .map(pk -> normalizePk(targetModel, pk))
+                .collect(Collectors.toSet());
+        try (Stream<?> rows = SqlExecutor.queryEntitiesStream(
+                connection,
+                sql.selectByJoinColumn(targetModel, owning.joinColumn(), jdbcOwnerPk),
+                targetModel,
+                dialect,
+                dialect.valueMapper(),
+                lazyLoadContext(),
+                registry)) {
+            rows.forEach(existing -> {
+                Object targetPk = normalizePk(targetModel, EntityHydrator.getFieldValue(existing, targetModel.primaryKey()));
+                if (!normalizedRetained.contains(targetPk)) {
+                    deleteEntityRow(existing, targetModel);
+                }
+            });
+        }
+    }
+
+    @Override
+    public Object currentForeignKey(EntityModel model, ManyToOneField relation, Object ownerPk) {
+        Object owner = selectRow(model.entityClass(), ownerPk);
+        if (owner == null) {
+            return null;
+        }
+        EntityRef<?> ref = EntityRef.get(relation, owner);
+        if (ref == null) {
+            return null;
+        }
+        return ref.foreignKey();
+    }
+
+    @Override
+    public <T> T selectByPrimaryKey(Class<T> type, Object id) {
+        return selectRow(type, id);
     }
 
     /**

@@ -10,6 +10,7 @@ import io.github.connellite.microorm.annotation.JoinTable;
 import io.github.connellite.microorm.annotation.ManyToMany;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.OneToMany;
+import io.github.connellite.microorm.annotation.OneToOne;
 import io.github.connellite.microorm.relation.LazyCollection;
 import io.github.connellite.microorm.relation.LazyRef;
 import org.junit.jupiter.api.Test;
@@ -147,5 +148,47 @@ class RelationMappingTest {
         EntityModelRegistry registry = new EntityModelRegistry();
         registry.register(Customer.class);
         assertThrows(MicroOrmException.class, () -> registry.register(MissingManyToOne.class));
+    }
+
+    @Entity
+    @Table(name = "rel_users")
+    static class User {
+        @Id
+        private UUID id;
+
+        @OneToOne
+        @JoinColumn(name = "profile_id")
+        private LazyRef<Profile> profile;
+    }
+
+    @Entity
+    @Table(name = "rel_profiles")
+    static class Profile {
+        @Id
+        private UUID id;
+
+        @OneToOne(mappedBy = "profile")
+        private LazyRef<User> user;
+    }
+
+    @Test
+    void registerBuildsOneToOneMetadata() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel userModel = registry.register(User.class);
+        EntityModel profileModel = registry.register(Profile.class);
+
+        assertEquals(1, userModel.oneToOneRelations().size());
+        OneToOneField owning = userModel.oneToOneRelations().get(0);
+        assertTrue(owning.owning());
+        assertEquals(Profile.class, owning.targetEntityClass());
+        assertFalse(owning.cascades(CascadeType.PERSIST));
+        assertFalse(owning.orphanRemoval());
+        assertEquals("profile_id", userModel.manyToOneByFieldName("profile").joinColumn());
+        assertTrue(userModel.manyToOneByFieldName("profile").unique());
+
+        OneToOneField inverse = profileModel.oneToOneRelations().get(0);
+        assertFalse(inverse.owning());
+        assertEquals("profile", inverse.mappedBy());
+        assertEquals(owning.javaField().getName(), inverse.owningSide(registry).javaField().getName());
     }
 }

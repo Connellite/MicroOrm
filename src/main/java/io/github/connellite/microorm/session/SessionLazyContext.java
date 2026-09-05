@@ -9,6 +9,7 @@ import io.github.connellite.microorm.mapping.CollectionRelation;
 import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.util.Logger;
@@ -101,6 +102,32 @@ final class SessionLazyContext implements LazyLoadContext {
                 this,
                 registry)) {
             return (List<T>) rows.toList();
+        }
+    }
+
+    @Override
+    public <T> T loadInverseOneToOne(OneToOneField relation, Object ownerId) {
+        ensureOpen();
+        LogHolder.logger.trace(() -> "Lazy loading inverse @OneToOne " + relation.javaField().getName()
+                + " for owner id " + ownerId);
+        if (ownerId == null) {
+            return null;
+        }
+        EntityModel targetModel = registry.get(relation.targetEntityClass());
+        ManyToOneField owning = targetModel.manyToOneByFieldName(relation.mappedBy());
+        EntityModel ownerModel = registry.get(owning.targetEntityClass());
+        Object jdbcValue = dialect.valueMapper().toJdbcValue(ownerModel.primaryKey(), ownerId);
+        try (var rows = SqlExecutor.queryEntitiesStream(
+                connection,
+                sql.selectByJoinColumn(targetModel, owning.joinColumn(), jdbcValue),
+                targetModel,
+                dialect,
+                dialect.valueMapper(),
+                this,
+                registry)) {
+            @SuppressWarnings("unchecked")
+            T found = (T) rows.findFirst().orElse(null);
+            return found;
         }
     }
 

@@ -334,7 +334,8 @@ public final class EntitySelect<T> {
     /**
      * Adds a SQL {@code INNER JOIN} for a root relation field.
      *
-     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     *                     or {@code @ManyToMany} relation
      * @return this query for chaining
      */
     public EntitySelect<T> join(String relationName) {
@@ -344,7 +345,8 @@ public final class EntitySelect<T> {
     /**
      * Adds a SQL {@code LEFT JOIN} for a root relation field.
      *
-     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     *                     or {@code @ManyToMany} relation
      * @return this query for chaining
      */
     public EntitySelect<T> leftJoin(String relationName) {
@@ -354,7 +356,8 @@ public final class EntitySelect<T> {
     /**
      * Adds a SQL {@code RIGHT JOIN} for a root relation field.
      *
-     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     *                     or {@code @ManyToMany} relation
      * @return this query for chaining
      */
     public EntitySelect<T> rightJoin(String relationName) {
@@ -364,7 +367,8 @@ public final class EntitySelect<T> {
     /**
      * Adds a SQL {@code FULL JOIN} for a root relation field.
      *
-     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     *                     or {@code @ManyToMany} relation
      * @return this query for chaining
      */
     public EntitySelect<T> fullJoin(String relationName) {
@@ -375,7 +379,8 @@ public final class EntitySelect<T> {
      * Adds a SQL {@code CROSS JOIN} for a root relation field. Cross joins intentionally omit
      * the relation {@code ON} predicate and should be used sparingly.
      *
-     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     *                     or {@code @ManyToMany} relation
      * @return this query for chaining
      */
     public EntitySelect<T> crossJoin(String relationName) {
@@ -385,7 +390,8 @@ public final class EntitySelect<T> {
     /**
      * Adds a join for a root relation field.
      *
-     * @param relationName Java field name of a {@code @ManyToOne} or {@code @OneToMany} relation
+     * @param relationName Java field name of a {@code @ManyToOne}, {@code @OneToOne}, {@code @OneToMany},
+     *                     or {@code @ManyToMany} relation
      * @param type         SQL join type
      * @return this query for chaining
      */

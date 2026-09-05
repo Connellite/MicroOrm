@@ -3,6 +3,7 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.collections.ConcurrentReferenceHashMap;
 import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.annotation.CascadeType;
 import io.github.connellite.microorm.annotation.Check;
 import io.github.connellite.microorm.annotation.Column;
 import io.github.connellite.microorm.annotation.ColumnDefault;
@@ -18,6 +19,7 @@ import io.github.connellite.microorm.annotation.ManyToMany;
 import io.github.connellite.microorm.annotation.ManyToOne;
 import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.OneToMany;
+import io.github.connellite.microorm.annotation.OneToOne;
 import io.github.connellite.microorm.annotation.Subselect;
 import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Transient;
@@ -112,6 +114,7 @@ public final class EntityModelRegistry {
         List<ManyToOneField> manyToOneRelations = new ArrayList<>();
         List<OneToManyField> oneToManyRelations = new ArrayList<>();
         List<ManyToManyField> manyToManyRelations = new ArrayList<>();
+        List<OneToOneField> oneToOneRelations = new ArrayList<>();
         EntityField pk = null;
         for (Field f : mappedFields(entityClass)) {
             if (Modifier.isStatic(f.getModifiers())) {
@@ -121,11 +124,15 @@ public final class EntityModelRegistry {
                 continue;
             }
             f.trySetAccessible();
-            if (isManyToOneRef(f)) {
-                manyToOneRelations.add(buildManyToOne(entityClass, f));
+            if (isToOneRef(f)) {
+                addToOneRelation(entityClass, f, manyToOneRelations, oneToOneRelations);
                 continue;
             }
             if (isRelationCollection(f)) {
+                if (f.getAnnotation(OneToOne.class) != null) {
+                    throw new MicroOrmException("@OneToOne field must be LazyRef or EagerRef on "
+                            + entityClass.getName() + "." + f.getName());
+                }
                 if (f.getAnnotation(ManyToMany.class) != null) {
                     manyToManyRelations.add(buildManyToMany(entityClass, table, f));
                 } else {
@@ -194,6 +201,7 @@ public final class EntityModelRegistry {
                 .manyToOneRelations(manyToOneRelations)
                 .oneToManyRelations(oneToManyRelations)
                 .manyToManyRelations(manyToManyRelations)
+                .oneToOneRelations(oneToOneRelations)
                 .immutable(immutable)
                 .subselectSql(subselectAnn == null ? null : subselectAnn.value())
                 .comment(tableComment(entityClass))
@@ -205,11 +213,36 @@ public final class EntityModelRegistry {
         return model;
     }
 
-    private ManyToOneField buildManyToOne(Class<?> entityClass, Field field) {
-        if (field.getAnnotation(ManyToOne.class) == null) {
-            throw new MicroOrmException("Relation reference field requires @ManyToOne on "
+    private void addToOneRelation(
+            Class<?> entityClass,
+            Field field,
+            List<ManyToOneField> manyToOneRelations,
+            List<OneToOneField> oneToOneRelations) {
+        OneToOne oneToOne = field.getAnnotation(OneToOne.class);
+        ManyToOne manyToOne = field.getAnnotation(ManyToOne.class);
+        if (oneToOne != null && manyToOne != null) {
+            throw new MicroOrmException("Field cannot declare both @OneToOne and @ManyToOne on "
                     + entityClass.getName() + "." + field.getName());
         }
+        if (oneToOne != null) {
+            oneToOneRelations.add(buildOneToOne(entityClass, field, oneToOne));
+            if (oneToOne.mappedBy().isBlank()) {
+                manyToOneRelations.add(buildOwningToOneJoin(entityClass, field, oneToOne.cascade(), true));
+            }
+            return;
+        }
+        if (manyToOne == null) {
+            throw new MicroOrmException("Relation reference field requires @ManyToOne or @OneToOne on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        manyToOneRelations.add(buildOwningToOneJoin(entityClass, field, manyToOne.cascade(), false));
+    }
+
+    private ManyToOneField buildOwningToOneJoin(
+            Class<?> entityClass,
+            Field field,
+            CascadeType[] cascade,
+            boolean unique) {
         Class<?> targetType = resolveRefTarget(entityClass, field);
         requireEntity(targetType);
         JoinColumn joinColumn = field.getAnnotation(JoinColumn.class);
@@ -218,13 +251,21 @@ public final class EntityModelRegistry {
                 : toPhysicalColumn(SqlIdentifier.unquoted(field.getName() + "_id"));
         boolean nullable = joinColumn == null || joinColumn.nullable();
         Class<?> fkType = primaryKeyJavaType(targetType);
-        return new ManyToOneField(
-                field,
-                targetType,
-                column,
-                nullable,
-                fkType,
-                field.getAnnotation(ManyToOne.class).cascade());
+        return new ManyToOneField(field, targetType, column, nullable, fkType, cascade, unique);
+    }
+
+    private OneToOneField buildOneToOne(Class<?> entityClass, Field field, OneToOne oneToOne) {
+        Class<?> targetType = resolveRefTarget(entityClass, field);
+        requireEntity(targetType);
+        String mappedBy = oneToOne.mappedBy();
+        if (!mappedBy.isBlank()) {
+            if (field.getAnnotation(JoinColumn.class) != null) {
+                throw new MicroOrmException("@JoinColumn is only allowed on the owning @OneToOne on "
+                        + entityClass.getName() + "." + field.getName());
+            }
+            validateInverseOneToOne(targetType, mappedBy, entityClass);
+        }
+        return new OneToOneField(field, targetType, mappedBy, oneToOne.cascade(), oneToOne.orphanRemoval());
     }
 
     private static Class<?> primaryKeyJavaType(Class<?> entityClass) {
@@ -270,7 +311,7 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("mappedBy field must have @ManyToOne on "
                     + childClass.getName() + "." + mappedByField);
         }
-        if (!isManyToOneRef(inverse)) {
+        if (!isToOneRef(inverse)) {
             throw new MicroOrmException("mappedBy field must be LazyRef or EagerRef on "
                     + childClass.getName() + "." + mappedByField);
         }
@@ -299,7 +340,34 @@ public final class EntityModelRegistry {
         return typeArgs.get(0);
     }
 
-    private static boolean isManyToOneRef(Field field) {
+    private static void validateInverseOneToOne(Class<?> targetClass, String mappedByField, Class<?> ownerClass) {
+        Field inverse;
+        try {
+            inverse = mappedField(targetClass, mappedByField);
+        } catch (NoSuchFieldException e) {
+            throw new MicroOrmException("mappedBy field '" + mappedByField + "' not found on " + targetClass.getName(), e);
+        }
+        OneToOne oneToOne = inverse.getAnnotation(OneToOne.class);
+        if (oneToOne == null) {
+            throw new MicroOrmException("mappedBy field must have @OneToOne on "
+                    + targetClass.getName() + "." + mappedByField);
+        }
+        if (!oneToOne.mappedBy().isBlank()) {
+            throw new MicroOrmException("mappedBy field must be the owning @OneToOne on "
+                    + targetClass.getName() + "." + mappedByField);
+        }
+        if (!isToOneRef(inverse)) {
+            throw new MicroOrmException("mappedBy field must be LazyRef or EagerRef on "
+                    + targetClass.getName() + "." + mappedByField);
+        }
+        Class<?> inverseTarget = resolveRefTarget(targetClass, inverse);
+        if (inverseTarget != ownerClass) {
+            throw new MicroOrmException("mappedBy @OneToOne must reference " + ownerClass.getName()
+                    + " on " + targetClass.getName() + "." + mappedByField);
+        }
+    }
+
+    private static boolean isToOneRef(Field field) {
         return EntityRef.class.isAssignableFrom(field.getType());
     }
 

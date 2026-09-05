@@ -9,6 +9,7 @@ import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.mapping.RelationPersister;
 import io.github.connellite.microorm.mapping.RelationValues;
 import io.github.connellite.microorm.query.ComparisonOperator;
@@ -857,6 +858,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         for (ManyToManyField relation : model.manyToManyRelations()) {
             registry.register(relation.targetEntityClass());
         }
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            registry.register(relation.targetEntityClass());
+        }
     }
 
     private JoinContext buildJoinContext(EntityModel model, EntitySelect<?> query, EntityModelRegistry registry) {
@@ -882,6 +886,19 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 EntityModel targetModel = registry.get(manyToOne.targetEntityClass());
                 bindings.put(join.relationName(), new JoinBinding(alias, targetModel));
                 sql.add(renderManyToOneJoin(model, manyToOne, targetModel, alias, join.type()));
+                continue;
+            }
+            OneToOneField oneToOne = findOneToOne(model, join.relationName());
+            if (oneToOne != null) {
+                EntityModel targetModel = registry.get(oneToOne.targetEntityClass());
+                bindings.put(join.relationName(), new JoinBinding(alias, targetModel));
+                if (oneToOne.owning()) {
+                    ManyToOneField owningJoin = model.manyToOneByFieldName(oneToOne.javaField().getName());
+                    sql.add(renderManyToOneJoin(model, owningJoin, targetModel, alias, join.type()));
+                } else {
+                    ManyToOneField inverse = targetModel.manyToOneByFieldName(oneToOne.mappedBy());
+                    sql.add(renderOneToManyJoin(model, inverse, targetModel, alias, join.type()));
+                }
                 continue;
             }
             OneToManyField oneToMany = findOneToMany(model, join.relationName());
@@ -987,6 +1004,15 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 + " " + joinType.sql() + " " + targetModel.sqlTableName(dialect) + " " + alias
                 + " ON " + alias + "." + dialect.sqlName(targetModel.primaryKey().columnIdentifier())
                 + " = " + linkAlias + "." + dialect.sqlName(targetLink);
+    }
+
+    private static OneToOneField findOneToOne(EntityModel model, String relationName) {
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            if (relation.javaField().getName().equals(relationName)) {
+                return relation;
+            }
+        }
+        return null;
     }
 
     private static OneToManyField findOneToMany(EntityModel model, String relationName) {

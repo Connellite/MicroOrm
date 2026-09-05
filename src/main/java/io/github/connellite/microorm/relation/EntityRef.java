@@ -1,10 +1,11 @@
 package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
 /**
- * Base class for many-to-one relation wrappers declared on {@code @ManyToOne} fields.
+ * Base class for to-one relation wrappers declared on {@code @ManyToOne} and {@code @OneToOne} fields.
  * <p>
  * Concrete types are {@link LazyRef} (loads the target on first {@link #get()} while the owning
  * {@link io.github.connellite.microorm.session.Session} is open) and {@link EagerRef} (target row
@@ -70,8 +71,19 @@ public abstract class EntityRef<T> {
         return (EntityRef<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
     }
 
+    /** Reads a relation reference wrapper from a mapped {@code @OneToOne} field. */
+    @SuppressWarnings("unchecked")
+    public static <T> EntityRef<T> get(OneToOneField field, Object owner) {
+        return (EntityRef<T>) MethodHandleReflectionUtil.get(field.varHandle(), owner);
+    }
+
     /** Sets a relation reference wrapper on a mapped entity field. */
     public static void set(ManyToOneField field, Object owner, EntityRef<?> value) {
+        MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
+    }
+
+    /** Sets a relation reference wrapper on a mapped {@code @OneToOne} field. */
+    public static void set(OneToOneField field, Object owner, EntityRef<?> value) {
         MethodHandleReflectionUtil.set(field.varHandle(), field.javaField(), owner, value);
     }
 }

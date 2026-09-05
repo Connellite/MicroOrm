@@ -1,11 +1,12 @@
 package io.github.connellite.microorm.relation;
 
 import io.github.connellite.microorm.mapping.ManyToOneField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 
 import java.util.Objects;
 
 /**
- * Eager many-to-one reference to a related entity. The target row is materialized when the owning
+ * Eager to-one reference to a related entity. The target row is materialized when the owning
  * entity is hydrated, so {@link #get()} never performs a database round-trip.
  * <p>
  * For writes use {@link #to(Object)} to reference a managed or new entity, or {@link #toId(Class, Object)}
@@ -54,9 +55,20 @@ public final class EagerRef<T> extends EntityRef<T> {
         EntityRef.set(field, owner, value);
     }
 
+    /** Sets an {@link EagerRef} on a mapped {@code @OneToOne} field. */
+    public static <T> void set(OneToOneField field, Object owner, EagerRef<T> value) {
+        EntityRef.set(field, owner, value);
+    }
+
     /** Reads an {@link EagerRef} from an entity field (VarHandle helper for mapped {@code EagerRef} fields). */
     @SuppressWarnings("unchecked")
     public static <T> EagerRef<T> get(ManyToOneField field, Object owner) {
+        return (EagerRef<T>) EntityRef.get(field, owner);
+    }
+
+    /** Reads an {@link EagerRef} from a mapped {@code @OneToOne} field. */
+    @SuppressWarnings("unchecked")
+    public static <T> EagerRef<T> get(OneToOneField field, Object owner) {
         return (EagerRef<T>) EntityRef.get(field, owner);
     }
 

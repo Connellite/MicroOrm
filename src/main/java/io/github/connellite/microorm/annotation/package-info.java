@@ -15,6 +15,7 @@
  * {@link io.github.connellite.microorm.annotation.UniqueConstraint}, and
  * {@link io.github.connellite.microorm.annotation.Check},
  * association markers {@link io.github.connellite.microorm.annotation.ManyToOne} /
+ * {@link io.github.connellite.microorm.annotation.OneToOne} /
  * {@link io.github.connellite.microorm.annotation.OneToMany} /
  * {@link io.github.connellite.microorm.annotation.ManyToMany} with
  * {@link io.github.connellite.microorm.annotation.JoinTable} and

@@ -14,6 +14,7 @@ import io.github.connellite.microorm.mapping.CollectionRelation;
 import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.OneToManyField;
+import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.relation.EagerCollection;
 import io.github.connellite.microorm.relation.EagerRef;
 import io.github.connellite.microorm.relation.LazyCollection;
@@ -146,11 +147,32 @@ public final class EntityHydrator {
                 LazyRef.set(relation, entity, lazyRef);
             }
         }
+        for (OneToOneField relation : model.oneToOneRelations()) {
+            if (relation.owning()) {
+                continue;
+            }
+            attachInverseOneToOne(entity, ownerId, relation, lazyContext);
+        }
         for (OneToManyField relation : model.oneToManyRelations()) {
             attachCollection(entity, ownerId, relation, lazyContext);
         }
         for (ManyToManyField relation : model.manyToManyRelations()) {
             attachCollection(entity, ownerId, relation, lazyContext);
+        }
+    }
+
+    private static void attachInverseOneToOne(
+            Object entity,
+            Object ownerId,
+            OneToOneField relation,
+            LazyLoadContext lazyContext) {
+        if (EagerRef.class.isAssignableFrom(relation.javaField().getType())) {
+            Object target = ownerId == null ? null : lazyContext.loadInverseOneToOne(relation, ownerId);
+            Object targetId = target == null ? null : ownerId;
+            EagerRef.set(relation, entity, EagerRef.of(relation.targetEntityClass(), targetId, target));
+        } else {
+            LazyRef<?> lazyRef = LazyRef.ofInverse(lazyContext, relation, ownerId);
+            LazyRef.set(relation, entity, lazyRef);
         }
     }
 
