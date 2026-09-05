@@ -94,7 +94,7 @@ public final class SqlExecutor {
     public static int executeInsertReturning(Connection connection, BoundStatement stmt, EntityModel model, Object entity) {
         LogHolder.logger.debug(() -> formatSql("insert", stmt));
         try (NamedPreparedStatement nps = prepareInsertReturning(connection, stmt.sql(), model)) {
-            nps.setAll(stmt.parameters());
+            bindParameters(nps, stmt.parameters());
             int n = nps.executeUpdate();
             if (model.primaryKey().autoIncrement()) {
                 try (ResultSet keys = nps.unwrap().getGeneratedKeys()) {
@@ -133,7 +133,7 @@ public final class SqlExecutor {
             for (List<Map<String, Object>> chunk : ListUtils.splitIntoChunksBySize(rows, chunkSize)) {
                 for (Map<String, Object> row : chunk) {
                     nps.clearParameters();
-                    nps.setAll(row);
+                    bindParameters(nps, row);
                     nps.addBatch();
                 }
                 total += executeBatchAndApplyKeys(connection, nps, model, entities, chunkStart, chunk.size());
@@ -156,7 +156,7 @@ public final class SqlExecutor {
         LogHolder.logger.debug(() -> "sequential insert (" + rows.size() + " rows): " + sql);
         for (int i = 0; i < rows.size(); i++) {
             try (NamedPreparedStatement nps = prepareInsertReturning(connection, sql, model)) {
-                nps.setAll(rows.get(i));
+                bindParameters(nps, rows.get(i));
                 total += nps.executeUpdate();
                 if (model.primaryKey().autoIncrement()) {
                     try (ResultSet keys = nps.unwrap().getGeneratedKeys()) {
@@ -208,6 +208,20 @@ public final class SqlExecutor {
             }
         }
         return total;
+    }
+
+    /** {@code setObject(null)} is rejected for BINARY columns (MSSQL/MySQL bind it as nvarchar). */
+    private static void bindParameters(NamedPreparedStatement nps, Map<String, Object> params) throws SQLException {
+        if (params == null || params.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            if (entry.getValue() == null) {
+                nps.setNull(entry.getKey());
+            } else {
+                nps.setObject(entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     private static void applyGeneratedKey(Object entity, EntityModel model, ResultSet keys) throws SQLException {

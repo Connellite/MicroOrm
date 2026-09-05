@@ -30,7 +30,6 @@ import io.github.connellite.microorm.relation.EntityRef;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,7 +114,6 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Set<Object> inserted,
             Set<Object> inProgress) {
         Map<String, Object> named = new LinkedHashMap<>();
-        Set<String> omitJoinColumns = new HashSet<>();
         for (EntityField f : model.fields()) {
             if (omitPk && f.id()) {
                 continue;
@@ -123,14 +121,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             named.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            Object value = resolveJoinColumnForWrite(entity, model, relation, registry, deferred, inserted, inProgress);
-            if (value == null && relation.nullable()) {
-                omitJoinColumns.add(relation.joinColumn());
-            } else {
-                named.put(relation.joinColumn(), value);
-            }
+            named.put(relation.joinColumn(), resolveJoinColumnForWrite(entity, model, relation, registry, deferred, inserted, inProgress));
         }
-        return new RelationInsertParts(insertSql(model, omitPk, omitJoinColumns), named);
+        return new RelationInsertParts(insertSql(model, omitPk), named);
     }
 
     @Override
