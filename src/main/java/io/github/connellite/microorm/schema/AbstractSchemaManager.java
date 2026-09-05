@@ -86,7 +86,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     public void dropTable(Connection connection, EntityModel model) throws SQLException {
         requirePhysicalMutableTable(model, "dropTable");
         dropJoinTables(connection, model);
-        if (existingColumns(connection, model).isEmpty()) {
+        if (!dropTableIfMissingIsSafe() && existingColumns(connection, model).isEmpty()) {
             return;
         }
         try (Statement st = connection.createStatement()) {
@@ -346,7 +346,10 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected void createJoinTables(Connection connection, EntityModel model) throws SQLException {
         for (ManyToManyField relation : model.manyToManyRelations()) {
-            if (!relation.owning() || physicalTableExists(connection, relation)) {
+            if (!relation.owning()) {
+                continue;
+            }
+            if (!createJoinTableIfExistsIsSafe() && physicalTableExists(connection, relation)) {
                 continue;
             }
             try (Statement st = connection.createStatement()) {
@@ -357,7 +360,10 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected void dropJoinTables(Connection connection, EntityModel model) throws SQLException {
         for (ManyToManyField relation : model.manyToManyRelations()) {
-            if (!relation.owning() || !physicalTableExists(connection, relation)) {
+            if (!relation.owning()) {
+                continue;
+            }
+            if (!dropJoinTableIfMissingIsSafe() && !physicalTableExists(connection, relation)) {
                 continue;
             }
             try (Statement st = connection.createStatement()) {
@@ -379,6 +385,29 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected String dropJoinTableDdl(ManyToManyField relation) {
         return "DROP TABLE " + relation.sqlJoinTableName(dialect);
+    }
+
+    /**
+     * When {@code true}, {@link #dropTableDdl} is safe if the table is missing
+     * ({@code IF EXISTS} / equivalent), so JDBC metadata is not consulted first.
+     */
+    protected boolean dropTableIfMissingIsSafe() {
+        return false;
+    }
+
+    /**
+     * When {@code true}, {@link #dropJoinTableDdl} is safe if the join table is missing.
+     */
+    protected boolean dropJoinTableIfMissingIsSafe() {
+        return false;
+    }
+
+    /**
+     * When {@code true}, {@link #buildCreateJoinTableDdl} is safe if the join table already exists
+     * ({@code IF NOT EXISTS} / equivalent).
+     */
+    protected boolean createJoinTableIfExistsIsSafe() {
+        return false;
     }
 
     protected boolean physicalTableExists(Connection connection, ManyToManyField relation) throws SQLException {

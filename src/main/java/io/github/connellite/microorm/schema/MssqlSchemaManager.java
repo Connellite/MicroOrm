@@ -61,6 +61,11 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected boolean dropJoinTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
     protected List<String> commentDdl(EntityModel model) {
         List<String> ddl = new ArrayList<>();
         String schema = model.schemaName() == null ? "dbo" : model.schemaName();

@@ -143,6 +143,11 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected boolean dropJoinTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
     protected String indexName(EntityModel model, EntityField field) {
         String name = super.indexName(model, field);
         if (name.length() <= 30) {

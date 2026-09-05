@@ -27,19 +27,54 @@ final class RelationWriteFkSchema {
                 st.execute("PRAGMA foreign_keys = ON");
             }
         }
+        if (database == Database.MYSQL) {
+            try (Statement st = connection.createStatement()) {
+                st.execute("SET SESSION lock_wait_timeout = 15");
+                st.execute("SET SESSION innodb_lock_wait_timeout = 15");
+            }
+        }
     }
 
     static void recreateSchema(Database database, Connection connection) throws SQLException {
+        if (database == Database.MYSQL) {
+            withMysqlForeignKeyChecksDisabled(connection, () -> {
+                executeAll(connection, mysqlDropTables());
+                executeAll(connection, mysqlCreate());
+            });
+            return;
+        }
         dropSchema(database, connection);
         createSchema(database, connection);
     }
 
     static void dropSchema(Database database, Connection connection) throws SQLException {
+        if (database == Database.MYSQL) {
+            withMysqlForeignKeyChecksDisabled(connection, () -> executeAll(connection, mysqlDropTables()));
+            return;
+        }
         executeAll(connection, dropStatements(database));
     }
 
     static void createSchema(Database database, Connection connection) throws SQLException {
         executeAll(connection, createStatements(database));
+    }
+
+    private static void withMysqlForeignKeyChecksDisabled(Connection connection, SqlRunner action) throws SQLException {
+        try (Statement st = connection.createStatement()) {
+            st.execute("SET FOREIGN_KEY_CHECKS = 0");
+        }
+        try {
+            action.run();
+        } finally {
+            try (Statement st = connection.createStatement()) {
+                st.execute("SET FOREIGN_KEY_CHECKS = 1");
+            }
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlRunner {
+        void run() throws SQLException;
     }
 
     private static void executeAll(Connection connection, List<String> statements) throws SQLException {
@@ -66,14 +101,7 @@ final class RelationWriteFkSchema {
                     "DROP TABLE IF EXISTS write_files CASCADE",
                     "DROP TABLE IF EXISTS write_documents CASCADE",
                     "DROP TABLE IF EXISTS write_folders CASCADE");
-            case MYSQL -> List.of(
-                    "SET FOREIGN_KEY_CHECKS = 0",
-                    "DROP TABLE IF EXISTS write_head_files",
-                    "DROP TABLE IF EXISTS write_doc_heads",
-                    "DROP TABLE IF EXISTS write_files",
-                    "DROP TABLE IF EXISTS write_documents",
-                    "DROP TABLE IF EXISTS write_folders",
-                    "SET FOREIGN_KEY_CHECKS = 1");
+            case MYSQL -> mysqlDropTables();
             case MSSQL -> List.of(
                     """
                     IF OBJECT_ID('fk_write_doc_heads_primary', 'F') IS NOT NULL
@@ -103,6 +131,15 @@ final class RelationWriteFkSchema {
                     oracleDropTable("write_documents"),
                     oracleDropTable("write_folders"));
         };
+    }
+
+    private static List<String> mysqlDropTables() {
+        return List.of(
+                "DROP TABLE IF EXISTS write_head_files",
+                "DROP TABLE IF EXISTS write_doc_heads",
+                "DROP TABLE IF EXISTS write_files",
+                "DROP TABLE IF EXISTS write_documents",
+                "DROP TABLE IF EXISTS write_folders");
     }
 
     private static String oracleDropTable(String table) {

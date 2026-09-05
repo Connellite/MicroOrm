@@ -3,11 +3,14 @@ package io.github.connellite.microorm.schema;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.mapping.ManyToManyField;
 import io.github.connellite.microorm.type.UuidStorage;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Set;
 import java.util.UUID;
 
 public final class MysqlSchemaManager extends AbstractSchemaManager {
@@ -57,8 +60,28 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected String dropJoinTableDdl(io.github.connellite.microorm.mapping.ManyToManyField relation) {
+    protected String dropJoinTableDdl(ManyToManyField relation) {
         return "DROP TABLE IF EXISTS " + relation.sqlJoinTableName(dialect);
+    }
+
+    @Override
+    protected String buildCreateJoinTableDdl(ManyToManyField relation) {
+        return super.buildCreateJoinTableDdl(relation).replaceFirst("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ");
+    }
+
+    @Override
+    protected boolean dropTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
+    protected boolean dropJoinTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
+    protected boolean createJoinTableIfExistsIsSafe() {
+        return true;
     }
 
     @Override
@@ -83,10 +106,65 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
+        Set<String> columns = caseInsensitiveNullSkippingSet();
+        String catalog = currentCatalog(connection, model);
+        String table = model.catalogTableName(dialect);
+        try (PreparedStatement ps = connection.prepareStatement("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = ? AND table_name = ?
+                """)) {
+            ps.setString(1, catalog);
+            ps.setString(2, table);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    columns.add(rs.getString(1));
+                }
+            }
+        }
+        return columns;
+    }
+
+    @Override
     protected boolean tableExists(Connection connection, String schema, String table) throws SQLException {
         String catalog = schema != null ? schema : connection.getCatalog();
-        try (ResultSet rs = connection.getMetaData().getTables(catalog, null, table, new String[] {"TABLE"})) {
-            return rs.next();
+        try (PreparedStatement ps = connection.prepareStatement("""
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = ? AND table_name = ? AND table_type = 'BASE TABLE'
+                """)) {
+            ps.setString(1, catalog);
+            ps.setString(2, table);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
+    }
+
+    @Override
+    protected boolean indexExists(Connection connection, EntityModel model, String indexName) throws SQLException {
+        String catalog = currentCatalog(connection, model);
+        try (PreparedStatement ps = connection.prepareStatement("""
+                SELECT 1
+                FROM information_schema.statistics
+                WHERE table_schema = ? AND table_name = ? AND index_name = ?
+                LIMIT 1
+                """)) {
+            ps.setString(1, catalog);
+            ps.setString(2, model.catalogTableName(dialect));
+            ps.setString(3, indexName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private String currentCatalog(Connection connection, EntityModel model) throws SQLException {
+        String catalog = model.catalogSchemaName(dialect);
+        if (catalog == null || catalog.isBlank()) {
+            return connection.getCatalog();
+        }
+        return catalog;
     }
 }

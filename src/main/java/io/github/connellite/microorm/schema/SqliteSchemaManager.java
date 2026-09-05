@@ -35,6 +35,26 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected String buildCreateJoinTableDdl(ManyToManyField relation) {
+        return super.buildCreateJoinTableDdl(relation).replaceFirst("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ");
+    }
+
+    @Override
+    protected boolean dropTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
+    protected boolean dropJoinTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
+    protected boolean createJoinTableIfExistsIsSafe() {
+        return true;
+    }
+
+    @Override
     protected String createIndexDdl(EntityModel model, EntityField field) {
         String indexName = indexName(model, field);
         String indexSql = dialect.sqlName(SqlIdentifier.unquoted(indexName));

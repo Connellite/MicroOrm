@@ -67,6 +67,26 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
+    protected String buildCreateJoinTableDdl(io.github.connellite.microorm.mapping.ManyToManyField relation) {
+        return super.buildCreateJoinTableDdl(relation).replaceFirst("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ");
+    }
+
+    @Override
+    protected boolean dropTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
+    protected boolean dropJoinTableIfMissingIsSafe() {
+        return true;
+    }
+
+    @Override
+    protected boolean createJoinTableIfExistsIsSafe() {
+        return true;
+    }
+
+    @Override
     protected List<String> commentDdl(EntityModel model) {
         List<String> ddl = new ArrayList<>();
         if (!model.comment().isBlank()) {
