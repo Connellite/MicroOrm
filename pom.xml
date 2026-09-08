@@ -6,7 +6,7 @@
 
     <groupId>io.github.connellite</groupId>
     <artifactId>MicroOrm</artifactId>
-    <version>1.0.0-alpha.14</version>
+    <version>1.0.0-alpha.15</version>
     <packaging>jar</packaging>
     <name>MicroOrm</name>
     <description>Lightweight JDBC ORM, built on ExtraLib.</description>
@@ -178,6 +178,9 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <argLine>@{argLine} --add-reads io.github.connellite.ExtraLib=io.github.connellite.microorm</argLine>
+                    <parallel>none</parallel>
+                    <forkedProcessTimeoutInSeconds>720</forkedProcessTimeoutInSeconds>
+                    <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
                     <systemPropertyVariables>
                         <java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>
                     </systemPropertyVariables>
