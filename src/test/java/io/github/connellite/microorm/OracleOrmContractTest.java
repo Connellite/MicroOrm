@@ -6,10 +6,8 @@ import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.session.Session;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.OracleContainer;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,9 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OracleOrmContractTest extends AbstractOrmContractTest {
-
-    private static final OracleContainer ORACLE =
-            new OracleContainer("gvenzl/oracle-xe:21-slim-faststart");
 
     @Entity
     @Table(name = "contract_oracle_temporal")
@@ -36,11 +31,7 @@ class OracleOrmContractTest extends AbstractOrmContractTest {
 
     @Override
     protected Connection openConnection() throws SQLException {
-        TestcontainersSupport.assumeDockerAvailable();
-        if (!ORACLE.isRunning()) {
-            ORACLE.start();
-        }
-        return DriverManager.getConnection(ORACLE.getJdbcUrl(), ORACLE.getUsername(), ORACLE.getPassword());
+        return DialectTestSupport.oracle().openConnection();
     }
 
     @Override

@@ -239,6 +239,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
             return RelationPersister.insert(this, entity);
         }
         assignGeneratedIdsIfNeeded(entity, m);
+        EntityHydrator.requirePkForInsert(entity, m.primaryKey());
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         BoundStatement bs = sql.insert(m, entity);
         SqlExecutor.executeInsertReturning(connection, bs, m, entity);
@@ -282,6 +283,7 @@ public final class Session implements AutoCloseable, RelationPersistSession {
                 throw new IllegalArgumentException("Batch insert cannot mix generated and explicit primary keys");
             }
             assignGeneratedIdsIfNeeded(entity, m);
+            EntityHydrator.requirePkForInsert(entity, m.primaryKey());
             LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
             rows.add(sql.insertParameters(m, entity, omitPk));
         }
@@ -743,9 +745,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         requireMutable(model, "insertEntityRow");
         assignGeneratedIdsIfNeeded(entity, model);
         EntityField pk = model.primaryKey();
+        EntityHydrator.requirePkForInsert(entity, pk);
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
         RelationSqlGenerator.RelationInsertParts parts =
-                relationSql().buildRelationInsert(model, entity, omitPk, registry, deferred, inserted, inProgress);
+                relationSql().buildRelationInsert(
+                        model, entity, omitPk, registry, deferred, inserted, inProgress, this::existsByPrimaryKey);
         BoundStatement bs = BoundStatement.of(parts.sql(), parts.parameters());
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         SqlExecutor.executeInsertReturning(connection, bs, model, entity);
@@ -762,7 +766,8 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         requireMutable(model, "updateEntityRow");
         EntityHydrator.requirePkSet(entity, model.primaryKey());
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_UPDATE);
-        int updated = SqlExecutor.executeUpdate(connection, relationSql().update(model, entity, registry, deferred));
+        int updated = SqlExecutor.executeUpdate(
+                connection, relationSql().update(model, entity, registry, deferred, this::existsByPrimaryKey));
         if (updated > 0) {
             LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_UPDATE);
         }

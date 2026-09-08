@@ -185,10 +185,38 @@ class RelationMappingTest {
         assertFalse(owning.orphanRemoval());
         assertEquals("profile_id", userModel.manyToOneByFieldName("profile").joinColumn());
         assertTrue(userModel.manyToOneByFieldName("profile").unique());
+        assertTrue(userModel.manyToOneByFieldName("profile").nullable());
 
         OneToOneField inverse = profileModel.oneToOneRelations().get(0);
         assertFalse(inverse.owning());
         assertEquals("profile", inverse.mappedBy());
         assertEquals(owning.javaField().getName(), inverse.owningSide(registry).javaField().getName());
+    }
+
+    @Entity
+    @Table(name = "rel_optional_false_orders")
+    static class OptionalFalseOrder {
+        @Id
+        private UUID id;
+
+        @ManyToOne(optional = false)
+        @JoinColumn(name = "customer_id")
+        private LazyRef<Customer> customer;
+
+        @ManyToOne
+        @JoinColumn(name = "alt_customer_id", nullable = false)
+        private LazyRef<Customer> altCustomer;
+    }
+
+    @Test
+    void manyToOneNullabilityFollowsHibernateOptionalAndJoinColumn() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        registry.register(Customer.class);
+        EntityModel model = registry.register(OptionalFalseOrder.class);
+
+        assertFalse(model.manyToOneByFieldName("customer").nullable());
+        assertFalse(model.manyToOneByFieldName("altCustomer").nullable());
+        EntityModel orderModel = registry.register(Order.class);
+        assertTrue(orderModel.manyToOneByFieldName("customer").nullable());
     }
 }

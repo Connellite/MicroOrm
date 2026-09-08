@@ -26,6 +26,12 @@ public @interface OneToOne {
     CascadeType[] cascade() default {};
 
     /**
+     * Whether the association is optional. {@code false} on the owning side means a persistent
+     * target must always exist, like JPA {@code optional=false}.
+     */
+    boolean optional() default true;
+
+    /**
      * When {@code true}, a related entity that disappears from a materialized reference
      * (or is deleted with the owner) is deleted. Independent of {@link #cascade()}, like JPA
      * {@code orphanRemoval}.

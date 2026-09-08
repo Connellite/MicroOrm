@@ -81,7 +81,9 @@ public final class DynamicSession implements AutoCloseable {
      */
     public int insert(String tableName, Map<String, ?> values) {
         DynamicTable table = registry.get(tableName);
-        BoundStatement stmt = sql.insert(table, withGeneratedIds(table, values));
+        Map<String, Object> effectiveValues = withGeneratedIds(table, values);
+        requirePrimaryKeyForInsert(table, effectiveValues);
+        BoundStatement stmt = sql.insert(table, effectiveValues);
         return SqlExecutor.executeUpdate(connection, stmt);
     }
 
@@ -94,6 +96,7 @@ public final class DynamicSession implements AutoCloseable {
         Map<String, Object> effectiveValues = withGeneratedIds(table, values);
         Column pk = table.primaryKey();
         boolean readIdentityKey = pk.autoIncrement() && isUnsetGeneratedPk(values.get(pk.name()));
+        requirePrimaryKeyForInsert(table, effectiveValues);
         BoundStatement stmt = sql.insert(table, effectiveValues);
         if (readIdentityKey) {
             return SqlExecutor.executeDynamicInsertReturningKey(connection, stmt, pk, dialect);
@@ -183,6 +186,27 @@ public final class DynamicSession implements AutoCloseable {
             effectiveValues.put(pk.name(), id);
         }
         return effectiveValues;
+    }
+
+    private static void requirePrimaryKeyForInsert(DynamicTable table, Map<String, ?> values) {
+        Column pk = table.primaryKey();
+        Object value = values.get(pk.name());
+        if (pk.autoIncrement() && isUnsetPk(value, pk)) {
+            return;
+        }
+        if (isUnsetPk(value, pk)) {
+            throw new MicroOrmException("Primary key value is required for dynamic table '" + table.name() + "'");
+        }
+    }
+
+    private static boolean isUnsetPk(Object value, Column pk) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof String s) {
+            return s.isBlank();
+        }
+        return pk.idGeneration().generated() && isUnsetGeneratedPk(value);
     }
 
     private static boolean isUnsetGeneratedPk(Object value) {

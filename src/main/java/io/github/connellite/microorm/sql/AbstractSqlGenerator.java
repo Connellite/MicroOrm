@@ -49,6 +49,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         requireMutable(model, "insert");
         EntityField pk = model.primaryKey();
         boolean omitPk = pk.autoIncrement() && EntityHydrator.isUnsetPk(entity, pk);
+        if (!omitPk) {
+            EntityHydrator.requirePkSet(entity, pk);
+        }
         return insert(model, entity, omitPk);
     }
 
@@ -114,6 +117,19 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             List<RelationPersister.DeferredFkUpdate> deferred,
             Set<Object> inserted,
             Set<Object> inProgress) {
+        return buildRelationInsert(model, entity, omitPk, registry, deferred, inserted, inProgress, null);
+    }
+
+    @Override
+    public RelationInsertParts buildRelationInsert(
+            EntityModel model,
+            Object entity,
+            boolean omitPk,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress,
+            RelationWriteContext context) {
         Map<String, Object> named = new LinkedHashMap<>();
         for (EntityField f : model.fields()) {
             if (omitPk && f.id()) {
@@ -122,7 +138,8 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             named.put(f.columnName(), dialect.valueMapper().toJdbcValue(f, EntityHydrator.getFieldValue(entity, f)));
         }
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            named.put(relation.joinColumn(), resolveJoinColumnForWrite(entity, model, relation, registry, deferred, inserted, inProgress));
+            named.put(relation.joinColumn(), resolveJoinColumnForWrite(
+                    entity, model, relation, registry, deferred, inserted, inProgress, context));
         }
         return new RelationInsertParts(insertSql(model, omitPk), named);
     }
@@ -150,6 +167,16 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Object entity,
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred) {
+        return update(model, entity, registry, deferred, null);
+    }
+
+    @Override
+    public BoundStatement update(
+            EntityModel model,
+            Object entity,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            RelationWriteContext context) {
         requireMutable(model, "update");
         EntityField pk = model.primaryKey();
         Map<String, Object> params = new LinkedHashMap<>();
@@ -164,7 +191,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         if (registry != null) {
             for (ManyToOneField relation : model.manyToOneRelations()) {
                 Object joinValue = resolveJoinColumnForWrite(
-                        entity, model, relation, registry, deferred, null, null);
+                        entity, model, relation, registry, deferred, null, null, context);
                 appendJoinColumnAssignment(sets, params, relation, joinValue);
             }
         }
@@ -215,10 +242,14 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
     }
 
     /**
-     * Hibernate two-pass insert: a nullable FK to a not-yet-inserted target is deferred;
-     * a required transient target throws like {@code TransientPropertyValueException}.
+     * Hibernate insert/update of a many-to-one join column:
+     * {@code ForeignKeys.Nullifier} writes {@code NULL} for an unsaved target;
+     * {@code findNonNullableTransientEntities} only rejects {@code !isNullable} associations
+     * (JPA {@code optional=false} / {@code JoinColumn.nullable=false}).
+     * A nullable FK to a target still being inserted in this graph is deferred (two-pass cycle).
      *
-     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java#L267">ActionQueue unresolved entity inserts</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java">ForeignKeys.Nullifier / findNonNullableTransientEntities</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/action/internal/UnresolvedEntityInsertActions.java">UnresolvedEntityInsertActions</a>
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/TransientPropertyValueException.java">TransientPropertyValueException</a>
      */
     private Object resolveJoinColumnForWrite(
@@ -228,8 +259,10 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred,
             Set<Object> inserted,
-            Set<Object> inProgress) {
+            Set<Object> inProgress,
+            RelationWriteContext context) {
         EntityRef<?> ref = EntityRef.get(relation, entity);
+        EntityModel targetModel = registry.get(relation.targetEntityClass());
         if (ref == null) {
             if (!relation.nullable()) {
                 throw new MicroOrmException("Required @ManyToOne '" + relation.javaField().getName()
@@ -238,25 +271,31 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             return null;
         }
         Object attached = ref.attachedEntity();
-        if (attached != null && inserted != null) {
-            EntityModel targetModel = registry.get(relation.targetEntityClass());
-            boolean alreadyInserted = inserted.contains(attached);
+        if (attached != null) {
+            boolean alreadyInserted = inserted != null && inserted.contains(attached);
             boolean pendingInGraph = inProgress != null && inProgress.contains(attached) && !alreadyInserted;
-            boolean unresolved = RelationValues.isNew(attached, targetModel) || pendingInGraph
-                    || (relation.nullable() && !alreadyInserted);
-            if (unresolved) {
-                if (deferred != null && relation.nullable()) {
-                    deferred.add(new RelationPersister.DeferredFkUpdate(entity, model, relation));
+            boolean missingPersistentRow = context != null
+                    && !alreadyInserted
+                    && !pendingInGraph
+                    && !context.existsByPrimaryKey(attached, targetModel);
+            boolean unsaved = RelationValues.isNew(attached, targetModel) || pendingInGraph || missingPersistentRow;
+            if (unsaved && !alreadyInserted) {
+                if (relation.nullable()) {
+                    if (deferred != null && pendingInGraph) {
+                        deferred.add(new RelationPersister.DeferredFkUpdate(entity, model, relation));
+                    }
                     return null;
                 }
-                throw new MicroOrmException("Not-null property references a transient value - "
-                        + "transient instance must be saved before current operation: "
-                        + model.entityClass().getName() + "." + relation.javaField().getName());
+                throw RelationValues.requiredTransientAssociation(
+                        model.entityClass(), relation.javaField().getName());
             }
         }
-        EntityModel targetModel = registry.get(relation.targetEntityClass());
         Object raw = RelationValues.resolveRawForeignKey(ref, relation, registry);
-        if (raw == null) {
+        if (EntityHydrator.isUnsetPkValue(raw, targetModel.primaryKey())) {
+            if (!relation.nullable()) {
+                throw new MicroOrmException("Required @ManyToOne '" + relation.javaField().getName()
+                        + "' has no resolvable primary key on " + model.entityClass().getName());
+            }
             return null;
         }
         return dialect().valueMapper().toJdbcValue(targetModel.primaryKey(), raw);

@@ -227,7 +227,8 @@ public final class EntityModelRegistry {
         if (oneToOne != null) {
             oneToOneRelations.add(buildOneToOne(entityClass, field, oneToOne));
             if (oneToOne.mappedBy().isBlank()) {
-                manyToOneRelations.add(buildOwningToOneJoin(entityClass, field, oneToOne.cascade(), true));
+                manyToOneRelations.add(buildOwningToOneJoin(
+                        entityClass, field, oneToOne.cascade(), true, oneToOne.optional()));
             }
             return;
         }
@@ -235,21 +236,30 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("Relation reference field requires @ManyToOne or @OneToOne on "
                     + entityClass.getName() + "." + field.getName());
         }
-        manyToOneRelations.add(buildOwningToOneJoin(entityClass, field, manyToOne.cascade(), false));
+        manyToOneRelations.add(buildOwningToOneJoin(
+                entityClass, field, manyToOne.cascade(), false, manyToOne.optional()));
     }
 
+    /**
+     * Hibernate {@code ToOneBinder}: {@code optional && joinColumn.nullable()} is the property
+     * nullability used by {@code ForeignKeys.findNonNullableTransientEntities}.
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/boot/model/internal/ToOneBinder.java">ToOneBinder.setOptional</a>
+     */
     private ManyToOneField buildOwningToOneJoin(
             Class<?> entityClass,
             Field field,
             CascadeType[] cascade,
-            boolean unique) {
+            boolean unique,
+            boolean optional) {
         Class<?> targetType = resolveRefTarget(entityClass, field);
         requireEntity(targetType);
         JoinColumn joinColumn = field.getAnnotation(JoinColumn.class);
         SqlIdentifier column = joinColumn != null && !joinColumn.name().isBlank()
                 ? toPhysicalColumn(SqlIdentifier.parse(joinColumn.name()))
                 : toPhysicalColumn(SqlIdentifier.unquoted(field.getName() + "_id"));
-        boolean nullable = joinColumn == null || joinColumn.nullable();
+        boolean joinNullable = joinColumn == null || joinColumn.nullable();
+        boolean nullable = optional && joinNullable;
         Class<?> fkType = primaryKeyJavaType(targetType);
         return new ManyToOneField(field, targetType, column, nullable, fkType, cascade, unique);
     }
@@ -513,8 +523,12 @@ public final class EntityModelRegistry {
         Class<?> type = ReflectionUtil.primitiveToWrapper(converter == null ? field.getType() : converter.databaseType());
         boolean numeric = Number.class.isAssignableFrom(type);
         boolean uuid = type == UUID.class;
-        if (!numeric && !uuid) {
-            throw new MicroOrmException("@Id field must be numeric or UUID on " + entityClass.getName() + "." + field.getName());
+        boolean string = type == String.class;
+        if (!numeric && !uuid && !string) {
+            throw new MicroOrmException("@Id field must be numeric, UUID, or String on " + entityClass.getName() + "." + field.getName());
+        }
+        if (string && idGeneration.generated()) {
+            throw new MicroOrmException("String @Id must be assigned (not generated) on " + entityClass.getName() + "." + field.getName());
         }
         if (idGeneration.uuid() && !uuid) {
             throw new MicroOrmException("@UuidGenerator requires a UUID @Id field on " + entityClass.getName() + "." + field.getName());

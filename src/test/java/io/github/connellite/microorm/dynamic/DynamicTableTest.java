@@ -120,6 +120,9 @@ class DynamicTableTest {
         assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
                 .column("id", LogicalType.UUID, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
                 .build());
+        assertThrows(IllegalArgumentException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.STRING, c -> c.primaryKey().generatedValue(GenerationType.IDENTITY))
+                .build());
     }
 
     @Test

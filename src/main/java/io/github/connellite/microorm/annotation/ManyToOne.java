@@ -15,4 +15,10 @@ import java.lang.annotation.Target;
 public @interface ManyToOne {
     /** Operations cascaded to the referenced entity. Empty by default, like JPA. */
     CascadeType[] cascade() default {};
+
+    /**
+     * Whether the association is optional. {@code false} means a persistent target must always
+     * exist, like JPA {@code optional=false}.
+     */
+    boolean optional() default true;
 }

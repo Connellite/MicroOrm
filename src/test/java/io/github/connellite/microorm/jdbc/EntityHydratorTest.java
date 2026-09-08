@@ -60,6 +60,28 @@ class EntityHydratorTest {
         assertFalse(EntityHydrator.isUnsetPk(item, pk));
     }
 
+    @Entity
+    @Table(name = "hydrator_string_ids")
+    static class StringIdItem {
+        @Id
+        private String id;
+    }
+
+    @Test
+    void isUnsetPkTreatsNullAndBlankStringAsUnset() {
+        EntityModel stringModel = new EntityModelRegistry().register(StringIdItem.class);
+        EntityField stringPk = stringModel.primaryKey();
+        StringIdItem item = new StringIdItem();
+
+        assertTrue(EntityHydrator.isUnsetPk(item, stringPk));
+        item.id = "";
+        assertTrue(EntityHydrator.isUnsetPk(item, stringPk));
+        item.id = "   ";
+        assertTrue(EntityHydrator.isUnsetPk(item, stringPk));
+        item.id = "ada";
+        assertFalse(EntityHydrator.isUnsetPk(item, stringPk));
+    }
+
     @Test
     void getAndSetFieldValueRoundTrip() {
         Item item = new Item();

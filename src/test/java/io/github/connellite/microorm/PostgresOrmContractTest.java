@@ -1,9 +1,6 @@
 package io.github.connellite.microorm;
 
-import org.testcontainers.containers.PostgreSQLContainer;
-
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,16 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PostgresOrmContractTest extends AbstractOrmContractTest {
 
-    private static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16-alpine");
-
     @Override
     protected Connection openConnection() throws SQLException {
-        TestcontainersSupport.assumeDockerAvailable();
-        if (!POSTGRES.isRunning()) {
-            POSTGRES.start();
-        }
-        return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DialectTestSupport.postgres().openConnection();
     }
 
     @Override

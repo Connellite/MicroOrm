@@ -145,15 +145,20 @@ abstract class AbstractManyToManyWriteTest {
 
     @AfterEach
     void tearDown() throws SQLException {
-        if (connection != null && !connection.isClosed()) {
-            try (Session session = orm.openSession()) {
-                session.dropEntity(Author.class);
-                session.dropEntity(PlainAuthor.class);
-                session.dropEntity(Book.class);
-                session.dropEntity(RemoveAuthor.class);
-                session.dropEntity(RemoveBook.class);
+        try {
+            if (connection != null && !connection.isClosed() && orm != null) {
+                try (Session session = orm.openSession()) {
+                    session.dropEntity(Author.class);
+                    session.dropEntity(PlainAuthor.class);
+                    session.dropEntity(Book.class);
+                    session.dropEntity(RemoveAuthor.class);
+                    session.dropEntity(RemoveBook.class);
+                }
             }
-            connection.close();
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
         }
     }
 
@@ -329,6 +334,27 @@ abstract class AbstractManyToManyWriteTest {
                     io.github.connellite.microorm.exception.MicroOrmException.class,
                     () -> session.insertRow(author));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
+            assertNull(session.selectRow(PlainAuthor.class, author.id));
+        }
+    }
+
+    @Test
+    void persistRejectsAssignedIdBookWithoutCascadeWhenTargetRowIsMissing() throws SQLException {
+        PlainAuthor author = new PlainAuthor();
+        author.id = UUID.fromString("77777777-7777-4777-8777-777777777778");
+        author.name = "No cascade assigned";
+        Book book = new Book();
+        book.id = UUID.fromString("77777777-7777-4777-8777-777777777779");
+        book.title = "Missing assigned";
+        author.books = LazyCollection.of(List.of(book));
+
+        try (Session session = orm.openSession()) {
+            var error = assertThrows(
+                    io.github.connellite.microorm.exception.MicroOrmException.class,
+                    () -> session.insertRow(author));
+            assertTrue(error.getMessage().contains("transient instance must be saved"));
+            assertNull(session.selectRow(PlainAuthor.class, author.id));
+            assertNull(session.selectRow(Book.class, book.id));
         }
     }
 

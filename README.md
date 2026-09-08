@@ -97,6 +97,29 @@ UUID primary keys can be generated before insert with `@UuidGenerator`. Supporte
 @UuidGenerator(version = UuidGenerator.Version.VERSION_7)
 private UUID id;
 ```
+
+A `String` primary key is assigned by the application and is never generated. Set a non-blank value before persist — for example a unique login:
+
+```java
+@Entity
+@Table(name = "users")
+public class User {
+    @Id
+    @Column(name = "user_id", length = 64)
+    private String userId;
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+}
+
+User user = new User();
+user.setUserId("ada");
+session.insertRow(user);
+```
+
+`null` and blank values are treated as unset and are rejected on insert, update, and delete.
+
 ## EntitySelect
 
 `EntitySelect` builds named-parameter SQL for a single root entity. Use it when you need composable predicates, sorting, pagination, or joins — without writing raw SQL.
@@ -228,7 +251,7 @@ public class Profile {
 
 `insertRow` is persist, `updateRow` is merge, `deleteRow` is remove.
 
-Persist order follows Hibernate: many-to-one parents are saved first, then the row, then collections. Required FKs to a transient target fail like `PropertyValueException` instead of inserting a violating row. Cyclic nullable FKs are written in a second update after both rows exist.
+Persist order follows Hibernate: many-to-one parents are saved first, then the row, then collections. Required (`optional=false` / `JoinColumn.nullable=false`) FKs to a transient target fail like Hibernate `TransientPropertyValueException`. Optional/nullable many-to-one to an unsaved target is nullified (`ForeignKeys.Nullifier`) instead of throwing. Cyclic nullable FKs are written in a second update after both rows exist.
 
 For writes, attach entities with `LazyRef.to(entity)` or reference existing rows with `LazyRef.toId(Customer.class, id)`. Collections can be built with `LazyCollection.builder()` before insert/update.
 
@@ -389,12 +412,13 @@ Entity classes on the classpath (unnamed module) do not need the `add-reads` fla
 
 ## Limitations (alpha)
 
-- Single-column primary keys only (numeric or UUID)
+- Single-column primary keys only (numeric, UUID, or assigned non-blank `String`)
 - Associations: `@ManyToOne`, `@OneToMany`, and `@ManyToMany` (no `@OneToOne` or embeddables)
 - No migrations framework or entity inheritance strategies
 - `Session` is not thread-safe — one session per thread
 - Supported field types: numeric primitives/wrappers, `boolean`, `String`, `UUID`, `float`/`double`
-- Numeric `0` is treated as unset for `@Id(autoIncrement = true)` inserts and PK lookups
+- Numeric `0` is treated as unset for generated numeric `@Id` inserts and PK lookups
+- Blank `String` `@Id` values are treated as unset and must be assigned before persist
 - `EntitySelect` covers one root entity; use raw `Query` for arbitrary projections or vendor-specific SQL
 
 ## License

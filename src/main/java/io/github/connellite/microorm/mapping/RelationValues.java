@@ -84,4 +84,20 @@ public final class RelationValues {
     public static boolean isNew(Object entity, EntityModel model) {
         return EntityHydrator.isUnsetPk(entity, model.primaryKey());
     }
+
+    /**
+     * Hibernate {@code TransientPropertyValueException} for a <em>non-nullable</em> association
+     * to an unsaved instance. Hibernate 5 text (still thrown from
+     * {@code UnresolvedEntityInsertActions} / {@code ForeignKeys.findNonNullableTransientEntities}
+     * which only collect {@code !isNullable} many-to-ones, not optional ones).
+     *
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java">ForeignKeys.findNonNullableTransientEntities</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/action/internal/UnresolvedEntityInsertActions.java">UnresolvedEntityInsertActions.checkNoUnresolvedActionsAfterOperation</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/TransientPropertyValueException.java">TransientPropertyValueException</a>
+     */
+    public static MicroOrmException requiredTransientAssociation(Class<?> ownerType, String propertyName) {
+        return new MicroOrmException("Not-null property references a transient value - "
+                + "transient instance must be saved before current operation: "
+                + ownerType.getName() + "." + propertyName);
+    }
 }

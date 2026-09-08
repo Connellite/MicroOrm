@@ -1,7 +1,6 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.microorm.annotation.CascadeType;
-import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.relation.EagerRef;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
@@ -24,9 +23,10 @@ import java.util.Set;
  *   <li>{@code persist}: cascade many-to-one before insert (parents first), then insert,
  *       then cascade collections (children after the FK owner exists)</li>
  *   <li>nullable FKs to a not-yet-inserted target are left {@code NULL} and updated after
- *       both rows exist (Hibernate unresolved entity-insert / two-pass cycle handling)</li>
- *   <li>required FKs to a transient or still-pending target fail like Hibernate
- *       {@code TransientPropertyValueException} instead of inserting a violating row</li>
+ *       both rows exist (Hibernate {@code ForeignKeys.Nullifier} / two-pass cycle handling)</li>
+ *   <li>required ({@code optional=false}) FKs to a transient target fail like Hibernate
+ *       {@code ForeignKeys.findNonNullableTransientEntities} /
+ *       {@code TransientPropertyValueException}; optional/nullable transients are nullified</li>
  *   <li>{@code remove}: delete cascaded children first, then the owner</li>
  * </ul>
  * {@code insertRow} is persist, {@code updateRow} is merge, {@code deleteRow} is remove.
@@ -152,6 +152,7 @@ public final class RelationPersister {
         }
         EntityModel model = session.registry().get(entity.getClass());
         cascadePersistManyToOnes(session, entity, model, inProgress, inserted, deferred);
+        validatePersistManyToManyTargets(session, entity, model, inserted);
         session.assignGeneratedIdsIfNeeded(entity, model);
         session.insertEntityRow(entity, model, deferred, inserted, inProgress);
         inserted.add(entity);
@@ -160,11 +161,15 @@ public final class RelationPersister {
 
     /**
      * Hibernate {@code cascadeBeforeSave}: persist many-to-one before the owner insert
-     * ({@code CascadePoint.BEFORE_INSERT_AFTER_DELETE}). A required transient target without
-     * {@code CascadeType.PERSIST} fails like {@code TransientPropertyValueException}.
+     * ({@code CascadePoint.BEFORE_INSERT_AFTER_DELETE}). Uncascaded transients are not rejected
+     * here — Hibernate's cascade visitor only persists when {@code CascadeType.PERSIST} is set.
+     * A <em>required</em> ({@code optional=false} / {@code JoinColumn.nullable=false}) transient
+     * target fails later like {@code ForeignKeys.findNonNullableTransientEntities} /
+     * {@code TransientPropertyValueException}. A nullable one is nullified on insert.
      *
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/AbstractSaveEventListener.java#L471">AbstractSaveEventListener.cascadeBeforeSave</a>
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/CascadePoint.java#L23">CascadePoint.BEFORE_INSERT_AFTER_DELETE</a>
+     * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java">ForeignKeys.findNonNullableTransientEntities</a>
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/TransientPropertyValueException.java">TransientPropertyValueException</a>
      */
     private static void cascadePersistManyToOnes(
@@ -175,6 +180,9 @@ public final class RelationPersister {
             Set<Object> inserted,
             List<DeferredFkUpdate> deferred) {
         for (ManyToOneField relation : model.manyToOneRelations()) {
+            if (!relation.cascades(CascadeType.PERSIST)) {
+                continue;
+            }
             EntityRef<?> ref = EntityRef.get(relation, entity);
             if (ref == null) {
                 continue;
@@ -185,19 +193,7 @@ public final class RelationPersister {
             }
             EntityModel targetModel = session.registry().get(relation.targetEntityClass());
             boolean transientTarget = RelationValues.isNew(attached, targetModel);
-            if (!relation.cascades(CascadeType.PERSIST)) {
-                if (transientTarget) {
-                    throw new MicroOrmException("Not-null property references a transient value - "
-                            + "transient instance must be saved before current operation: "
-                            + model.entityClass().getName() + "." + relation.javaField().getName());
-                }
-                continue;
-            }
-            if (transientTarget) {
-                persist(session, attached, inProgress, inserted, deferred);
-                continue;
-            }
-            if (!session.existsByPrimaryKey(attached, targetModel)) {
+            if (transientTarget || !session.existsByPrimaryKey(attached, targetModel)) {
                 persist(session, attached, inProgress, inserted, deferred);
             }
         }
@@ -239,6 +235,34 @@ public final class RelationPersister {
         persistInverseOneToOnes(session, owner, ownerModel, inProgress, inserted, deferred);
     }
 
+    private static void validatePersistManyToManyTargets(
+            RelationPersistSession session,
+            Object owner,
+            EntityModel ownerModel,
+            Set<Object> inserted) {
+        for (ManyToManyField relation : ownerModel.manyToManyRelations()) {
+            if (!relation.owning()) {
+                continue;
+            }
+            if (relation.cascades(CascadeType.PERSIST)) {
+                continue;
+            }
+            EntityCollection<?> collection = EntityCollection.get(relation, owner);
+            if (collection == null || !collection.isMaterialized()) {
+                continue;
+            }
+            EntityModel childModel = session.registry().get(relation.targetEntityClass());
+            for (Object child : collection.elementsOrEmpty()) {
+                if (RelationValues.isNew(child, childModel)) {
+                    throw RelationValues.requiredTransientAssociation(ownerModel.entityClass(), relation.javaField().getName());
+                }
+                if (!inserted.contains(child) && !session.existsByPrimaryKey(child, childModel)) {
+                    throw RelationValues.requiredTransientAssociation(ownerModel.entityClass(), relation.javaField().getName());
+                }
+            }
+        }
+    }
+
     /**
      * Inverse {@code @OneToOne} is persisted after the owner exists so the owning join column
      * can point at the owner primary key.
@@ -273,11 +297,9 @@ public final class RelationPersister {
                 } else if (!transientTarget) {
                     session.updateJoinColumn(child, childModel, owning);
                 }
-            } else if (transientTarget) {
-                throw new MicroOrmException("Not-null property references a transient value - "
-                        + "transient instance must be saved before current operation: "
-                        + ownerModel.entityClass().getName() + "." + relation.javaField().getName());
             }
+            // Unowned / inverse without cascade: Hibernate skips persist (CascadeStyles.NONE).
+            // CHECK_ON_FLUSH also skips unowned associations unless unowned_association_transient_check.
         }
     }
 
@@ -295,6 +317,9 @@ public final class RelationPersister {
             Set<Object> inserted,
             List<DeferredFkUpdate> deferred) {
         for (ManyToManyField relation : ownerModel.manyToManyRelations()) {
+            if (!relation.owning() && !relation.cascades(CascadeType.PERSIST)) {
+                continue;
+            }
             EntityCollection<?> collection = EntityCollection.get(relation, owner);
             if (collection == null || !collection.isMaterialized()) {
                 continue;
@@ -309,15 +334,15 @@ public final class RelationPersister {
                         persist(session, child, inProgress, inserted, deferred);
                     }
                 } else if (transientTarget) {
-                    throw new MicroOrmException("Not-null property references a transient value - "
-                            + "transient instance must be saved before current operation: "
-                            + ownerModel.entityClass().getName() + "." + relation.javaField().getName());
+                    throw RelationValues.requiredTransientAssociation(
+                            ownerModel.entityClass(), relation.javaField().getName());
+                } else if (!inserted.contains(child) && !session.existsByPrimaryKey(child, childModel)) {
+                    throw RelationValues.requiredTransientAssociation(ownerModel.entityClass(), relation.javaField().getName());
                 }
                 Object childPk = session.pkValue(child, childModel);
                 if (childPk == null) {
-                    throw new MicroOrmException("Not-null property references a transient value - "
-                            + "transient instance must be saved before current operation: "
-                            + ownerModel.entityClass().getName() + "." + relation.javaField().getName());
+                    throw RelationValues.requiredTransientAssociation(
+                            ownerModel.entityClass(), relation.javaField().getName());
                 }
                 targetPks.add(childPk);
             }
@@ -418,13 +443,10 @@ public final class RelationPersister {
             setRefToOwner(owning, attached, entity);
             if (mergeChild) {
                 merge(session, attached, inProgress, inserted, deferred);
-            } else if (RelationValues.isNew(attached, childModel)) {
-                throw new MicroOrmException("Not-null property references a transient value - "
-                        + "transient instance must be saved before current operation: "
-                        + model.entityClass().getName() + "." + relation.javaField().getName());
-            } else {
+            } else if (!RelationValues.isNew(attached, childModel)) {
                 session.updateJoinColumn(attached, childModel, owning);
             }
+            // Inverse without cascade MERGE: do not persist a transient child (Hibernate cascade NONE).
         }
     }
 
@@ -440,7 +462,7 @@ public final class RelationPersister {
             Set<Object> inserted,
             List<DeferredFkUpdate> deferred) {
         for (ManyToOneField relation : model.manyToOneRelations()) {
-            if (!relation.cascades(CascadeType.MERGE) && !relation.cascades(CascadeType.PERSIST)) {
+            if (!relation.cascades(CascadeType.MERGE)) {
                 continue;
             }
             EntityRef<?> ref = EntityRef.get(relation, entity);
@@ -522,14 +544,18 @@ public final class RelationPersister {
             }
             EntityModel childModel = session.registry().get(relation.targetEntityClass());
             boolean mergeChildren = relation.cascades(CascadeType.MERGE);
+            if (!relation.owning() && !mergeChildren) {
+                continue;
+            }
             Set<Object> targetPks = new HashSet<>();
             for (Object child : collection.elementsOrEmpty()) {
                 if (mergeChildren) {
                     merge(session, child, inProgress, inserted, deferred);
                 } else if (RelationValues.isNew(child, childModel)) {
-                    throw new MicroOrmException("Not-null property references a transient value - "
-                            + "transient instance must be saved before current operation: "
-                            + model.entityClass().getName() + "." + relation.javaField().getName());
+                    throw RelationValues.requiredTransientAssociation(
+                            model.entityClass(), relation.javaField().getName());
+                } else if (!inserted.contains(child) && !session.existsByPrimaryKey(child, childModel)) {
+                    throw RelationValues.requiredTransientAssociation(model.entityClass(), relation.javaField().getName());
                 }
                 Object childPk = session.pkValue(child, childModel);
                 if (childPk != null) {

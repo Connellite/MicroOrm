@@ -78,6 +78,23 @@ abstract class AbstractOneToOneWriteTest {
     }
 
     @Entity
+    @Table(name = "o2o_required_users")
+    static class RequiredUser {
+        @Id
+        UUID id;
+
+        @Column(nullable = false)
+        String name;
+
+        @OneToOne(optional = false)
+        @JoinColumn(name = "profile_id")
+        LazyRef<Profile> profile;
+
+        RequiredUser() {
+        }
+    }
+
+    @Entity
     @Table(name = "o2o_remove_users")
     static class RemoveUser {
         @Id
@@ -151,12 +168,13 @@ abstract class AbstractOneToOneWriteTest {
     void setUp() throws SQLException {
         connection = openConnection();
         orm = createOrm(connection).register(
-                User.class, Profile.class, PlainUser.class,
+                User.class, Profile.class, PlainUser.class, RequiredUser.class,
                 RemoveUser.class, RemoveProfile.class,
                 Employee.class, Desk.class);
         try (Session session = orm.openSession()) {
             session.dropEntity(User.class);
             session.dropEntity(PlainUser.class);
+            session.dropEntity(RequiredUser.class);
             session.dropEntity(RemoveUser.class);
             session.dropEntity(Employee.class);
             session.dropEntity(Profile.class);
@@ -167,6 +185,7 @@ abstract class AbstractOneToOneWriteTest {
             session.createEntity(Desk.class);
             session.createEntity(User.class);
             session.createEntity(PlainUser.class);
+            session.createEntity(RequiredUser.class);
             session.createEntity(RemoveUser.class);
             session.createEntity(Employee.class);
         }
@@ -174,17 +193,23 @@ abstract class AbstractOneToOneWriteTest {
 
     @AfterEach
     void tearDown() throws SQLException {
-        if (connection != null && !connection.isClosed()) {
-            try (Session session = orm.openSession()) {
-                session.dropEntity(User.class);
-                session.dropEntity(PlainUser.class);
-                session.dropEntity(RemoveUser.class);
-                session.dropEntity(Employee.class);
-                session.dropEntity(Profile.class);
-                session.dropEntity(RemoveProfile.class);
-                session.dropEntity(Desk.class);
+        try {
+            if (connection != null && !connection.isClosed() && orm != null) {
+                try (Session session = orm.openSession()) {
+                    session.dropEntity(User.class);
+                    session.dropEntity(PlainUser.class);
+                    session.dropEntity(RequiredUser.class);
+                    session.dropEntity(RemoveUser.class);
+                    session.dropEntity(Employee.class);
+                    session.dropEntity(Profile.class);
+                    session.dropEntity(RemoveProfile.class);
+                    session.dropEntity(Desk.class);
+                }
             }
-            connection.close();
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
         }
     }
 
@@ -406,10 +431,28 @@ abstract class AbstractOneToOneWriteTest {
     }
 
     @Test
-    void persistRejectsTransientProfileWithoutCascade() throws SQLException {
+    void persistNullableTransientOneToOneWithoutCascadeWritesNullFk() throws SQLException {
         PlainUser user = new PlainUser();
         user.id = UUID.fromString("77777777-7777-4777-8777-777777777777");
         user.name = "No cascade";
+        Profile profile = new Profile();
+        profile.bio = "Missing";
+        user.profile = LazyRef.to(profile);
+
+        try (Session session = orm.openSession()) {
+            session.insertRow(user);
+            PlainUser loaded = session.selectRow(PlainUser.class, user.id);
+            assertEquals("No cascade", loaded.name);
+            assertNull(loaded.profile.get());
+            assertNull(profile.id);
+        }
+    }
+
+    @Test
+    void persistRejectsRequiredTransientOneToOneWithoutCascade() throws SQLException {
+        RequiredUser user = new RequiredUser();
+        user.id = UUID.fromString("77777777-7777-4777-8777-777777777778");
+        user.name = "Required profile";
         Profile profile = new Profile();
         profile.bio = "Missing";
         user.profile = LazyRef.to(profile);
@@ -419,6 +462,45 @@ abstract class AbstractOneToOneWriteTest {
                     io.github.connellite.microorm.exception.MicroOrmException.class,
                     () -> session.insertRow(user));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
+            assertNull(session.selectRow(RequiredUser.class, user.id));
+        }
+    }
+
+    @Test
+    void persistNullableAssignedIdOneToOneWithoutCascadeWritesNullFkWhenTargetRowIsMissing() throws SQLException {
+        PlainUser user = new PlainUser();
+        user.id = UUID.fromString("77777777-7777-4777-8777-777777777779");
+        user.name = "Assigned missing";
+        Profile profile = new Profile();
+        profile.id = UUID.fromString("77777777-7777-4777-8777-777777777780");
+        profile.bio = "Missing";
+        user.profile = LazyRef.to(profile);
+
+        try (Session session = orm.openSession()) {
+            session.insertRow(user);
+            PlainUser loaded = session.selectRow(PlainUser.class, user.id);
+            assertEquals("Assigned missing", loaded.name);
+            assertNull(loaded.profile.get());
+            assertNull(session.selectRow(Profile.class, profile.id));
+        }
+    }
+
+    @Test
+    void persistRejectsRequiredAssignedIdOneToOneWithoutCascadeWhenTargetRowIsMissing() throws SQLException {
+        RequiredUser user = new RequiredUser();
+        user.id = UUID.fromString("77777777-7777-4777-8777-777777777781");
+        user.name = "Required assigned";
+        Profile profile = new Profile();
+        profile.id = UUID.fromString("77777777-7777-4777-8777-777777777782");
+        profile.bio = "Missing";
+        user.profile = LazyRef.to(profile);
+
+        try (Session session = orm.openSession()) {
+            var error = assertThrows(
+                    io.github.connellite.microorm.exception.MicroOrmException.class,
+                    () -> session.insertRow(user));
+            assertTrue(error.getMessage().contains("transient instance must be saved"));
+            assertNull(session.selectRow(RequiredUser.class, user.id));
         }
     }
 

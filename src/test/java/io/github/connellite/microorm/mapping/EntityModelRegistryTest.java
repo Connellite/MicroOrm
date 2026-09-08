@@ -116,6 +116,21 @@ class EntityModelRegistryTest {
     }
 
     @Entity
+    @Table(name = "assigned_string_ids")
+    static class AssignedStringId {
+        @Id
+        private String id;
+    }
+
+    @Entity
+    @Table(name = "generated_string_ids")
+    static class GeneratedStringId {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private String id;
+    }
+
+    @Entity
     @Table(name = "uuid_generated_ids")
     static class UuidGeneratedId {
         @Id
@@ -398,6 +413,23 @@ class EntityModelRegistryTest {
         EntityModelRegistry registry = new EntityModelRegistry();
 
         assertThrows(MicroOrmException.class, () -> registry.register(GeneratedUuidId.class));
+    }
+
+    @Test
+    void assignedStringIdIsAcceptedWithoutGeneration() {
+        EntityModel model = new EntityModelRegistry().register(AssignedStringId.class);
+
+        assertEquals(String.class, model.primaryKey().javaType());
+        assertFalse(model.primaryKey().autoIncrement());
+        assertFalse(model.primaryKey().idGeneration().generated());
+    }
+
+    @Test
+    void rejectsGeneratedValueOnStringId() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+
+        MicroOrmException error = assertThrows(MicroOrmException.class, () -> registry.register(GeneratedStringId.class));
+        assertTrue(error.getMessage().contains("assigned"));
     }
 
     @Test

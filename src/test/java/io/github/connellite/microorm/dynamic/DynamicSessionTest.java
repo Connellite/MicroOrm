@@ -113,6 +113,43 @@ class DynamicSessionTest {
         }
     }
 
+    @Test
+    void insertReturningIdReturnsAssignedStringPrimaryKey() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(assignedStringIdTable());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("string_users");
+
+                Object id = session.insertReturningId("string_users", Map.of("user_id", "ada", "name", "Ada"));
+
+                assertEquals("ada", id);
+                Map<String, Object> row = session.selectOne("string_users", Map.of("user_id", id)).orElseThrow();
+                assertEquals("Ada", row.get("name"));
+            }
+        }
+    }
+
+    @Test
+    void dynamicAssignedStringPrimaryKeyMustBeNonBlankBeforeInsert() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(assignedStringIdTable());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("string_users");
+
+                assertThrows(MicroOrmException.class,
+                        () -> session.insert("string_users", Map.of("name", "Missing id")));
+                assertThrows(MicroOrmException.class,
+                        () -> session.insert("string_users", Map.of("user_id", "   ", "name", "Blank id")));
+                assertThrows(MicroOrmException.class,
+                        () -> session.insertReturningId("string_users", Map.of("name", "Missing id")));
+                assertThrows(MicroOrmException.class,
+                        () -> session.insertReturningId("string_users", Map.of("user_id", "   ", "name", "Blank id")));
+            }
+        }
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("dialects")
     void createInsertSelectUpdateDelete(DialectTestSupport.DialectFixture dialect) throws SQLException {
@@ -230,6 +267,13 @@ class DynamicSessionTest {
         return DynamicTable.builder("generated_uuid_items")
                 .column("id", LogicalType.UUID, c -> c.primaryKey()
                         .uuidGenerator(UuidGenerator.Version.VERSION_7))
+                .column("name", LogicalType.STRING, Column.Builder::notNull)
+                .build();
+    }
+
+    private static DynamicTable assignedStringIdTable() {
+        return DynamicTable.builder("string_users")
+                .column("user_id", LogicalType.STRING, c -> c.primaryKey().length(64))
                 .column("name", LogicalType.STRING, Column.Builder::notNull)
                 .build();
     }

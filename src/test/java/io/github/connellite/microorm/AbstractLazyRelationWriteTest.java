@@ -148,6 +148,24 @@ abstract class AbstractLazyRelationWriteTest {
         }
     }
 
+    /** Required many-to-one ({@code optional=false}) without cascade — Hibernate rejects a transient target. */
+    @Entity
+    @Table(name = "write_required_docs")
+    static class RequiredDocument {
+        @Id
+        UUID id;
+
+        @Column(nullable = false)
+        String title;
+
+        @ManyToOne(optional = false)
+        @JoinColumn(name = "folder_id")
+        LazyRef<Folder> folder;
+
+        RequiredDocument() {
+        }
+    }
+
     private Connection connection;
     private MicroOrm orm;
 
@@ -162,14 +180,27 @@ abstract class AbstractLazyRelationWriteTest {
         connection = openConnection();
         RelationWriteFkSchema.prepareConnection(databaseKind(), connection);
         RelationWriteFkSchema.recreateSchema(databaseKind(), connection);
-        orm = createOrm(connection).register(Folder.class, Document.class, StoredFile.class, DocHead.class, HeadFile.class);
+        orm = createOrm(connection).register(
+                Folder.class, Document.class, StoredFile.class, DocHead.class, HeadFile.class, RequiredDocument.class);
+        try (Session session = orm.openSession()) {
+            session.dropEntity(RequiredDocument.class);
+            session.createEntity(RequiredDocument.class);
+        }
     }
 
     @AfterEach
     void tearDown() throws SQLException {
-        if (connection != null && !connection.isClosed()) {
-            RelationWriteFkSchema.dropSchema(databaseKind(), connection);
-            connection.close();
+        try {
+            if (connection != null && !connection.isClosed() && orm != null) {
+                try (Session session = orm.openSession()) {
+                    session.dropEntity(RequiredDocument.class);
+                }
+                RelationWriteFkSchema.dropSchema(databaseKind(), connection);
+            }
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
         }
     }
 
@@ -648,7 +679,7 @@ abstract class AbstractLazyRelationWriteTest {
     }
 
     @Test
-    void persistRejectsTransientManyToOneWithoutCascade() throws SQLException {
+    void persistNullableTransientManyToOneWithoutCascadeWritesNullFk() throws SQLException {
         Folder folder = new Folder();
         folder.name = "Missing";
         folder.itemCount = 0;
@@ -659,9 +690,29 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.to(folder);
 
         try (Session session = orm.openSession()) {
+            session.insertRow(doc);
+            Document loaded = session.selectRow(Document.class, doc.id);
+            assertEquals("Orphaned", loaded.title);
+            assertNull(loaded.folder.get());
+            assertNull(folder.id);
+        }
+    }
+
+    @Test
+    void persistRejectsRequiredTransientManyToOneWithoutCascade() throws SQLException {
+        Folder folder = new Folder();
+        folder.name = "Missing";
+        folder.itemCount = 0;
+
+        RequiredDocument doc = new RequiredDocument();
+        doc.id = UUID.fromString("eeeeeee3-eeee-4eee-8eee-eeeeeeeeeee3");
+        doc.title = "Required folder";
+        doc.folder = LazyRef.to(folder);
+
+        try (Session session = orm.openSession()) {
             MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insertRow(doc));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(Document.class, doc.id));
+            assertNull(session.selectRow(RequiredDocument.class, doc.id));
         }
     }
 
@@ -685,6 +736,72 @@ abstract class AbstractLazyRelationWriteTest {
             assertNotNull(session.selectRow(Folder.class, folder.id));
             assertNull(session.selectRow(Document.class, doc.id));
             assertEquals(0, session.selectRow(Folder.class, folder.id).documents.get().size());
+        }
+    }
+
+    @Test
+    void persistNullableAssignedIdManyToOneWithoutCascadeWritesNullFkWhenTargetRowIsMissing() throws SQLException {
+        Folder folder = new Folder();
+        folder.id = UUID.fromString("fffffff2-ffff-4fff-8fff-fffffffffff2");
+        folder.name = "Missing assigned";
+        folder.itemCount = 0;
+
+        Document doc = new Document();
+        doc.id = UUID.fromString("fffffff3-ffff-4fff-8fff-fffffffffff3");
+        doc.title = "Nullable assigned target";
+        doc.folder = LazyRef.to(folder);
+
+        try (Session session = orm.openSession()) {
+            session.insertRow(doc);
+            assertNotNull(session.selectRow(Document.class, doc.id));
+            assertNull(session.selectRow(Document.class, doc.id).folder.get());
+            assertNull(session.selectRow(Folder.class, folder.id));
+        }
+    }
+
+    @Test
+    void persistRejectsRequiredAssignedIdManyToOneWithoutCascadeWhenTargetRowIsMissing() throws SQLException {
+        Folder folder = new Folder();
+        folder.id = UUID.fromString("fffffff4-ffff-4fff-8fff-fffffffffff4");
+        folder.name = "Missing assigned";
+        folder.itemCount = 0;
+
+        RequiredDocument doc = new RequiredDocument();
+        doc.id = UUID.fromString("fffffff5-ffff-4fff-8fff-fffffffffff5");
+        doc.title = "Required assigned target";
+        doc.folder = LazyRef.to(folder);
+
+        try (Session session = orm.openSession()) {
+            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insertRow(doc));
+            assertTrue(error.getMessage().contains("transient instance must be saved"));
+            assertNull(session.selectRow(RequiredDocument.class, doc.id));
+        }
+    }
+
+    @Test
+    void updateWithPersistOnlyCascadeDoesNotPersistNewManyToOneTarget() throws SQLException {
+        Document doc = new Document();
+        doc.id = UUID.fromString("fffffff6-ffff-4fff-8fff-fffffffffff6");
+        doc.title = "Original";
+        StoredFile file = new StoredFile();
+        file.id = UUID.fromString("fffffff7-ffff-4fff-8fff-fffffffffff7");
+        file.name = "file.txt";
+        file.document = LazyRef.to(doc);
+
+        try (Session session = orm.openSession()) {
+            session.insertRow(file);
+        }
+
+        Document missing = new Document();
+        missing.id = UUID.fromString("fffffff8-ffff-4fff-8fff-fffffffffff8");
+        missing.title = "Missing";
+        file.document = LazyRef.to(missing);
+
+        try (Session session = orm.openSession()) {
+            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.updateRow(file));
+            assertTrue(error.getMessage().contains("transient instance must be saved"));
+            assertNull(session.selectRow(Document.class, missing.id));
+            assertEquals(doc.id, session.selectRow(StoredFile.class, file.id).document.get().id);
         }
     }
 

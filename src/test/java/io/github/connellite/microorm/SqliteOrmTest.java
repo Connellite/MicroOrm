@@ -226,12 +226,43 @@ class SqliteOrmTest {
     }
 
     @Entity
-    @Table(name = "invalid_string_id")
-    public static class InvalidStringId {
+    @Table(name = "assigned_string_users")
+    public static class AssignedStringUser {
         @Id
-        private String id;
+        @Column(name = "user_id", length = 64)
+        private String userId;
 
-        public InvalidStringId() {
+        @Column(nullable = false)
+        private String name;
+
+        public AssignedStringUser() {
+        }
+
+        public AssignedStringUser(String userId, String name) {
+            this.userId = userId;
+            this.name = name;
+        }
+
+        public String getUserId() {
+            return userId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+
+    @Entity
+    @Table(name = "invalid_boolean_id")
+    public static class InvalidBooleanId {
+        @Id
+        private boolean id;
+
+        public InvalidBooleanId() {
         }
     }
 
@@ -486,9 +517,39 @@ class SqliteOrmTest {
     }
 
     @Test
+    void assignedStringIdMustBeNonBlankBeforePersist() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(AssignedStringUser.class);
+            try (Session s = orm.openSession()) {
+                s.dropEntity(AssignedStringUser.class);
+                s.createEntity(AssignedStringUser.class);
+
+                AssignedStringUser saved = s.insertRow(new AssignedStringUser("ada", "Ada"));
+                assertEquals("ada", saved.getUserId());
+                AssignedStringUser loaded = s.selectRow(AssignedStringUser.class, "ada");
+                assertEquals("Ada", loaded.getName());
+
+                loaded.setName("Ada Lovelace");
+                assertEquals(1, s.updateRow(loaded));
+                assertEquals("Ada Lovelace", s.selectRow(AssignedStringUser.class, "ada").getName());
+
+                MicroOrmException missing = assertThrows(MicroOrmException.class,
+                        () -> s.insertRow(new AssignedStringUser()));
+                assertTrue(missing.getMessage().contains("Primary key"));
+                MicroOrmException blank = assertThrows(MicroOrmException.class,
+                        () -> s.insertRow(new AssignedStringUser("  ", "blank")));
+                assertTrue(blank.getMessage().contains("Primary key"));
+
+                assertEquals(1, s.deleteRow(loaded));
+                assertNull(s.selectRow(AssignedStringUser.class, "ada"));
+            }
+        }
+    }
+
+    @Test
     void rejectsUnsupportedIdTypes() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            assertThrows(MicroOrmException.class, () -> MicroOrm.sqlite(c).register(InvalidStringId.class));
+            assertThrows(MicroOrmException.class, () -> MicroOrm.sqlite(c).register(InvalidBooleanId.class));
             assertThrows(MicroOrmException.class, () -> MicroOrm.sqlite(c).register(InvalidUuidAutoIncrementId.class));
         }
     }

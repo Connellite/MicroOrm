@@ -41,10 +41,24 @@ public final class EntityHydrator {
         if (value == null) {
             return true;
         }
+        if (value instanceof String s) {
+            return s.isBlank();
+        }
         if (pk.idGeneration().generated() && value instanceof Number n) {
             return n.longValue() == 0L;
         }
         return false;
+    }
+
+    /**
+     * After id generation, fail if the primary key will be written on INSERT but is still unset.
+     * Identity columns with an unset value are omitted from INSERT and are not required here.
+     */
+    public static void requirePkForInsert(Object entity, EntityField pk) {
+        if (pk.autoIncrement() && isUnsetPk(entity, pk)) {
+            return;
+        }
+        requirePkSet(entity, pk);
     }
 
     public static void requirePkValue(Object value, EntityField pk) {

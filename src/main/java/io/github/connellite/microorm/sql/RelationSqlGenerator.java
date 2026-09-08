@@ -44,11 +44,32 @@ public interface RelationSqlGenerator {
         return buildRelationInsert(model, entity, omitPk, registry, deferred, inserted);
     }
 
+    default RelationInsertParts buildRelationInsert(
+            EntityModel model,
+            Object entity,
+            boolean omitPk,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            Set<Object> inserted,
+            Set<Object> inProgress,
+            RelationWriteContext context) {
+        return buildRelationInsert(model, entity, omitPk, registry, deferred, inserted, inProgress);
+    }
+
     BoundStatement update(
             EntityModel model,
             Object entity,
             EntityModelRegistry registry,
             List<RelationPersister.DeferredFkUpdate> deferred);
+
+    default BoundStatement update(
+            EntityModel model,
+            Object entity,
+            EntityModelRegistry registry,
+            List<RelationPersister.DeferredFkUpdate> deferred,
+            RelationWriteContext context) {
+        return update(model, entity, registry, deferred);
+    }
 
     BoundStatement updateJoinColumn(
             EntityModel model,
