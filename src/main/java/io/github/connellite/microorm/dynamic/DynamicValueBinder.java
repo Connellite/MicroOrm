@@ -23,6 +23,7 @@ public final class DynamicValueBinder {
 
     /** Converts a Java value to a JDBC parameter for the given column. */
     public Object toJdbc(Column column, Object value) {
+        value = column.convertToDatabaseColumn(value);
         if (value == null) {
             return null;
         }
@@ -34,7 +35,8 @@ public final class DynamicValueBinder {
         if (value == null) {
             return null;
         }
-        return mapper.fromJdbcValue(ValueBinderFields.field(column.type()), value);
+        Object databaseValue = mapper.fromJdbcValue(ValueBinderFields.field(column.type()), value);
+        return column.convertToEntityAttribute(databaseValue);
     }
 
     /** Reads a raw JDBC value for the column, allowing dialect mappers to normalize driver-specific objects. */

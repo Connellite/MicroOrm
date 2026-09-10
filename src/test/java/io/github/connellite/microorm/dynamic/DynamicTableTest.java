@@ -4,13 +4,47 @@ import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.IdGenerationKind;
+import io.github.connellite.microorm.type.AttributeConverter;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DynamicTableTest {
+
+    public record Money(String currency, BigDecimal amount) {
+    }
+
+    public static class MoneyConverter implements AttributeConverter<Money, String> {
+        @Override
+        public String convertToDatabaseColumn(Money attribute) {
+            return attribute == null ? null : attribute.currency() + ":" + attribute.amount();
+        }
+
+        @Override
+        public Money convertToEntityAttribute(String dbData) {
+            if (dbData == null) {
+                return null;
+            }
+            String[] parts = dbData.split(":", 2);
+            return new Money(parts[0], new BigDecimal(parts[1]));
+        }
+    }
+
+    public static class WrongDatabaseConverter implements AttributeConverter<Money, Integer> {
+        @Override
+        public Integer convertToDatabaseColumn(Money attribute) {
+            return 1;
+        }
+
+        @Override
+        public Money convertToEntityAttribute(Integer dbData) {
+            return null;
+        }
+    }
 
     @Test
     void builderCreatesTableWithPrimaryKey() {
@@ -25,6 +59,29 @@ class DynamicTableTest {
         assertEquals("order_items", table.tableName());
         assertEquals(3, table.columns().size());
         assertEquals("id", table.primaryKey().name());
+    }
+
+    @Test
+    void builderCreatesColumnWithConverter() {
+        DynamicTable table = DynamicTable.builder("orders")
+                .column("id", LogicalType.UUID, Column.Builder::primaryKey)
+                .column("total", LogicalType.STRING, c -> c.converter(MoneyConverter.class))
+                .build();
+
+        Column total = table.columnByName("total");
+        assertTrue(total.converted());
+        assertEquals(Money.class, total.javaType());
+        assertEquals(String.class, total.jdbcJavaType());
+        assertEquals("USD:12.34", total.convertToDatabaseColumn(new Money("USD", new BigDecimal("12.34"))));
+        assertEquals(new Money("USD", new BigDecimal("12.34")), total.convertToEntityAttribute("USD:12.34"));
+    }
+
+    @Test
+    void rejectsConverterWhoseDatabaseTypeDoesNotMatchLogicalType() {
+        assertThrows(MicroOrmException.class, () -> DynamicTable.builder("bad")
+                .column("id", LogicalType.UUID, Column.Builder::primaryKey)
+                .column("total", LogicalType.STRING, c -> c.converter(WrongDatabaseConverter.class))
+                .build());
     }
 
     @Test

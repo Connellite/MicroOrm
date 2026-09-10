@@ -38,6 +38,37 @@ public final class DynamicDialectSupport {
                 }
                 return sql + " LIMIT 1";
             }
+
+            @Override
+            protected String applyLimitOffset(String sql, Integer limit, Integer offset, boolean hasOrder) {
+                int effectiveOffset = offset == null ? 0 : offset;
+                if (limit == null && effectiveOffset == 0) {
+                    return sql;
+                }
+                if (dialect instanceof OracleDialect) {
+                    if (effectiveOffset > 0) {
+                        sql += " OFFSET " + effectiveOffset + " ROWS";
+                    }
+                    if (limit != null) {
+                        sql += " FETCH NEXT " + limit + " ROWS ONLY";
+                    }
+                    return sql;
+                }
+                if (dialect instanceof MssqlDialect) {
+                    if (effectiveOffset == 0 && limit != null) {
+                        return "SELECT TOP " + limit + " " + sql.substring("SELECT ".length());
+                    }
+                    if (!hasOrder) {
+                        sql += " ORDER BY (SELECT 1)";
+                    }
+                    sql += " OFFSET " + effectiveOffset + " ROWS";
+                    if (limit != null) {
+                        sql += " FETCH NEXT " + limit + " ROWS ONLY";
+                    }
+                    return sql;
+                }
+                return super.applyLimitOffset(sql, limit, offset, hasOrder);
+            }
         };
     }
 

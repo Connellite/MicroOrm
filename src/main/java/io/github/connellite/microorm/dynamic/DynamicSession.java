@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * Session for runtime-defined tables: DDL (create/sync/drop) and Map-based CRUD.
@@ -95,7 +96,7 @@ public final class DynamicSession implements AutoCloseable {
         DynamicTable table = registry.get(tableName);
         Map<String, Object> effectiveValues = withGeneratedIds(table, values);
         Column pk = table.primaryKey();
-        boolean readIdentityKey = pk.autoIncrement() && isUnsetGeneratedPk(values.get(pk.name()));
+        boolean readIdentityKey = pk.autoIncrement() && isUnsetPk(values.get(pk.name()), pk);
         requirePrimaryKeyForInsert(table, effectiveValues);
         BoundStatement stmt = sql.insert(table, effectiveValues);
         if (readIdentityKey) {
@@ -103,7 +104,7 @@ public final class DynamicSession implements AutoCloseable {
         }
         SqlExecutor.executeUpdate(connection, stmt);
         Object id = effectiveValues.get(pk.name());
-        if (id == null || isUnsetGeneratedPk(id)) {
+        if (isUnsetPk(id, pk)) {
             throw new MicroOrmException("Primary key value is required for dynamic table '" + table.name() + "'");
         }
         return id;
@@ -147,6 +148,44 @@ public final class DynamicSession implements AutoCloseable {
         return SqlExecutor.queryMaps(connection, sql.selectWhere(table, filters), table, dialect, valueBinder);
     }
 
+    /** Materializes rows matching a fluent dynamic SELECT. */
+    public List<Map<String, Object>> selectRows(DynamicSelect query) {
+        try (Stream<Map<String, Object>> rows = streamRows(query)) {
+            return rows.toList();
+        }
+    }
+
+    /** Returns exactly one row matching a fluent dynamic SELECT; throws when none or multiple rows match. */
+    public Map<String, Object> selectOne(DynamicSelect query) {
+        return singleResult(findAtMostTwo(query), true, query.tableName());
+    }
+
+    /** Returns zero or one row matching a fluent dynamic SELECT; throws when multiple rows match. */
+    public Optional<Map<String, Object>> findOne(DynamicSelect query) {
+        return Optional.ofNullable(singleResult(findAtMostTwo(query), false, query.tableName()));
+    }
+
+    /** Lazy dynamic-query row stream; must be closed. */
+    public Stream<Map<String, Object>> streamRows(DynamicSelect query) {
+        Objects.requireNonNull(query, "query");
+        DynamicTable table = registry.get(query.tableName());
+        return SqlExecutor.queryMapsStream(connection, sql.select(table, query), table, dialect, valueBinder);
+    }
+
+    /** Materializes custom-query rows using the registered dynamic table metadata. */
+    public List<Map<String, Object>> selectRows(String tableName, Query query) {
+        try (Stream<Map<String, Object>> rows = streamRows(tableName, query)) {
+            return rows.toList();
+        }
+    }
+
+    /** Lazy custom-query row stream using the registered dynamic table metadata; must be closed. */
+    public Stream<Map<String, Object>> streamRows(String tableName, Query query) {
+        Objects.requireNonNull(query, "query");
+        DynamicTable table = registry.get(tableName);
+        return SqlExecutor.queryMapsStream(connection, query, table, dialect, valueBinder);
+    }
+
     /** Returns the first matching row, or empty when none match. */
     public Optional<Map<String, Object>> selectOne(String tableName, Map<String, ?> filters) {
         List<Map<String, Object>> rows = select(tableName, filters);
@@ -160,9 +199,46 @@ public final class DynamicSession implements AutoCloseable {
         return Optional.of(rows.get(0));
     }
 
+    /** Executes a fluent dynamic UPDATE. */
+    public int execute(DynamicUpdate update) {
+        Objects.requireNonNull(update, "update");
+        DynamicTable table = registry.get(update.tableName());
+        return SqlExecutor.executeUpdate(connection, sql.update(table, update));
+    }
+
+    /** Executes a fluent dynamic DELETE. */
+    public int execute(DynamicDelete delete) {
+        Objects.requireNonNull(delete, "delete");
+        DynamicTable table = registry.get(delete.tableName());
+        return SqlExecutor.executeUpdate(connection, sql.delete(table, delete));
+    }
+
     /** Shared registry of runtime table definitions. */
     public DynamicTableRegistry registry() {
         return registry;
+    }
+
+    private List<Map<String, Object>> findAtMostTwo(DynamicSelect query) {
+        try (Stream<Map<String, Object>> rows = streamRows(query)) {
+            return rows.limit(2).toList();
+        }
+    }
+
+    private static Map<String, Object> singleResult(
+            List<Map<String, Object>> rows,
+            boolean requireOne,
+            String tableName) {
+        if (rows.isEmpty()) {
+            if (requireOne) {
+                throw new MicroOrmException("Expected one row, got 0 for dynamic table '" + tableName + "'");
+            }
+            return null;
+        }
+        if (rows.size() > 1) {
+            throw new MicroOrmException("Expected at most one row, got " + rows.size()
+                    + " for dynamic table '" + tableName + "'");
+        }
+        return rows.get(0);
     }
 
     private Map<String, Object> withGeneratedIds(DynamicTable table, Map<String, ?> values) {
@@ -203,10 +279,14 @@ public final class DynamicSession implements AutoCloseable {
         if (value == null) {
             return true;
         }
-        if (value instanceof String s) {
+        Object databaseValue = pk.convertToDatabaseColumn(value);
+        if (databaseValue == null) {
+            return true;
+        }
+        if (databaseValue instanceof String s) {
             return s.isBlank();
         }
-        return pk.idGeneration().generated() && isUnsetGeneratedPk(value);
+        return pk.idGeneration().generated() && isUnsetGeneratedPk(databaseValue);
     }
 
     private static boolean isUnsetGeneratedPk(Object value) {

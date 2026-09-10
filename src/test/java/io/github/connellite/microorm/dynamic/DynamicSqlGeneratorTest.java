@@ -23,9 +23,11 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static io.github.connellite.microorm.dynamic.DynamicSelect.field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -125,6 +127,100 @@ class DynamicSqlGeneratorTest {
         BoundStatement stmt = generator.exists(table, Map.of("id", UUID.randomUUID()));
 
         assertTrue(stmt.sql().endsWith("FETCH FIRST 1 ROWS ONLY"));
+    }
+
+    @Test
+    void fluentSelectRendersCriteriaOrderingAndPagination() {
+        BoundStatement stmt = sql.select(table, DynamicSelect.from("docs")
+                .columns("id", "name")
+                .where(field("name").like("A%"))
+                .and(field("removed").eq(false))
+                .orderBy(field("name").desc())
+                .limit(10)
+                .offset(5));
+
+        assertEquals("SELECT documents.id, documents.name FROM documents"
+                + " WHERE (documents.name LIKE :p1 AND documents.removed = :p2)"
+                + " ORDER BY documents.name DESC LIMIT 10 OFFSET 5", stmt.sql());
+        assertEquals("A%", stmt.parameters().get("p1"));
+        assertEquals(false, stmt.parameters().get("p2"));
+    }
+
+    @Test
+    void fluentSelectRendersInBetweenNullAndDistinctGroupHaving() {
+        BoundStatement stmt = sql.select(table, DynamicSelect.from("docs")
+                .distinct()
+                .where(field("name").in(List.of("alpha", "beta")))
+                .and(field("removed").isNotNull())
+                .groupBy("removed")
+                .having(field("name").between("a", "z")));
+
+        assertEquals("SELECT DISTINCT documents.id, documents.name, documents.removed FROM documents"
+                + " WHERE (documents.name IN (:p1) AND documents.removed IS NOT NULL)"
+                + " GROUP BY documents.removed HAVING documents.name BETWEEN :p2 AND :p3", stmt.sql());
+        assertEquals(List.of("alpha", "beta"), stmt.collectionParameters().get("p1"));
+        assertEquals("a", stmt.parameters().get("p2"));
+        assertEquals("z", stmt.parameters().get("p3"));
+    }
+
+    @Test
+    void fluentUpdateRequiresWhereOrAllRows() {
+        assertThrows(MicroOrmException.class, () -> sql.update(
+                table,
+                DynamicUpdate.table("docs").set("name", "beta")));
+
+        BoundStatement stmt = sql.update(
+                table,
+                DynamicUpdate.table("docs").set("name", "beta").where(field("id").eq(UUID.fromString("00000000-0000-0000-0000-000000000001"))));
+
+        assertEquals("UPDATE documents SET name = :set_name WHERE documents.id = :p1", stmt.sql());
+        assertEquals("beta", stmt.parameters().get("set_name"));
+        assertEquals("00000000-0000-0000-0000-000000000001", stmt.parameters().get("p1"));
+    }
+
+    @Test
+    void fluentUpdateAllowsExplicitAllRows() {
+        BoundStatement stmt = sql.update(table, DynamicUpdate.table("docs").set("removed", true).allRows());
+
+        assertEquals("UPDATE documents SET removed = :set_removed", stmt.sql());
+        assertEquals(true, stmt.parameters().get("set_removed"));
+    }
+
+    @Test
+    void fluentDeleteRequiresWhereOrAllRows() {
+        assertThrows(MicroOrmException.class, () -> sql.delete(table, DynamicDelete.from("docs")));
+
+        BoundStatement stmt = sql.delete(table, DynamicDelete.from("docs").where(field("name").ne("alpha")));
+
+        assertEquals("DELETE FROM documents WHERE documents.name <> :p1", stmt.sql());
+        assertEquals("alpha", stmt.parameters().get("p1"));
+    }
+
+    @Test
+    void fluentDeleteAllowsExplicitAllRows() {
+        BoundStatement stmt = sql.delete(table, DynamicDelete.from("docs").allRows());
+
+        assertEquals("DELETE FROM documents", stmt.sql());
+    }
+
+    @Test
+    void fluentSelectUsesMssqlPagination() {
+        DynamicSqlGenerator generator = DynamicDialectSupport.sqlGenerator(MssqlDialect.getInstance());
+
+        BoundStatement top = generator.select(table, DynamicSelect.from("docs").limit(10));
+        BoundStatement offset = generator.select(table, DynamicSelect.from("docs").offset(5));
+
+        assertTrue(top.sql().startsWith("SELECT TOP 10 documents.id"));
+        assertTrue(offset.sql().endsWith("ORDER BY (SELECT 1) OFFSET 5 ROWS"));
+    }
+
+    @Test
+    void fluentSelectUsesOraclePagination() {
+        DynamicSqlGenerator generator = DynamicDialectSupport.sqlGenerator(OracleDialect.getInstance());
+
+        BoundStatement stmt = generator.select(table, DynamicSelect.from("docs").limit(10).offset(5));
+
+        assertTrue(stmt.sql().endsWith("OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY"));
     }
 
     @Test

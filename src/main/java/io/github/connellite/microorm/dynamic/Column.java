@@ -2,11 +2,17 @@ package io.github.connellite.microorm.dynamic;
 
 import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.UuidGenerator;
+import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.AttributeConverter;
+import io.github.connellite.reflection.ReflectionUtil;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -25,6 +31,9 @@ public final class Column {
     private final boolean unique;
     private final boolean indexed;
     private final int length;
+    private final AttributeConverter<Object, Object> converter;
+    private final Class<?> converterAttributeType;
+    private final Class<?> converterDatabaseType;
 
     private Column(
             SqlIdentifier columnIdentifier,
@@ -35,7 +44,10 @@ public final class Column {
             boolean nullable,
             boolean unique,
             boolean indexed,
-            int length) {
+            int length,
+            AttributeConverter<?, ?> converter,
+            Class<?> converterAttributeType,
+            Class<?> converterDatabaseType) {
         this.columnIdentifier = columnIdentifier;
         this.type = Objects.requireNonNull(type, "type");
         this.sqlTypeOverride = sqlTypeOverride == null ? "" : sqlTypeOverride;
@@ -45,6 +57,11 @@ public final class Column {
         this.unique = unique;
         this.indexed = indexed;
         this.length = length;
+        @SuppressWarnings("unchecked")
+        AttributeConverter<Object, Object> typedConverter = (AttributeConverter<Object, Object>) converter;
+        this.converter = typedConverter;
+        this.converterAttributeType = converterAttributeType;
+        this.converterDatabaseType = converterDatabaseType;
     }
 
     /** Logical column name used as the key in insert/update/select maps. */
@@ -112,6 +129,41 @@ public final class Column {
         return length;
     }
 
+    /** Preferred Java value type for Map-based CRUD before converter application. */
+    public Class<?> javaType() {
+        return converterAttributeType == null ? type.javaType() : converterAttributeType;
+    }
+
+    /** Java type stored in JDBC after applying the dynamic converter, when present. */
+    public Class<?> jdbcJavaType() {
+        return converterDatabaseType == null ? type.javaType() : converterDatabaseType;
+    }
+
+    /** Returns whether this column has an attribute converter. */
+    public boolean converted() {
+        return converter != null;
+    }
+
+    /** Converter map-side value type, or {@code null} when not converted. */
+    public Class<?> converterAttributeType() {
+        return converterAttributeType;
+    }
+
+    /** Converter database-side Java type, or {@code null} when not converted. */
+    public Class<?> converterDatabaseType() {
+        return converterDatabaseType;
+    }
+
+    /** Converts a Map value to its database-side Java value. */
+    public Object convertToDatabaseColumn(Object value) {
+        return converter == null ? value : converter.convertToDatabaseColumn(value);
+    }
+
+    /** Converts a database-side Java value to its Map value. */
+    public Object convertToEntityAttribute(Object value) {
+        return converter == null ? value : converter.convertToEntityAttribute(value);
+    }
+
     /** Starts building a column with the given logical name and type. */
     public static Builder builder(String name, LogicalType type) {
         return new Builder(name, type);
@@ -133,6 +185,9 @@ public final class Column {
         private boolean unique;
         private boolean indexed;
         private int length;
+        private AttributeConverter<?, ?> converter;
+        private Class<?> converterAttributeType;
+        private Class<?> converterDatabaseType;
 
         private Builder(String name, LogicalType type) {
             this.name = name;
@@ -241,6 +296,27 @@ public final class Column {
             return this;
         }
 
+        /** Applies a converter between Map values and the column's database-side logical type. */
+        public Builder converter(Class<? extends AttributeConverter<?, ?>> converterClass) {
+            Objects.requireNonNull(converterClass, "converterClass");
+            AttributeConverter<?, ?> converter;
+            try {
+                converter = ReflectionUtil.getInstance(converterClass);
+            } catch (ReflectiveOperationException e) {
+                throw new MicroOrmException("Cannot instantiate converter " + converterClass.getName()
+                        + " for dynamic column '" + name + "'", e);
+            }
+            List<Class<?>> types = converterTypes(converterClass);
+            if (types.size() < 2) {
+                throw new MicroOrmException("Converter " + converterClass.getName()
+                        + " must declare AttributeConverter<Attribute, Database>");
+            }
+            this.converter = converter;
+            this.converterAttributeType = types.get(0);
+            this.converterDatabaseType = types.get(1);
+            return this;
+        }
+
         /** Builds an immutable column descriptor. */
         public Column build() {
             Objects.requireNonNull(name, "name");
@@ -248,6 +324,7 @@ public final class Column {
                 throw new IllegalArgumentException("Column name cannot be blank");
             }
             SqlGenerator.validateIdentifier(name, "column");
+            validateConverterDatabaseType(name, type, converterDatabaseType);
             IdGeneration idGeneration = resolveIdGeneration();
             if (idGeneration.generated() && !primaryKey) {
                 throw new IllegalArgumentException("Generated primary key generation requires primaryKey on column: " + name);
@@ -267,7 +344,10 @@ public final class Column {
                     primaryKey || nullable,
                     unique,
                     indexed,
-                    length);
+                    length,
+                    converter,
+                    converterAttributeType,
+                    converterDatabaseType);
         }
 
         private IdGeneration resolveIdGeneration() {
@@ -314,6 +394,43 @@ public final class Column {
                 throw new IllegalArgumentException("Generator name cannot be blank");
             }
             return name.trim();
+        }
+
+        private static void validateConverterDatabaseType(String columnName, LogicalType type, Class<?> converterDatabaseType) {
+            if (converterDatabaseType == null) {
+                return;
+            }
+            Class<?> columnType = ReflectionUtil.primitiveToWrapper(type.javaType());
+            Class<?> databaseType = ReflectionUtil.primitiveToWrapper(converterDatabaseType);
+            if (!columnType.isAssignableFrom(databaseType) && !databaseType.isAssignableFrom(columnType)) {
+                throw new MicroOrmException("Converter database type " + converterDatabaseType.getName()
+                        + " does not match dynamic column '" + columnName + "' logical type " + type);
+            }
+        }
+
+        private static List<Class<?>> converterTypes(Class<?> converterClass) {
+            for (Type genericInterface : converterClass.getGenericInterfaces()) {
+                List<Class<?>> classes = converterTypes(genericInterface);
+                if (!classes.isEmpty()) {
+                    return classes;
+                }
+            }
+            Class<?> superClass = converterClass.getSuperclass();
+            return superClass == null || superClass == Object.class ? List.of() : converterTypes(superClass);
+        }
+
+        private static List<Class<?>> converterTypes(Type type) {
+            if (type instanceof ParameterizedType parameterized
+                    && parameterized.getRawType() == AttributeConverter.class) {
+                return ReflectionUtil.getAllGenericParameterClasses(parameterized);
+            }
+            if (type instanceof Class<?> clazz) {
+                return converterTypes(clazz);
+            }
+            if (type instanceof ParameterizedType parameterized && parameterized.getRawType() instanceof Class<?> rawClass) {
+                return converterTypes(rawClass);
+            }
+            return List.of();
         }
     }
 

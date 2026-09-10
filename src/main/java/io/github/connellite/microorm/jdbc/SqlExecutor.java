@@ -342,16 +342,109 @@ public final class SqlExecutor {
             DynamicTable table,
             Dialect dialect,
             DynamicValueBinder binder) {
+        try (Stream<Map<String, Object>> rows = queryMapsStream(connection, stmt, table, dialect, binder)) {
+            return rows.toList();
+        }
+    }
+
+    /** Lazy dynamic-table map stream; must be closed. */
+    public static Stream<Map<String, Object>> queryMapsStream(
+            Connection connection,
+            BoundStatement stmt,
+            DynamicTable table,
+            Dialect dialect,
+            DynamicValueBinder binder) {
         LogHolder.logger.debug(() -> formatSql("dynamic-select", stmt));
-        try (NamedPreparedStatement nps = prepare(connection, stmt);
-             ResultSet rs = nps.executeQuery()) {
-            List<Map<String, Object>> rows = new ArrayList<>();
-            while (rs.next()) {
-                rows.add(MapRowMapper.mapRow(rs, table, dialect, binder));
-            }
-            return rows;
+        NamedPreparedStatement nps = null;
+        ResultSet rs = null;
+        try {
+            nps = prepare(connection, stmt);
+            rs = nps.executeQuery();
+            Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);
+            validateDynamicColumnLabels(table, dialect, columnLabels);
+            return ResultSetDynamicMapStream.stream(nps, rs, table, dialect, binder, columnLabels);
         } catch (SQLException e) {
+            closeQuietly(rs, nps);
             throw MicroOrmException.wrap(e);
+        } catch (RuntimeException e) {
+            closeQuietly(rs, nps);
+            throw e;
+        }
+    }
+
+    /** Materializes rows from a custom query as maps using registered dynamic-table columns. */
+    public static List<Map<String, Object>> queryMaps(
+            Connection connection,
+            Query query,
+            DynamicTable table,
+            Dialect dialect,
+            DynamicValueBinder binder) {
+        try (Stream<Map<String, Object>> rows = queryMapsStream(connection, query, table, dialect, binder)) {
+            return rows.toList();
+        }
+    }
+
+    /** Lazy custom-query dynamic map stream; must be closed. */
+    public static Stream<Map<String, Object>> queryMapsStream(
+            Connection connection,
+            Query query,
+            DynamicTable table,
+            Dialect dialect,
+            DynamicValueBinder binder) {
+        LogHolder.logger.debug(() -> formatSql("dynamic-select", query));
+        NamedPreparedStatement nps = null;
+        ResultSet rs = null;
+        try {
+            nps = prepare(connection, query);
+            rs = nps.executeQuery();
+            Collection<String> columnLabels = ResultSetMetaDataUtils.getColumnLabels(rs);
+            validateDynamicColumnLabels(table, dialect, columnLabels);
+            return ResultSetDynamicMapStream.stream(nps, rs, table, dialect, binder, columnLabels);
+        } catch (SQLException e) {
+            closeQuietly(rs, nps);
+            throw MicroOrmException.wrap(e);
+        } catch (RuntimeException e) {
+            closeQuietly(rs, nps);
+            throw e;
+        }
+    }
+
+    private static void validateDynamicColumnLabels(
+            DynamicTable table,
+            Dialect dialect,
+            Collection<String> columnLabels) {
+        for (String label : columnLabels) {
+            if (!isDynamicColumnLabel(table, dialect, label)) {
+                throw new MicroOrmException("Unknown column label '" + label
+                        + "' for dynamic table '" + table.name() + "'");
+            }
+        }
+    }
+
+    private static boolean isDynamicColumnLabel(DynamicTable table, Dialect dialect, String label) {
+        for (Column column : table.columns()) {
+            String expected = dialect.jdbcColumnLabel(column.columnIdentifier());
+            if (label.equals(expected) || label.equalsIgnoreCase(expected)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void closeQuietly(ResultSet resultSet, NamedPreparedStatement statement) {
+        if (resultSet != null) {
+            try {
+                resultSet.close();
+            } catch (SQLException e) {
+                LogHolder.logger.trace(() -> "Ignoring ResultSet close failure: " + e.getMessage());
+            }
+        }
+        if (statement != null) {
+            try {
+                statement.close();
+            } catch (SQLException e) {
+                LogHolder.logger.trace(() -> "Ignoring statement close failure: " + e.getMessage());
+            }
         }
     }
 

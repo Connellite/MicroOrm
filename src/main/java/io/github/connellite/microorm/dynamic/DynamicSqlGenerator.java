@@ -24,6 +24,15 @@ public interface DynamicSqlGenerator {
     /** Builds {@code SELECT ... WHERE col = :col AND ...}. Empty filters delegate to {@link #selectAll}. */
     BoundStatement selectWhere(DynamicTable table, Map<String, ?> filters);
 
+    /** Builds a SELECT from a fluent dynamic-table query. */
+    BoundStatement select(DynamicTable table, DynamicSelect query);
+
+    /** Builds an UPDATE from a fluent dynamic-table mutation. */
+    BoundStatement update(DynamicTable table, DynamicUpdate mutation);
+
+    /** Builds a DELETE from a fluent dynamic-table mutation. */
+    BoundStatement delete(DynamicTable table, DynamicDelete mutation);
+
     /** Builds {@code SELECT 1 ... WHERE ...} limited to one row for existence checks. */
     BoundStatement exists(DynamicTable table, Map<String, ?> whereValues);
 }

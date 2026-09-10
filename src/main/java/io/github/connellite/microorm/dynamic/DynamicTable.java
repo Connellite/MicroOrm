@@ -7,6 +7,7 @@ import io.github.connellite.microorm.sql.SqlIdentifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Immutable runtime table definition: physical table name, columns, and primary key.
@@ -99,7 +100,7 @@ public final class DynamicTable {
         }
 
         /** Adds a column via {@link Column#builder(String, LogicalType)}. */
-        public Builder column(String columnName, LogicalType type, java.util.function.Consumer<Column.Builder> config) {
+        public Builder column(String columnName, LogicalType type, Consumer<Column.Builder> config) {
             Column.Builder builder = Column.builder(columnName, type);
             if (config != null) {
                 config.accept(builder);

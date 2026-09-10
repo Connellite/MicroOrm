@@ -9,17 +9,24 @@ import io.github.connellite.microorm.annotation.Table;
 import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.session.Session;
+import io.github.connellite.microorm.sql.Query;
+import io.github.connellite.microorm.type.AttributeConverter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static io.github.connellite.microorm.dynamic.DynamicSelect.field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,6 +39,40 @@ class DynamicSessionTest {
     static class Sidecar {
         @Id
         private long id;
+    }
+
+    public record Money(String currency, BigDecimal amount) {
+    }
+
+    record UserId(String value) {
+    }
+
+    public static class MoneyConverter implements AttributeConverter<Money, String> {
+        @Override
+        public String convertToDatabaseColumn(Money attribute) {
+            return attribute == null ? null : attribute.currency() + ":" + attribute.amount();
+        }
+
+        @Override
+        public Money convertToEntityAttribute(String dbData) {
+            if (dbData == null) {
+                return null;
+            }
+            String[] parts = dbData.split(":", 2);
+            return new Money(parts[0], new BigDecimal(parts[1]));
+        }
+    }
+
+    public static class UserIdConverter implements AttributeConverter<UserId, String> {
+        @Override
+        public String convertToDatabaseColumn(UserId attribute) {
+            return attribute == null ? null : attribute.value();
+        }
+
+        @Override
+        public UserId convertToEntityAttribute(String dbData) {
+            return dbData == null ? null : new UserId(dbData);
+        }
     }
 
     private static MicroOrm newOrm(DialectTestSupport.DialectFixture dialect, Connection connection) {
@@ -146,6 +187,105 @@ class DynamicSessionTest {
                         () -> session.insertReturningId("string_users", Map.of("name", "Missing id")));
                 assertThrows(MicroOrmException.class,
                         () -> session.insertReturningId("string_users", Map.of("user_id", "   ", "name", "Blank id")));
+            }
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("dialects")
+    void convertsDynamicColumnValuesToDatabaseColumnAndBack(DialectTestSupport.DialectFixture dialect) throws SQLException {
+        UUID id = UUID.randomUUID();
+        Money original = new Money("USD", new BigDecimal("12.34"));
+        Money updated = new Money("EUR", new BigDecimal("56.78"));
+        try (Connection connection = dialect.openConnection()) {
+            DialectTestSupport.dropTables(connection, "dynamic_converted_orders");
+            MicroOrm orm = dialect.createOrm(connection);
+            orm.dynamicRegistry().register(convertedOrderTable());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("converted_orders");
+
+                session.insert("converted_orders", Map.of("id", id, "total", original));
+
+                assertEquals("USD:12.34", rawTotal(connection));
+                Map<String, Object> row = session.selectOne("converted_orders", Map.of("total", original)).orElseThrow();
+                assertEquals(original, row.get("total"));
+
+                session.update("converted_orders", Map.of("total", updated), Map.of("total", original));
+                row = session.selectOne("converted_orders", Map.of("total", updated)).orElseThrow();
+                assertEquals(updated, row.get("total"));
+
+                session.delete("converted_orders", Map.of("total", updated));
+                assertFalse(session.exists("converted_orders", Map.of("id", id)));
+            }
+        }
+    }
+
+    @Test
+    void convertedDynamicAssignedStringPrimaryKeyMustBeNonBlankBeforeInsert() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(convertedStringIdTable());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("converted_string_users");
+
+                assertThrows(MicroOrmException.class,
+                        () -> session.insert("converted_string_users", Map.of("user_id", new UserId("   "), "name", "Blank id")));
+                assertThrows(MicroOrmException.class,
+                        () -> session.insertReturningId("converted_string_users", Map.of("user_id", new UserId("   "), "name", "Blank id")));
+
+                UserId id = new UserId("ada");
+                Object returnedId = session.insertReturningId("converted_string_users", Map.of("user_id", id, "name", "Ada"));
+
+                assertEquals(id, returnedId);
+                Map<String, Object> row = session.selectOne("converted_string_users", Map.of("user_id", id)).orElseThrow();
+                assertEquals(id, row.get("user_id"));
+                assertEquals("Ada", row.get("name"));
+            }
+        }
+    }
+
+    @Test
+    void fluentDynamicQueriesUseConvertersAndMapNativeRows() throws SQLException {
+        UUID id = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        Money original = new Money("USD", new BigDecimal("12.34"));
+        Money other = new Money("GBP", new BigDecimal("99.00"));
+        Money updated = new Money("EUR", new BigDecimal("56.78"));
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(convertedOrderTable());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("converted_orders");
+                session.insert("converted_orders", Map.of("id", id, "total", original));
+                session.insert("converted_orders", Map.of("id", otherId, "total", other));
+
+                assertEquals(2, session.selectRows(DynamicSelect.from("converted_orders")
+                        .columns("id", "total")
+                        .where(field("total").in(List.of(original, other)))
+                        .orderBy(field("total").asc())).size());
+
+                assertEquals(1, session.execute(DynamicUpdate.table("converted_orders")
+                        .set("total", updated)
+                        .where(field("total").eq(original))));
+
+                Map<String, Object> row = session.selectOne(DynamicSelect.from("converted_orders")
+                        .where(field("total").eq(updated)));
+                assertEquals(updated, row.get("total"));
+
+                try (Stream<Map<String, Object>> rows = session.streamRows(DynamicSelect.from("converted_orders")
+                        .where(field("total").eq(updated)))) {
+                    assertEquals(1, rows.count());
+                }
+
+                Query nativeQuery = Query.of("SELECT id, total FROM dynamic_converted_orders WHERE total = :total")
+                        .set("total", "EUR:56.78");
+                row = session.selectRows("converted_orders", nativeQuery).get(0);
+                assertEquals(id, row.get("id"));
+                assertEquals(updated, row.get("total"));
+
+                assertEquals(1, session.execute(DynamicDelete.from("converted_orders")
+                        .where(field("total").eq(updated))));
+                assertFalse(session.exists("converted_orders", Map.of("id", id)));
             }
         }
     }
@@ -276,6 +416,29 @@ class DynamicSessionTest {
                 .column("user_id", LogicalType.STRING, c -> c.primaryKey().length(64))
                 .column("name", LogicalType.STRING, Column.Builder::notNull)
                 .build();
+    }
+
+    private static DynamicTable convertedOrderTable() {
+        return DynamicTable.builder("converted_orders")
+                .table("dynamic_converted_orders")
+                .column("id", LogicalType.UUID, Column.Builder::primaryKey)
+                .column("total", LogicalType.STRING, c -> c.notNull().length(64).converter(MoneyConverter.class))
+                .build();
+    }
+
+    private static DynamicTable convertedStringIdTable() {
+        return DynamicTable.builder("converted_string_users")
+                .column("user_id", LogicalType.STRING, c -> c.primaryKey().length(64).converter(UserIdConverter.class))
+                .column("name", LogicalType.STRING, Column.Builder::notNull)
+                .build();
+    }
+
+    private static String rawTotal(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT total FROM dynamic_converted_orders")) {
+            rs.next();
+            return rs.getString(1);
+        }
     }
 
     private static Stream<DialectTestSupport.DialectFixture> dialects() {
