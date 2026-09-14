@@ -360,7 +360,7 @@ Maven:
     <dependency>
         <groupId>io.github.connellite</groupId>
         <artifactId>MicroOrm</artifactId>
-        <version>1.0.0-alpha.15</version>
+        <version>1.0.0-alpha.16</version>
     </dependency>
 </dependencies>
 ```
@@ -374,7 +374,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.connellite:MicroOrm:1.0.0-alpha.9'
+    implementation 'com.github.connellite:MicroOrm:1.0.0-alpha.16'
 }
 ```
 
