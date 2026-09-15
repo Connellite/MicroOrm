@@ -13,7 +13,7 @@ import io.github.connellite.microorm.dynamic.DynamicSession;
 import io.github.connellite.microorm.dynamic.DynamicTableRegistry;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
-import io.github.connellite.microorm.mapping.SpringPhysicalNamingStrategy;
+import io.github.connellite.microorm.mapping.SnakeCasePhysicalNamingStrategy;
 import io.github.connellite.microorm.repository.EntityRepository;
 import io.github.connellite.microorm.repository.RepositoryProxyFactory;
 import io.github.connellite.microorm.session.Session;
@@ -37,13 +37,13 @@ public final class MicroOrm {
     private final DynamicTableRegistry dynamicRegistry;
 
     /** Creates a registry with Spring Boot-style snake_case physical names. */
-    public static EntityModelRegistry springNamingRegistry() {
-        return new EntityModelRegistry(SpringPhysicalNamingStrategy.getInstance());
+    public static EntityModelRegistry snakeCaseNamingRegistry() {
+        return new EntityModelRegistry(SnakeCasePhysicalNamingStrategy.getInstance());
     }
 
     /**
      * Constructs an ORM instance with a custom dialect, connection lifecycle, and entity metadata registry
-     * (for example {@link #springNamingRegistry()}).
+     * (for example {@link #snakeCaseNamingRegistry()}).
      */
     public MicroOrm(Dialect dialect, ConnectionProvider provider, EntityModelRegistry registry) {
         this.dialect = dialect;

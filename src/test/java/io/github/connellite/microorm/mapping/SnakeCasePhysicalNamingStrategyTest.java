@@ -4,9 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SpringPhysicalNamingStrategyTest {
+class SnakeCasePhysicalNamingStrategyTest {
 
-    private final SpringPhysicalNamingStrategy strategy = SpringPhysicalNamingStrategy.getInstance();
+    private final SnakeCasePhysicalNamingStrategy strategy = SnakeCasePhysicalNamingStrategy.getInstance();
 
     @Test
     void convertsPascalCaseTableNamesToSnakeCase() {

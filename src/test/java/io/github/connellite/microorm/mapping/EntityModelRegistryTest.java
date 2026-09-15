@@ -279,8 +279,8 @@ class EntityModelRegistryTest {
     }
 
     @Test
-    void springPhysicalNamingStrategyMapsToSnakeCase() {
-        EntityModelRegistry registry = new EntityModelRegistry(SpringPhysicalNamingStrategy.getInstance());
+    void snakeCasePhysicalNamingStrategyMapsToSnakeCase() {
+        EntityModelRegistry registry = new EntityModelRegistry(SnakeCasePhysicalNamingStrategy.getInstance());
         EntityModel model = registry.register(OrderItem.class);
 
         assertEquals("order_item", model.tableName());

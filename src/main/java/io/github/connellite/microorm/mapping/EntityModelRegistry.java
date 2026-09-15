@@ -59,7 +59,7 @@ public final class EntityModelRegistry {
         this(IdentityPhysicalNamingStrategy.getInstance());
     }
 
-    /** Creates a registry with the given physical naming strategy (for example {@link SpringPhysicalNamingStrategy}). */
+    /** Creates a registry with the given physical naming strategy (for example {@link SnakeCasePhysicalNamingStrategy}). */
     public EntityModelRegistry(PhysicalNamingStrategy physicalNamingStrategy) {
         this.physicalNamingStrategy = Objects.requireNonNull(physicalNamingStrategy, "physicalNamingStrategy");
     }
