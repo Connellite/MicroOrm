@@ -31,6 +31,7 @@ import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Modifier;
@@ -191,7 +192,7 @@ public final class EntityModelRegistry {
         if (pk == null) {
             throw new MicroOrmException("Missing @Id on " + entityClass.getName());
         }
-        boolean immutable = entityClass.getAnnotation(Immutable.class) != null || subselectAnn != null;
+        boolean immutable = isImmutable(entityClass) || subselectAnn != null;
         EntityModel model = EntityModel.builder()
                 .entityClass(entityClass)
                 .tableIdentifier(table)
@@ -514,8 +515,20 @@ public final class EntityModelRegistry {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isEntity(Class<?> type) {
+        return hasTypeOrPackageAnnotation(type, Entity.class);
+    }
+
+    private static boolean isImmutable(Class<?> type) {
+        return hasTypeOrPackageAnnotation(type, Immutable.class);
+    }
+
+    private static boolean isMappedSuperclass(Class<?> type) {
+        return hasTypeOrPackageAnnotation(type, MappedSuperclass.class);
+    }
+
+    private static boolean hasTypeOrPackageAnnotation(Class<?> type, Class<? extends Annotation> annotationType) {
         Package packageInfo = type.getPackage();
-        return type.getAnnotation(Entity.class) != null || packageInfo != null && packageInfo.getAnnotation(Entity.class) != null;
+        return type.getAnnotation(annotationType) != null || packageInfo != null && packageInfo.getAnnotation(annotationType) != null;
     }
 
     private static void validateIdField(Class<?> entityClass, Field field, IdGeneration idGeneration, ConverterMetadata converter) {
@@ -796,7 +809,7 @@ public final class EntityModelRegistry {
     private static List<Field> mappedFields(Class<?> entityClass) {
         List<Class<?>> hierarchy = new ArrayList<>();
         for (Class<?> current = entityClass; current != null && current != Object.class; current = current.getSuperclass()) {
-            if (current == entityClass || current.getAnnotation(MappedSuperclass.class) != null) {
+            if (current == entityClass || isMappedSuperclass(current)) {
                 hierarchy.add(0, current);
             }
         }

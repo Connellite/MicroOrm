@@ -14,6 +14,8 @@ import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.generation.IdGenerationKind;
+import io.github.connellite.microorm.generation.PackageAnnotatedImmutableEntity;
+import io.github.connellite.microorm.repository.PackageAnnotatedMappedSuperclass;
 import io.github.connellite.microorm.schema.PackageAnnotatedEntity;
 import org.junit.jupiter.api.Test;
 
@@ -238,6 +240,13 @@ class EntityModelRegistryTest {
     static class RegistryMappedSuperclass {
         @Column
         protected String inherited;
+    }
+
+    @Entity
+    @Table(name = "package_mapped_super_child")
+    static class PackageMappedSuperclassChild extends PackageAnnotatedMappedSuperclass {
+        @Id
+        private long id;
     }
 
     @Entity
@@ -535,5 +544,22 @@ class EntityModelRegistryTest {
 
         assertEquals("id", model.primaryKey().javaField().getName());
         assertEquals(2, model.fields().size());
+    }
+
+    @Test
+    void packageImmutableAnnotationMarksPackageClassesAsImmutable() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(PackageAnnotatedImmutableEntity.class);
+
+        assertTrue(model.immutable());
+    }
+
+    @Test
+    void packageMappedSuperclassAnnotationMapsInheritedFields() {
+        EntityModelRegistry registry = new EntityModelRegistry();
+        EntityModel model = registry.register(PackageMappedSuperclassChild.class);
+
+        assertEquals(2, model.fields().size());
+        assertTrue(model.fields().stream().anyMatch(f -> f.javaField().getName().equals("inherited")));
     }
 }
