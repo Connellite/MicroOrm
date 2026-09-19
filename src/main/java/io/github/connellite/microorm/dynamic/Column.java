@@ -249,12 +249,18 @@ public final class Column {
             return this;
         }
 
-        /** Enables UUID primary key generation with the default UUID version. */
+        /**
+         * Enables UUID primary key generation with ExtraLib (default version 4).
+         * Without this, an unset UUID primary key is filled with {@link java.util.UUID#randomUUID()}.
+         */
         public Builder uuidGenerator() {
             return uuidGenerator(UuidGenerator.Version.VERSION_4);
         }
 
-        /** Enables UUID primary key generation with the selected UUID version. */
+        /**
+         * Enables UUID primary key generation with ExtraLib using the selected version.
+         * Without this, an unset UUID primary key is filled with {@link java.util.UUID#randomUUID()}.
+         */
         public Builder uuidGenerator(UuidGenerator.Version version) {
             this.uuidGeneratorVersion = Objects.requireNonNull(version, "version");
             return this;

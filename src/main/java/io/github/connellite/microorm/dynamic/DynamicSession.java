@@ -247,6 +247,8 @@ public final class DynamicSession implements AutoCloseable {
         Column pk = table.primaryKey();
         if (pk.uuidGenerated() && effectiveValues.get(pk.name()) == null) {
             effectiveValues.put(pk.name(), generateUuid(pk.idGeneration().uuidVersion()));
+        } else if (!pk.idGeneration().generated() && pk.type() == LogicalType.UUID && effectiveValues.get(pk.name()) == null) {
+            effectiveValues.put(pk.name(), UUID.randomUUID());
         }
         if (pk.sequenceGenerated() && isUnsetGeneratedPk(effectiveValues.get(pk.name()))) {
             if (!dialect.supportsSequences()) {

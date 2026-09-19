@@ -27,10 +27,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static io.github.connellite.microorm.dynamic.DynamicSelect.field;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class DynamicSessionTest {
 
@@ -146,10 +143,30 @@ class DynamicSessionTest {
 
                 Object id = session.insertReturningId("generated_uuid_items", Map.of("name", "uuid7"));
 
-                assertTrue(id instanceof UUID);
+                assertInstanceOf(UUID.class, id);
                 assertEquals(7, ((UUID) id).version());
                 Map<String, Object> row = session.selectOne("generated_uuid_items", Map.of("id", id)).orElseThrow();
                 assertEquals("uuid7", row.get("name"));
+            }
+        }
+    }
+
+    @Test
+    void insertFillsUnsetUuidPrimaryKeyWithoutGenerator() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            orm.dynamicRegistry().register(DynamicTable.builder("uuid_items")
+                    .column("id", LogicalType.UUID, Column.Builder::primaryKey)
+                    .column("name", LogicalType.STRING, Column.Builder::notNull)
+                    .build());
+            try (DynamicSession session = orm.openDynamicSession()) {
+                session.createTable("uuid_items");
+
+                Object id = session.insertReturningId("uuid_items", Map.of("name", "random"));
+
+                assertInstanceOf(UUID.class, id);
+                Map<String, Object> row = session.selectOne("uuid_items", Map.of("id", id)).orElseThrow();
+                assertEquals("random", row.get("name"));
             }
         }
     }

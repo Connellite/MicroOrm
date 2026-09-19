@@ -7,6 +7,7 @@ import java.lang.annotation.Target;
 
 /**
  * Generates UUID primary keys before insert using MicroOrm's UUID generator integration.
+ * Without this annotation an unset UUID {@link Id} is filled with {@link java.util.UUID#randomUUID()}.
  */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)

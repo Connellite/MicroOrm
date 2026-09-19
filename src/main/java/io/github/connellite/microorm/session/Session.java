@@ -584,7 +584,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
             return;
         }
         if (pk.javaType() == UUID.class && EntityHydrator.getFieldValue(entity, pk) == null) {
-            EntityHydrator.setFieldValue(entity, pk, UuidGenerators.generateVersion4());
+            EntityHydrator.setFieldValue(entity, pk, UUID.randomUUID());
         }
     }
 
