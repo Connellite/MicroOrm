@@ -1,9 +1,9 @@
 package io.github.connellite.microorm.session;
 
-/** Visitor for events published through {@link Session#publishEvent(Object)}. */
+/** Visitor for events published through {@link TransactionalEventSession#publishEvent(Object)}. */
 public interface TransactionalEventVisitor<E> {
 
-    /** Called before {@link Session#commitTransaction()} calls JDBC {@code commit()}. */
+    /** Called before {@link JdbcSession#commitTransaction()} calls JDBC {@code commit()}. */
     void beforeCommit(E event);
 
     /** Called after JDBC {@code commit()} succeeds. */

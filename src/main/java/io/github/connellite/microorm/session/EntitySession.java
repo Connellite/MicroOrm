@@ -1,7 +1,10 @@
 package io.github.connellite.microorm.session;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.query.EntityDelete;
+import io.github.connellite.microorm.query.EntityInsert;
 import io.github.connellite.microorm.query.EntitySelect;
+import io.github.connellite.microorm.query.EntityUpdate;
 import io.github.connellite.microorm.sql.Query;
 
 import java.sql.SQLException;
@@ -11,7 +14,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Entity CRUD and query surface implemented by {@link Session}.
+ * Entity CRUD, typed mutation DSL, and query surface implemented by {@link Session}.
  * Materializing {@code selectRows}/{@code selectOne}/{@code findOne} methods are defaults over {@link #streamRows}.
  */
 public interface EntitySession {
@@ -43,6 +46,12 @@ public interface EntitySession {
     int deleteById(Class<?> entityClass, Object id);
 
     int deleteAllRows(Class<?> entityClass);
+
+    int execute(EntityInsert<?> insert);
+
+    int execute(EntityUpdate<?> update);
+
+    int execute(EntityDelete<?> delete);
 
     boolean existsById(Class<?> type, Object id);
 

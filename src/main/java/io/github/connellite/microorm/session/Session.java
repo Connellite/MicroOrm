@@ -51,7 +51,7 @@ import java.util.stream.Stream;
  * DML ({@code insert}, {@code update}, {@code delete}, {@code select}) throws {@link MicroOrmException}
  * on failure; DDL ({@code createEntity}, {@code syncEntity}, {@code dropEntity}) declares {@link SQLException}.
  */
-public final class Session implements AutoCloseable, EntitySession, RelationPersistSession {
+public final class Session implements JdbcSession, TransactionalEventSession, EntitySession, RelationPersistSession {
 
     private final Connection connection;
     private final ConnectionProvider provider;
@@ -82,6 +82,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * JDBC connection used by this session (same instance for the session lifetime).
      */
+    @Override
     public Connection connection() {
         return connection;
     }
@@ -94,6 +95,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Disables auto-commit for explicit {@link #commitTransaction()} / {@link #rollbackTransaction()}.
      */
+    @Override
     public void beginTransaction() throws SQLException {
         if (localTransactionActive) {
             throw new MicroOrmException("Session transaction already active");
@@ -106,6 +108,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Commits the current transaction and re-enables auto-commit.
      */
+    @Override
     public void commitTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             if (localTransactionActive) {
@@ -128,6 +131,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Rolls back the current transaction and re-enables auto-commit.
      */
+    @Override
     public void rollbackTransaction() throws SQLException {
         if (!connection.getAutoCommit()) {
             connection.rollback();
@@ -150,6 +154,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * Events are delivered only for explicit {@link #beginTransaction()} transactions unless
      * {@code fallbackExecution} is enabled.
      */
+    @Override
     public <E> Session addTransactionalEventListener(
             Class<E> eventType,
             TransactionalEventVisitor<? super E> visitor) {
@@ -162,6 +167,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * @param fallbackExecution when {@code true}, events published outside a local transaction are delivered as
      *                          {@code afterCommit} followed by {@code afterCompletion}
      */
+    @Override
     public <E> Session addTransactionalEventListener(
             Class<E> eventType,
             boolean fallbackExecution,
@@ -179,6 +185,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * Inside a local session transaction, the event is queued until commit or rollback. Outside a local
      * transaction, only listeners registered with {@code fallbackExecution = true} are invoked.
      */
+    @Override
     public void publishEvent(Object event) {
         Objects.requireNonNull(event, "event");
         if (localTransactionActive) {
@@ -199,6 +206,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * Ensures the entity table exists (creates it when missing). Safe to call on every application
      * startup: never drops an existing table or deletes rows; only creates missing tables and indexes.
      */
+    @Override
     public void createEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
         requireMutable(m, "createEntity");
@@ -209,6 +217,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * Aligns the database schema with the entity mapping (adds missing nullable columns and indexes).
      * Safe to call on every application startup: never drops tables or deletes rows.
      */
+    @Override
     public void syncEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
         requireMutable(m, "syncEntity");
@@ -218,6 +227,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Drops the entity table and all rows (destructive).
      */
+    @Override
     public void dropEntity(Class<?> entityClass) throws SQLException {
         EntityModel m = registry.register(entityClass);
         requireMutable(m, "dropEntity");
@@ -228,6 +238,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * Inserts one entity row. When the entity has relation wrapper fields, persists the object graph in dependency order.
      * Auto-increment and UUID primary keys are filled on the entity when applicable.
      */
+    @Override
     public <T> T insertRow(T entity) {
         Objects.requireNonNull(entity, "insertRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
@@ -251,6 +262,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * @param batchSize JDBC batch chunk size (values {@code <= 0} use an internal default)
      * @return number of rows inserted
      */
+    @Override
     public <T> int insertRows(List<T> entities, int batchSize) {
         if (entities == null || entities.isEmpty()) {
             return 0;
@@ -300,6 +312,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Updates one row by primary key. Returns {@code 0} when no row matched.
      */
+    @Override
     public int updateRow(Object entity) {
         Objects.requireNonNull(entity, "updateRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
@@ -319,6 +332,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Deletes one row by primary key on the entity. Returns {@code 0} when no row matched.
      */
+    @Override
     public int deleteRow(Object entity) {
         Objects.requireNonNull(entity, "deleteRow entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
@@ -338,6 +352,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Deletes one row by primary key value. Returns {@code 0} when no row matched.
      */
+    @Override
     public int deleteById(Class<?> entityClass, Object id) {
         EntityModel m = registry.get(entityClass);
         requireMutable(m, "deleteById");
@@ -348,6 +363,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Deletes all rows from the entity table (table definition is kept).
      */
+    @Override
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
         requireMutable(m, "deleteAllRows");
@@ -358,6 +374,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Returns whether a row exists for the given primary key.
      */
+    @Override
     public boolean existsById(Class<?> type, Object id) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
@@ -367,6 +384,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Returns {@code null} when no row matches the primary key.
      */
+    @Override
     public <T> T selectRow(Class<T> type, Object id) {
         return selectRow(type, id, lazyLoadContext());
     }
@@ -393,6 +411,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      * so lazy relation wrappers can load related rows until {@link #close()}.
      * Prefer {@link EntitySession#selectRows(Class)} when the full result fits in memory.
      */
+    @Override
     public <T> Stream<T> streamRows(Class<T> type) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
@@ -405,6 +424,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
      */
+    @Override
     public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
@@ -417,6 +437,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Lazy entity-query stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
      */
+    @Override
     public <T> Stream<T> streamRows(EntitySelect<T> query) {
         Objects.requireNonNull(query, "query cannot be null");
         return openStream(() -> {
@@ -430,6 +451,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
      */
+    @Override
     public <T> Stream<T> streamRows(Class<T> type, Query query) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
@@ -444,6 +466,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      *
      * @return affected row count
      */
+    @Override
     public int execute(Query query) {
         Objects.requireNonNull(query, "query cannot be null");
         return SqlExecutor.executeUpdate(connection, query);
@@ -452,6 +475,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
     /**
      * Executes a custom scalar query and returns the first column of the first row.
      */
+    @Override
     public <T> T selectScalar(Query query, Class<T> targetType) {
         Objects.requireNonNull(query, "query cannot be null");
         Objects.requireNonNull(targetType, "targetType cannot be null");
@@ -463,6 +487,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      *
      * @return affected row count
      */
+    @Override
     public int execute(EntityInsert<?> insert) {
         Objects.requireNonNull(insert, "insert cannot be null");
         EntityModel m = registry.get(insert.entityType());
@@ -475,6 +500,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      *
      * @return affected row count
      */
+    @Override
     public int execute(EntityUpdate<?> update) {
         Objects.requireNonNull(update, "update cannot be null");
         EntityModel m = registry.get(update.entityType());
@@ -487,6 +513,7 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
      *
      * @return affected row count
      */
+    @Override
     public int execute(EntityDelete<?> delete) {
         Objects.requireNonNull(delete, "delete cannot be null");
         EntityModel m = registry.get(delete.entityType());
@@ -613,13 +640,13 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
         return EntityHydrator.getFieldValue(entity, model.primaryKey());
     }
 
-    @Override
     /**
      * Hibernate {@code ForeignKeys.isTransient} / persister lookup for an assigned identifier:
      * {@code false} when the PK is unset, otherwise a database exists-check (no persistence context).
      *
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java#L298">ForeignKeys.isTransient</a>
      */
+    @Override
     public boolean existsByPrimaryKey(Object entity, EntityModel model) {
         Object id = pkValue(entity, model);
         if (EntityHydrator.isUnsetPkValue(id, model.primaryKey())) {
@@ -714,12 +741,12 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
         return deleted;
     }
 
-    @Override
     /**
      * Hibernate {@code cascadeBeforeDelete}: remove collection children before the owner.
      *
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultDeleteEventListener.java#L491">DefaultDeleteEventListener.cascadeBeforeDelete</a>
      */
+    @Override
     public void deleteChildrenByOwner(OneToManyField relation, Object ownerPk) {
         EntityModel childModel = registry.get(relation.targetEntityClass());
         ManyToOneField inverse = childModel.manyToOneByFieldName(relation.mappedBy());
@@ -743,12 +770,12 @@ public final class Session implements AutoCloseable, EntitySession, RelationPers
         }
     }
 
-    @Override
     /**
      * Hibernate {@code Cascade.deleteOrphans}: delete collection elements no longer referenced by the owner.
      *
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/Cascade.java#L630">Cascade.deleteOrphans</a>
      */
+    @Override
     public void deleteOrphanChildren(
             OneToManyField relation,
             Object ownerPk,
