@@ -2,7 +2,10 @@ package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.annotation.Column;
+import io.github.connellite.microorm.annotation.Convert;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Enumerated;
+import io.github.connellite.microorm.annotation.EnumType;
 import io.github.connellite.microorm.annotation.GeneratedValue;
 import io.github.connellite.microorm.annotation.GenerationType;
 import io.github.connellite.microorm.annotation.GenericGenerator;
@@ -10,6 +13,8 @@ import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.MappedSuperclass;
 import io.github.connellite.microorm.annotation.SequenceGenerator;
 import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.Temporal;
+import io.github.connellite.microorm.annotation.TemporalType;
 import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.annotation.UuidGenerator;
 import io.github.connellite.microorm.generation.IdGeneration;
@@ -17,6 +22,7 @@ import io.github.connellite.microorm.generation.IdGenerationKind;
 import io.github.connellite.microorm.generation.PackageAnnotatedImmutableEntity;
 import io.github.connellite.microorm.repository.PackageAnnotatedMappedSuperclass;
 import io.github.connellite.microorm.schema.PackageAnnotatedEntity;
+import io.github.connellite.microorm.type.AttributeConverter;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -231,9 +237,78 @@ class EntityModelRegistryTest {
         @Id
         private long id;
 
+        @Temporal(TemporalType.TIMESTAMP)
         private java.util.Date createdAt;
 
         private LocalDateTime updatedAt;
+    }
+
+    enum RegistryStatus {
+        OPEN, CLOSED
+    }
+
+    @Entity
+    @Table(name = "enumerated_fields")
+    static class EnumeratedFields {
+        @Id
+        private long id;
+
+        private RegistryStatus defaultStatus;
+
+        @Enumerated(EnumType.STRING)
+        private RegistryStatus namedStatus;
+    }
+
+    @Entity
+    @Table(name = "missing_temporal")
+    static class MissingTemporal {
+        @Id
+        private long id;
+
+        private java.util.Date createdAt;
+    }
+
+    @Entity
+    @Table(name = "enumerated_on_string")
+    static class EnumeratedOnString {
+        @Id
+        private long id;
+
+        @Enumerated
+        private String name;
+    }
+
+    public static class IdentityStringConverter implements AttributeConverter<String, String> {
+        @Override
+        public String convertToDatabaseColumn(String attribute) {
+            return attribute;
+        }
+
+        @Override
+        public String convertToEntityAttribute(String dbData) {
+            return dbData;
+        }
+    }
+
+    @Entity
+    @Table(name = "convert_and_enumerated")
+    static class ConvertAndEnumerated {
+        @Id
+        private long id;
+
+        @Convert(converter = IdentityStringConverter.class)
+        @Enumerated
+        private RegistryStatus status;
+    }
+
+    @Entity
+    @Table(name = "temporal_on_string")
+    static class TemporalOnString {
+        @Id
+        private long id;
+
+        @Temporal(TemporalType.DATE)
+        private String name;
     }
 
     @MappedSuperclass
@@ -526,6 +601,49 @@ class EntityModelRegistryTest {
         EntityModelRegistry registry = new EntityModelRegistry();
         EntityModel model = registry.register(TemporalFields.class);
         assertEquals(3, model.fields().size());
+        EntityField createdAt = model.fields().stream()
+                .filter(field -> field.javaField().getName().equals("createdAt"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(java.sql.Timestamp.class, createdAt.jdbcJavaType());
+    }
+
+    @Test
+    void mapsEnumeratedOrdinalAndString() {
+        EntityModel model = new EntityModelRegistry().register(EnumeratedFields.class);
+        EntityField defaultStatus = model.fields().stream()
+                .filter(field -> field.javaField().getName().equals("defaultStatus"))
+                .findFirst()
+                .orElseThrow();
+        EntityField namedStatus = model.fields().stream()
+                .filter(field -> field.javaField().getName().equals("namedStatus"))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(Integer.class, defaultStatus.jdbcJavaType());
+        assertEquals(String.class, namedStatus.jdbcJavaType());
+        assertEquals(0, defaultStatus.convertToDatabaseColumn(RegistryStatus.OPEN));
+        assertEquals("CLOSED", namedStatus.convertToDatabaseColumn(RegistryStatus.CLOSED));
+    }
+
+    @Test
+    void rejectsDateWithoutTemporal() {
+        assertThrows(MicroOrmException.class, () -> new EntityModelRegistry().register(MissingTemporal.class));
+    }
+
+    @Test
+    void rejectsEnumeratedOnNonEnum() {
+        assertThrows(MicroOrmException.class, () -> new EntityModelRegistry().register(EnumeratedOnString.class));
+    }
+
+    @Test
+    void rejectsConvertCombinedWithEnumerated() {
+        assertThrows(MicroOrmException.class, () -> new EntityModelRegistry().register(ConvertAndEnumerated.class));
+    }
+
+    @Test
+    void rejectsTemporalOnNonDate() {
+        assertThrows(MicroOrmException.class, () -> new EntityModelRegistry().register(TemporalOnString.class));
     }
 
     @Test

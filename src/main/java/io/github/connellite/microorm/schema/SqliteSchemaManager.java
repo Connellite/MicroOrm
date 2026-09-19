@@ -87,7 +87,26 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
             }
             return storage == UuidStorage.BINARY ? "BLOB" : "TEXT";
         }
+        String temporal = baseTypeForTemporal(t);
+        if (temporal != null) {
+            return temporal;
+        }
         throw new IllegalArgumentException("Unsupported field type for SQLite DDL: " + t.getName());
+    }
+
+    @Override
+    protected String sqlDateType() {
+        return "TEXT";
+    }
+
+    @Override
+    protected String sqlTimeType() {
+        return "TEXT";
+    }
+
+    @Override
+    protected String sqlTimestampType() {
+        return "TEXT";
     }
 
     @Override

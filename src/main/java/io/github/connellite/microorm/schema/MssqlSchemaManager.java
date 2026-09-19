@@ -46,7 +46,16 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
             }
             return "BINARY(16)";
         }
+        String temporal = baseTypeForTemporal(t);
+        if (temporal != null) {
+            return temporal;
+        }
         throw new IllegalArgumentException("Unsupported field type for MSSQL DDL: " + t.getName());
+    }
+
+    @Override
+    protected String sqlTimestampType() {
+        return "DATETIME2";
     }
 
     @Override

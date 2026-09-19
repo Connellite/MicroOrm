@@ -53,6 +53,7 @@ public final class SupportedFieldTypes {
             Time.class,
             Timestamp.class,
             java.util.Date.class,
+            java.util.Calendar.class,
             LocalDate.class,
             LocalTime.class,
             LocalDateTime.class,

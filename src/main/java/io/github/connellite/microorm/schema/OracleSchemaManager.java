@@ -120,7 +120,16 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
             }
             return storage == UuidStorage.STRING ? "VARCHAR2(36)" : "RAW(16)";
         }
+        String temporal = baseTypeForTemporal(t);
+        if (temporal != null) {
+            return temporal;
+        }
         throw new IllegalArgumentException("Unsupported field type for Oracle DDL: " + t.getName());
+    }
+
+    @Override
+    protected String sqlTimeType() {
+        return "TIMESTAMP";
     }
 
     @Override

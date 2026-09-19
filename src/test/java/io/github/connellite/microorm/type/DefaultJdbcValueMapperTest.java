@@ -4,6 +4,8 @@ import io.github.connellite.microorm.mapping.EntityField;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -28,6 +30,17 @@ class DefaultJdbcValueMapperTest {
         assertEquals(uuid, mapper.fromJdbcValue(field, bytes));
     }
 
+    @Test
+    void readsMysqlDatetimeLocalDateTimeAsTimestamp() throws NoSuchFieldException {
+        DefaultJdbcValueMapper mapper = new DefaultJdbcValueMapper(UuidStorage.STRING);
+        EntityField field = field("occurredAt");
+        LocalDateTime localDateTime = LocalDateTime.of(2026, 7, 13, 21, 50, 45);
+
+        Object jdbc = mapper.fromJdbcValue(field, localDateTime);
+
+        assertEquals(Timestamp.valueOf(localDateTime), jdbc);
+    }
+
     private static EntityField field(String name) throws NoSuchFieldException {
         Field javaField = Holder.class.getDeclaredField(name);
         return new EntityField(javaField, name, false, false, false);
@@ -35,5 +48,6 @@ class DefaultJdbcValueMapperTest {
 
     static class Holder {
         private UUID id;
+        private Timestamp occurredAt;
     }
 }

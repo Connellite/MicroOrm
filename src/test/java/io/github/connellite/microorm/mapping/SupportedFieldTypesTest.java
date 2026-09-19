@@ -34,6 +34,7 @@ class SupportedFieldTypesTest {
         assertTrue(SupportedFieldTypes.isSupported(java.sql.Date.class));
         assertTrue(SupportedFieldTypes.isSupported(Timestamp.class));
         assertTrue(SupportedFieldTypes.isSupported(Date.class));
+        assertTrue(SupportedFieldTypes.isSupported(java.util.Calendar.class));
         assertTrue(SupportedFieldTypes.isSupported(LocalDateTime.class));
         assertTrue(SupportedFieldTypes.isSupported(UUID.class));
     }

@@ -131,6 +131,31 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected abstract String baseTypeForJava(Class<?> javaType, int length);
 
+    protected String baseTypeForTemporal(Class<?> javaType) {
+        if (javaType == java.sql.Date.class) {
+            return sqlDateType();
+        }
+        if (javaType == java.sql.Time.class) {
+            return sqlTimeType();
+        }
+        if (javaType == java.sql.Timestamp.class) {
+            return sqlTimestampType();
+        }
+        return null;
+    }
+
+    protected String sqlDateType() {
+        return "DATE";
+    }
+
+    protected String sqlTimeType() {
+        return "TIME";
+    }
+
+    protected String sqlTimestampType() {
+        return "TIMESTAMP";
+    }
+
     protected String columnDefinition(EntityField f, boolean includeUnique) {
         StringBuilder sb = new StringBuilder();
         sb.append(dialect.sqlName(f.columnIdentifier())).append(' ');

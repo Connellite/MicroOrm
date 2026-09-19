@@ -10,6 +10,8 @@ import io.github.connellite.microorm.annotation.ColumnDefault;
 import io.github.connellite.microorm.annotation.Comment;
 import io.github.connellite.microorm.annotation.Convert;
 import io.github.connellite.microorm.annotation.Entity;
+import io.github.connellite.microorm.annotation.Enumerated;
+import io.github.connellite.microorm.annotation.EnumType;
 import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.annotation.Immutable;
 import io.github.connellite.microorm.annotation.Index;
@@ -22,6 +24,8 @@ import io.github.connellite.microorm.annotation.OneToMany;
 import io.github.connellite.microorm.annotation.OneToOne;
 import io.github.connellite.microorm.annotation.Subselect;
 import io.github.connellite.microorm.annotation.Table;
+import io.github.connellite.microorm.annotation.Temporal;
+import io.github.connellite.microorm.annotation.TemporalType;
 import io.github.connellite.microorm.annotation.Transient;
 import io.github.connellite.microorm.annotation.UniqueConstraint;
 import io.github.connellite.microorm.relation.EntityCollection;
@@ -30,6 +34,9 @@ import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
+import io.github.connellite.microorm.type.EnumeratedOrdinalConverter;
+import io.github.connellite.microorm.type.EnumeratedStringConverter;
+import io.github.connellite.microorm.type.TemporalAttributeConverter;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -37,6 +44,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -748,9 +756,33 @@ public final class EntityModelRegistry {
 
     private static ConverterMetadata converterMetadata(Class<?> entityClass, Field field) {
         Convert convert = field.getAnnotation(Convert.class);
-        if (convert == null) {
-            return null;
+        Enumerated enumerated = field.getAnnotation(Enumerated.class);
+        Temporal temporal = field.getAnnotation(Temporal.class);
+        int specified = (convert != null ? 1 : 0) + (enumerated != null ? 1 : 0) + (temporal != null ? 1 : 0);
+        if (specified > 1) {
+            throw new MicroOrmException("Only one of @Convert, @Enumerated, @Temporal may be present on "
+                    + entityClass.getName() + "." + field.getName());
         }
+        if (convert != null) {
+            return convertMetadata(entityClass, field, convert);
+        }
+        if (enumerated != null) {
+            return enumeratedMetadata(entityClass, field, enumerated.value());
+        }
+        if (temporal != null) {
+            return temporalMetadata(entityClass, field, temporal.value());
+        }
+        if (field.getType().isEnum()) {
+            return enumeratedMetadata(entityClass, field, EnumType.ORDINAL);
+        }
+        if (isTemporalAttribute(field.getType())) {
+            throw new MicroOrmException("@Temporal is required for " + field.getType().getName()
+                    + " on " + entityClass.getName() + "." + field.getName());
+        }
+        return null;
+    }
+
+    private static ConverterMetadata convertMetadata(Class<?> entityClass, Field field, Convert convert) {
         AttributeConverter<?, ?> converter;
         try {
             converter = ReflectionUtil.getInstance(convert.converter());
@@ -773,6 +805,37 @@ public final class EntityModelRegistry {
                     + " does not match " + entityClass.getName() + "." + field.getName());
         }
         return new ConverterMetadata(converter, attributeType, databaseType);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static ConverterMetadata enumeratedMetadata(Class<?> entityClass, Field field, EnumType enumType) {
+        if (!field.getType().isEnum()) {
+            throw new MicroOrmException("@Enumerated requires an enum field on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        Class<? extends Enum> type = field.getType().asSubclass(Enum.class);
+        if (enumType == EnumType.STRING) {
+            return new ConverterMetadata(new EnumeratedStringConverter(type), field.getType(), String.class);
+        }
+        return new ConverterMetadata(new EnumeratedOrdinalConverter(type), field.getType(), Integer.class);
+    }
+
+    private static ConverterMetadata temporalMetadata(Class<?> entityClass, Field field, TemporalType temporalType) {
+        Class<?> attributeType = field.getType();
+        if (!isTemporalAttribute(attributeType)) {
+            throw new MicroOrmException("@Temporal requires java.util.Date or java.util.Calendar on "
+                    + entityClass.getName() + "." + field.getName());
+        }
+        Class<?> databaseType = switch (temporalType) {
+            case DATE -> java.sql.Date.class;
+            case TIME -> java.sql.Time.class;
+            case TIMESTAMP -> java.sql.Timestamp.class;
+        };
+        return new ConverterMetadata(new TemporalAttributeConverter(temporalType, attributeType), attributeType, databaseType);
+    }
+
+    private static boolean isTemporalAttribute(Class<?> type) {
+        return type == java.util.Date.class || type == Calendar.class;
     }
 
     private static List<Class<?>> converterTypes(Class<?> converterClass) {

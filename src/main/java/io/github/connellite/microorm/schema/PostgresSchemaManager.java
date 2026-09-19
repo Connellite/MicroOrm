@@ -48,6 +48,10 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
             }
             return "UUID";
         }
+        String temporal = baseTypeForTemporal(t);
+        if (temporal != null) {
+            return temporal;
+        }
         throw new IllegalArgumentException("Unsupported field type for PostgreSQL DDL: " + t.getName());
     }
 

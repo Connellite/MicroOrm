@@ -46,7 +46,16 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
             }
             return storage == UuidStorage.STRING ? "CHAR(36)" : "BINARY(16)";
         }
+        String temporal = baseTypeForTemporal(t);
+        if (temporal != null) {
+            return temporal;
+        }
         throw new IllegalArgumentException("Unsupported field type for MySQL DDL: " + t.getName());
+    }
+
+    @Override
+    protected String sqlTimestampType() {
+        return "DATETIME";
     }
 
     @Override
