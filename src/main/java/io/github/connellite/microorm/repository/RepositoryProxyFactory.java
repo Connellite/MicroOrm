@@ -133,10 +133,10 @@ public final class RepositoryProxyFactory {
                 Object[] arguments = args == null ? new Object[0] : args;
                 if (method.getReturnType() != void.class && method.getReturnType() != Void.class) {
                     return executor.execute(session -> invokeFunction(
-                            session, method, buildFunctionQuery(method, arguments, procedureAnnotation)));
+                            session, method, buildFunctionQuery(session, method, arguments, procedureAnnotation)));
                 }
                 return executor.execute(session -> invokeNativeQuery(
-                        session, method, buildProcedureQuery(method, arguments, procedureAnnotation), "@Procedure"));
+                        session, method, buildProcedureQuery(session, method, arguments, procedureAnnotation), "@Procedure"));
             }
             if (method.isDefault()) {
                 return invokeDefaultMethod(proxy, method, args);
@@ -298,6 +298,7 @@ public final class RepositoryProxyFactory {
         }
 
         private Query buildProcedureQuery(
+                Session session,
                 Method method,
                 Object[] args,
                 Procedure annotation) {
@@ -305,10 +306,16 @@ public final class RepositoryProxyFactory {
             if (procedure.isBlank()) {
                 procedure = method.getName();
             }
-            return buildNativeQuery(method, args, procedureSql(method, args, procedure), "@Procedure");
+            return buildNativeQuery(
+                    method,
+                    args,
+                    session.dialect().sqlGenerator().procedureSql(
+                            procedure, parameterPlaceholders(method, args, "@Procedure")),
+                    "@Procedure");
         }
 
         private Query buildFunctionQuery(
+                Session session,
                 Method method,
                 Object[] args,
                 Procedure annotation) {
@@ -316,7 +323,12 @@ public final class RepositoryProxyFactory {
             if (function.isBlank()) {
                 function = method.getName();
             }
-            return buildNativeQuery(method, args, functionSql(method, args, function), "@Procedure");
+            return buildNativeQuery(
+                    method,
+                    args,
+                    session.dialect().sqlGenerator().functionSql(
+                            function, parameterPlaceholders(method, args, "@Procedure")),
+                    "@Procedure");
         }
 
         private Object invokeFunction(Session session, Method method, Query query) {
@@ -332,20 +344,6 @@ public final class RepositoryProxyFactory {
             }
             Class<?> scalarType = ReflectionUtil.primitiveToWrapper(returnType);
             return session.selectScalar(query, scalarType);
-        }
-
-        private String functionSql(Method method, Object[] args, String function) {
-            if (looksLikeNativeSql(function)) {
-                return function;
-            }
-            return "SELECT " + function + "(" + String.join(", ", parameterPlaceholders(method, args, "@Procedure")) + ")";
-        }
-
-        private String procedureSql(Method method, Object[] args, String procedure) {
-            if (looksLikeNativeSql(procedure)) {
-                return procedure;
-            }
-            return "CALL " + procedure + "(" + String.join(", ", parameterPlaceholders(method, args, "@Procedure")) + ")";
         }
 
         private List<String> parameterPlaceholders(Method method, Object[] args, String annotationName) {
@@ -367,13 +365,6 @@ public final class RepositoryProxyFactory {
                 placeholders.add(":" + parameterName(method, parameters[i], param, annotationName));
             }
             return placeholders;
-        }
-
-        private boolean looksLikeNativeSql(String procedure) {
-            String trimmed = procedure.trim();
-            String lower = trimmed.toLowerCase();
-            return trimmed.startsWith("{") || lower.startsWith("select ") || lower.startsWith("call ")
-                    || lower.startsWith("exec ") || lower.startsWith("execute ");
         }
 
         private Query buildNativeQuery(Method method, Object[] args, String sql, String annotationName) {

@@ -2,6 +2,8 @@ package io.github.connellite.microorm.sql;
 
 import io.github.connellite.microorm.dialect.Dialect;
 
+import java.util.List;
+
 public final class OracleSqlGenerator extends AbstractSqlGenerator {
 
     public OracleSqlGenerator(Dialect dialect) {
@@ -27,5 +29,13 @@ public final class OracleSqlGenerator extends AbstractSqlGenerator {
             return sql;
         }
         return sql + " FETCH FIRST " + limit + " ROWS ONLY";
+    }
+
+    @Override
+    public String functionSql(String function, List<String> parameterPlaceholders) {
+        if (looksLikeNativeSql(function)) {
+            return function;
+        }
+        return "SELECT " + function + "(" + String.join(", ", parameterPlaceholders) + ") FROM dual";
     }
 }

@@ -218,6 +218,11 @@ public final class MicroOrm {
         T apply(DynamicSession session) throws SQLException;
     }
 
+    /** Database dialect used by sessions opened from this instance. */
+    public Dialect dialect() {
+        return dialect;
+    }
+
     /** Shared entity metadata registry (same instance passed to every {@link Session}). */
     public EntityModelRegistry registry() {
         return registry;

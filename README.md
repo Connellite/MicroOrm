@@ -275,7 +275,7 @@ interface UserRepository extends EntityRepository<User, UUID> {
 }
 ```
 
-`@Query` is native SQL only. `@Procedure` uses the return type to choose the call style: `void` methods render procedure calls such as `CALL archive_inactive_users()`, while non-void methods render scalar function queries such as `SELECT count_active_users()`. If you need vendor-specific syntax such as MSSQL `EXEC` or Oracle `FROM dual`, pass the full native SQL.
+`@Query` is native SQL only. `@Procedure` uses the return type to choose the call style: `void` methods render a dialect procedure call (`CALL archive_inactive_users()` by default, `EXEC` on SQL Server), while non-void methods render a scalar function query (`SELECT count_active_users()`, `SELECT ... FROM dual` on Oracle, `SELECT dbo....` on SQL Server). Pass full native SQL when you need a vendor-specific form.
 
 ## Dynamic tables
 

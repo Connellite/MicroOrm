@@ -2,6 +2,8 @@ package io.github.connellite.microorm.sql;
 
 import io.github.connellite.microorm.dialect.Dialect;
 
+import java.util.List;
+
 public final class MssqlSqlGenerator extends AbstractSqlGenerator {
 
     public MssqlSqlGenerator(Dialect dialect) {
@@ -33,5 +35,24 @@ public final class MssqlSqlGenerator extends AbstractSqlGenerator {
             sql += " FETCH NEXT " + limit + " ROWS ONLY";
         }
         return sql;
+    }
+
+    @Override
+    public String procedureSql(String procedure, List<String> parameterPlaceholders) {
+        if (looksLikeNativeSql(procedure)) {
+            return procedure;
+        }
+        if (parameterPlaceholders.isEmpty()) {
+            return "EXEC " + procedure;
+        }
+        return "EXEC " + procedure + " " + String.join(", ", parameterPlaceholders);
+    }
+
+    @Override
+    public String functionSql(String function, List<String> parameterPlaceholders) {
+        if (looksLikeNativeSql(function)) {
+            return function;
+        }
+        return "SELECT dbo." + function + "(" + String.join(", ", parameterPlaceholders) + ")";
     }
 }

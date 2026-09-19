@@ -8,6 +8,7 @@ import java.lang.annotation.Target;
 /**
  * Native stored procedure or function call attached to an {@link io.github.connellite.microorm.repository.EntityRepository} method.
  * Void repository methods are treated as procedures; non-void methods are treated as scalar functions.
+ * The dialect renders the call SQL; pass full native SQL when the default form is not enough.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

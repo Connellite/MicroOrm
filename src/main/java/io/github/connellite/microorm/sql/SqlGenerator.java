@@ -11,6 +11,8 @@ import io.github.connellite.microorm.query.EntityInsert;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.query.EntityUpdate;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -71,6 +73,41 @@ public interface SqlGenerator {
     BoundStatement deleteJoinTableByOwner(ManyToManyField owning, Object ownerValue);
 
     BoundStatement deleteJoinTableByTarget(ManyToManyField owning, Object targetValue);
+
+    /**
+     * Renders a stored procedure call for {@link io.github.connellite.microorm.annotation.Procedure}.
+     * Values that already look like native SQL are returned unchanged so callers can pass vendor-specific text.
+     */
+    default String procedureSql(String procedure, List<String> parameterPlaceholders) {
+        if (looksLikeNativeSql(procedure)) {
+            return procedure;
+        }
+        return "CALL " + procedure + "(" + String.join(", ", parameterPlaceholders) + ")";
+    }
+
+    /**
+     * Renders a stored function query for {@link io.github.connellite.microorm.annotation.Procedure}.
+     * Values that already look like native SQL are returned unchanged so callers can pass vendor-specific text.
+     */
+    default String functionSql(String function, List<String> parameterPlaceholders) {
+        if (looksLikeNativeSql(function)) {
+            return function;
+        }
+        return "SELECT " + function + "(" + String.join(", ", parameterPlaceholders) + ")";
+    }
+
+    /** Returns whether {@code sql} is already a native call or query rather than a routine name. */
+    default boolean looksLikeNativeSql(String sql) {
+        String trimmed = sql.trim();
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        return trimmed.startsWith("{")
+                || lower.startsWith("select ")
+                || lower.startsWith("call ")
+                || lower.startsWith("exec ")
+                || lower.startsWith("execute ")
+                || lower.startsWith("begin ")
+                || lower.startsWith("begin;");
+    }
 
     /** Validates table and column names on a built {@link EntityModel}. */
     static void validateColumnNames(EntityModel model) {

@@ -11,19 +11,7 @@ import java.util.UUID;
 /**
  * Default {@link JdbcValueMapper} used by most dialects. UUID encoding follows {@link UuidStorage}.
  */
-public final class DefaultJdbcValueMapper implements JdbcValueMapper {
-
-    private final UuidStorage uuidStorage;
-
-    /** Creates a mapper with the given UUID JDBC representation. */
-    public DefaultJdbcValueMapper(UuidStorage uuidStorage) {
-        this.uuidStorage = uuidStorage;
-    }
-
-    @Override
-    public UuidStorage uuidStorage() {
-        return uuidStorage;
-    }
+public record DefaultJdbcValueMapper(UuidStorage uuidStorage) implements JdbcValueMapper {
 
     @Override
     public Object toJdbcValue(EntityField field, Object value) {

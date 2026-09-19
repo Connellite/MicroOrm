@@ -87,6 +87,11 @@ public final class Session implements AutoCloseable, RelationPersistSession {
         return connection;
     }
 
+    /** Database dialect used by this session. */
+    public Dialect dialect() {
+        return dialect;
+    }
+
     /**
      * Disables auto-commit for explicit {@link #commitTransaction()} / {@link #rollbackTransaction()}.
      */

@@ -121,28 +121,6 @@ class RepositoryTest {
         void callProcedure(@Param("name") String name);
     }
 
-    interface MssqlProcedureRepository extends EntityRepository<RepositoryItem, Long> {
-        @Procedure("EXEC repository_insert_item @p_name = :name")
-        void insertByProcedure(@Param("name") String name);
-
-        @Procedure("EXEC repository_rename_item @p_id = :id, @p_name = :name")
-        void renameByProcedure(@Param("id") long id, @Param("name") String name);
-
-        @Procedure("SELECT dbo.repository_item_label(:name)")
-        String labelByFunction(@Param("name") String name);
-
-        @Procedure("SELECT dbo.repository_count_items()")
-        long countByFunction();
-    }
-
-    interface OracleFunctionRepository extends EntityRepository<RepositoryItem, Long> {
-        @Procedure("SELECT repository_item_label(:name) FROM dual")
-        String labelByFunction(@Param("name") String name);
-
-        @Procedure("SELECT repository_count_items() FROM dual")
-        long countByFunction();
-    }
-
     @ParameterizedTest(name = "{0}")
     @MethodSource("dialects")
     void onDemandRepositoryDelegatesToSessionMethods(DialectTestSupport.DialectFixture dialect) throws SQLException {
@@ -255,23 +233,13 @@ class RepositoryTest {
             repository.createEntity();
             createRepositoryProcedures(connection, dialect);
 
-            if ("MSSQL".equals(dialect.name())) {
-                MssqlProcedureRepository procedureRepository = orm.repository(MssqlProcedureRepository.class);
-                procedureRepository.insertByProcedure("from_proc");
-            } else {
-                repository.insertByProcedure("from_proc");
-            }
+            repository.insertByProcedure("from_proc");
             RepositoryItem inserted = repository.findNativeByName("from_proc").orElseThrow();
 
-            assertEquals("fn:from_proc", labelByFunction(orm, dialect, "from_proc"));
-            assertEquals(1L, countByFunction(orm, dialect));
+            assertEquals("fn:from_proc", repository.labelByFunction("from_proc"));
+            assertEquals(1L, repository.countByFunction());
 
-            if ("MSSQL".equals(dialect.name())) {
-                MssqlProcedureRepository procedureRepository = orm.repository(MssqlProcedureRepository.class);
-                procedureRepository.renameByProcedure(inserted.getId(), "renamed_proc");
-            } else {
-                repository.renameByProcedure(inserted.getId(), "renamed_proc");
-            }
+            repository.renameByProcedure(inserted.getId(), "renamed_proc");
 
             assertEquals("renamed_proc", repository.selectRow(inserted.getId()).getName());
         }
@@ -308,22 +276,6 @@ class RepositoryTest {
                 DialectTestSupport.mysql(),
                 DialectTestSupport.mssql(),
                 DialectTestSupport.oracle());
-    }
-
-    private static String labelByFunction(MicroOrm orm, DialectTestSupport.DialectFixture dialect, String name) {
-        return switch (dialect.name()) {
-            case "MSSQL" -> orm.repository(MssqlProcedureRepository.class).labelByFunction(name);
-            case "Oracle" -> orm.repository(OracleFunctionRepository.class).labelByFunction(name);
-            default -> orm.repository(RepositoryItemRepository.class).labelByFunction(name);
-        };
-    }
-
-    private static long countByFunction(MicroOrm orm, DialectTestSupport.DialectFixture dialect) {
-        return switch (dialect.name()) {
-            case "MSSQL" -> orm.repository(MssqlProcedureRepository.class).countByFunction();
-            case "Oracle" -> orm.repository(OracleFunctionRepository.class).countByFunction();
-            default -> orm.repository(RepositoryItemRepository.class).countByFunction();
-        };
     }
 
     private static void createRepositoryProcedures(
