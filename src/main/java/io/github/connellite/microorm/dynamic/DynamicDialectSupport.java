@@ -24,13 +24,14 @@ public final class DynamicDialectSupport {
 
     /** Returns the SQL generator for the given dialect. */
     public static DynamicSqlGenerator sqlGenerator(Dialect dialect) {
+        Dialect syntax = dialect.unwrap();
         return new AbstractDynamicSqlGenerator(dialect) {
             @Override
             protected String limitOne(String sql) {
-                if (dialect instanceof OracleDialect) {
+                if (syntax instanceof OracleDialect) {
                     return sql + " FETCH FIRST 1 ROWS ONLY";
                 }
-                if (dialect instanceof MssqlDialect) {
+                if (syntax instanceof MssqlDialect) {
                     if (sql.startsWith("SELECT 1 FROM ")) {
                         return "SELECT TOP 1 1 FROM " + sql.substring("SELECT 1 FROM ".length());
                     }
@@ -45,7 +46,7 @@ public final class DynamicDialectSupport {
                 if (limit == null && effectiveOffset == 0) {
                     return sql;
                 }
-                if (dialect instanceof OracleDialect) {
+                if (syntax instanceof OracleDialect) {
                     if (effectiveOffset > 0) {
                         sql += " OFFSET " + effectiveOffset + " ROWS";
                     }
@@ -54,7 +55,7 @@ public final class DynamicDialectSupport {
                     }
                     return sql;
                 }
-                if (dialect instanceof MssqlDialect) {
+                if (syntax instanceof MssqlDialect) {
                     if (effectiveOffset == 0 && limit != null) {
                         return "SELECT TOP " + limit + " " + sql.substring("SELECT ".length());
                     }
@@ -74,19 +75,20 @@ public final class DynamicDialectSupport {
 
     /** Returns the schema manager for the given dialect. */
     public static DynamicSchemaManager schemaManager(Dialect dialect) {
-        if (dialect instanceof SqliteDialect) {
+        Dialect syntax = dialect.unwrap();
+        if (syntax instanceof SqliteDialect) {
             return new SqliteDynamicSchemaManager(dialect);
         }
-        if (dialect instanceof PostgresDialect) {
+        if (syntax instanceof PostgresDialect) {
             return new PostgresDynamicSchemaManager(dialect);
         }
-        if (dialect instanceof MysqlDialect) {
+        if (syntax instanceof MysqlDialect) {
             return new MysqlDynamicSchemaManager(dialect);
         }
-        if (dialect instanceof MssqlDialect) {
+        if (syntax instanceof MssqlDialect) {
             return new MssqlDynamicSchemaManager(dialect);
         }
-        if (dialect instanceof OracleDialect) {
+        if (syntax instanceof OracleDialect) {
             return new OracleDynamicSchemaManager(dialect);
         }
         throw new MicroOrmException("Unsupported dialect for dynamic tables: " + dialect.getClass().getName());

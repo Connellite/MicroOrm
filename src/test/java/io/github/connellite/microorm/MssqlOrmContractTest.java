@@ -7,16 +7,9 @@ import io.github.connellite.microorm.annotation.Id;
 import io.github.connellite.microorm.connection.KeepOpenConnectionProvider;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dialect.MssqlDialect;
-import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
-import io.github.connellite.microorm.schema.MssqlSchemaManager;
-import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.session.Session;
-import io.github.connellite.microorm.sql.MssqlSqlGenerator;
-import io.github.connellite.microorm.sql.SqlGenerator;
-import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.DefaultJdbcValueMapper;
-import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.UuidStorage;
 import io.github.connellite.util.UuidUtil;
 import org.junit.jupiter.api.Test;
@@ -106,7 +99,7 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
                 }
 
                 MicroOrm orm = new MicroOrm(
-                        new MssqlMicrosoftGuidDialect(),
+                        microsoftGuidDialect(),
                         new KeepOpenConnectionProvider(connection),
                         new EntityModelRegistry()).register(PrecreatedGuidWidget.class);
 
@@ -141,7 +134,7 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
     void microsoftGuidSchemaManagerCreatesUniqueidentifierColumn() throws SQLException {
         try (Connection connection = openConnection()) {
             MicroOrm orm = new MicroOrm(
-                    new MssqlMicrosoftGuidDialect(),
+                    microsoftGuidDialect(),
                     new KeepOpenConnectionProvider(connection),
                     new EntityModelRegistry()).register(PrecreatedGuidWidget.class);
 
@@ -177,50 +170,7 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
         }
     }
 
-    private static final class MssqlMicrosoftGuidDialect implements Dialect {
-        private final Dialect delegate = MssqlDialect.getInstance();
-        private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.MICROSOFT_GUID);
-        private final SqlGenerator sqlGenerator = new MssqlSqlGenerator(this);
-        private final SchemaManager schemaManager = new MssqlSchemaManager(this);
-
-        @Override
-        public String sqlName(SqlIdentifier identifier) {
-            return delegate.sqlName(identifier);
-        }
-
-        @Override
-        public String catalogName(SqlIdentifier identifier) {
-            return delegate.catalogName(identifier);
-        }
-
-        @Override
-        public String jdbcColumnLabel(SqlIdentifier identifier) {
-            return delegate.jdbcColumnLabel(identifier);
-        }
-
-        @Override
-        public SqlGenerator sqlGenerator() {
-            return sqlGenerator;
-        }
-
-        @Override
-        public JdbcValueMapper valueMapper() {
-            return valueMapper;
-        }
-
-        @Override
-        public void createTable(Connection c, EntityModel model) throws SQLException {
-            schemaManager.createTable(c, model);
-        }
-
-        @Override
-        public void syncTable(Connection c, EntityModel model) throws SQLException {
-            schemaManager.syncTable(c, model);
-        }
-
-        @Override
-        public void dropTable(Connection c, EntityModel model) throws SQLException {
-            schemaManager.dropTable(c, model);
-        }
+    private static Dialect microsoftGuidDialect() {
+        return MssqlDialect.getInstance().withValueMapper(new DefaultJdbcValueMapper(UuidStorage.MICROSOFT_GUID));
     }
 }

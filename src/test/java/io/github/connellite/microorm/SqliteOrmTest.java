@@ -17,7 +17,6 @@ import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.EntityModelRegistry;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.schema.SchemaManager;
-import io.github.connellite.microorm.schema.SqliteSchemaManager;
 import io.github.connellite.microorm.session.Session;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
@@ -763,7 +762,7 @@ class SqliteOrmTest {
 
     private static final class SqliteSequenceTestDialect implements Dialect {
         private final SqliteDialect delegate = SqliteDialect.getInstance();
-        private final SchemaManager schemaManager = new SqliteSchemaManager(this);
+        private final SchemaManager schemaManager = delegate.schemaManager(this);
 
         @Override
         public String sqlName(SqlIdentifier identifier) {

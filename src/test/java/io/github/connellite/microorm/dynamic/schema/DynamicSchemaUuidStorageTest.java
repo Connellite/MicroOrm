@@ -6,17 +6,11 @@ import io.github.connellite.microorm.dialect.MysqlDialect;
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
+import io.github.connellite.microorm.dynamic.DynamicDialectSupport;
 import io.github.connellite.microorm.dynamic.LogicalType;
-import io.github.connellite.microorm.mapping.EntityModel;
-import io.github.connellite.microorm.sql.SqlGenerator;
-import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.DefaultJdbcValueMapper;
-import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.UuidStorage;
 import org.junit.jupiter.api.Test;
-
-import java.sql.Connection;
-import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -65,64 +59,26 @@ class DynamicSchemaUuidStorageTest {
     }
 
     private static SqliteDynamicSchemaManager sqlite(UuidStorage storage) {
-        return new SqliteDynamicSchemaManager(new StorageDialect(SqliteDialect.getInstance(), storage));
+        return (SqliteDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(SqliteDialect.getInstance(), storage));
     }
 
     private static PostgresDynamicSchemaManager postgres(UuidStorage storage) {
-        return new PostgresDynamicSchemaManager(new StorageDialect(PostgresDialect.getInstance(), storage));
+        return (PostgresDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(PostgresDialect.getInstance(), storage));
     }
 
     private static MysqlDynamicSchemaManager mysql(UuidStorage storage) {
-        return new MysqlDynamicSchemaManager(new StorageDialect(MysqlDialect.getInstance(), storage));
+        return (MysqlDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(MysqlDialect.getInstance(), storage));
     }
 
     private static MssqlDynamicSchemaManager mssql(UuidStorage storage) {
-        return new MssqlDynamicSchemaManager(new StorageDialect(MssqlDialect.getInstance(), storage));
+        return (MssqlDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(MssqlDialect.getInstance(), storage));
     }
 
     private static OracleDynamicSchemaManager oracle(UuidStorage storage) {
-        return new OracleDynamicSchemaManager(new StorageDialect(OracleDialect.getInstance(), storage));
+        return (OracleDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(OracleDialect.getInstance(), storage));
     }
 
-    private record StorageDialect(Dialect delegate, UuidStorage storage) implements Dialect {
-        @Override
-        public String sqlName(SqlIdentifier identifier) {
-            return delegate.sqlName(identifier);
-        }
-
-        @Override
-        public String catalogName(SqlIdentifier identifier) {
-            return delegate.catalogName(identifier);
-        }
-
-        @Override
-        public String jdbcColumnLabel(SqlIdentifier identifier) {
-            return delegate.jdbcColumnLabel(identifier);
-        }
-
-        @Override
-        public SqlGenerator sqlGenerator() {
-            return delegate.sqlGenerator();
-        }
-
-        @Override
-        public JdbcValueMapper valueMapper() {
-            return new DefaultJdbcValueMapper(storage);
-        }
-
-        @Override
-        public void createTable(Connection c, EntityModel model) throws SQLException {
-            delegate.createTable(c, model);
-        }
-
-        @Override
-        public void syncTable(Connection c, EntityModel model) throws SQLException {
-            delegate.syncTable(c, model);
-        }
-
-        @Override
-        public void dropTable(Connection c, EntityModel model) throws SQLException {
-            delegate.dropTable(c, model);
-        }
+    private static Dialect withStorage(Dialect dialect, UuidStorage storage) {
+        return dialect.withValueMapper(new DefaultJdbcValueMapper(storage));
     }
 }

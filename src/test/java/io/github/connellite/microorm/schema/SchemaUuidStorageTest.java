@@ -6,16 +6,10 @@ import io.github.connellite.microorm.dialect.MysqlDialect;
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
-import io.github.connellite.microorm.mapping.EntityModel;
-import io.github.connellite.microorm.sql.SqlGenerator;
-import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.DefaultJdbcValueMapper;
-import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.UuidStorage;
 import org.junit.jupiter.api.Test;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,64 +59,26 @@ class SchemaUuidStorageTest {
     }
 
     private static SqliteSchemaManager sqlite(UuidStorage storage) {
-        return new SqliteSchemaManager(new StorageDialect(SqliteDialect.getInstance(), storage));
+        return (SqliteSchemaManager) withStorage(SqliteDialect.getInstance(), storage).schemaManager();
     }
 
     private static PostgresSchemaManager postgres(UuidStorage storage) {
-        return new PostgresSchemaManager(new StorageDialect(PostgresDialect.getInstance(), storage));
+        return (PostgresSchemaManager) withStorage(PostgresDialect.getInstance(), storage).schemaManager();
     }
 
     private static MysqlSchemaManager mysql(UuidStorage storage) {
-        return new MysqlSchemaManager(new StorageDialect(MysqlDialect.getInstance(), storage));
+        return (MysqlSchemaManager) withStorage(MysqlDialect.getInstance(), storage).schemaManager();
     }
 
     private static MssqlSchemaManager mssql(UuidStorage storage) {
-        return new MssqlSchemaManager(new StorageDialect(MssqlDialect.getInstance(), storage));
+        return (MssqlSchemaManager) withStorage(MssqlDialect.getInstance(), storage).schemaManager();
     }
 
     private static OracleSchemaManager oracle(UuidStorage storage) {
-        return new OracleSchemaManager(new StorageDialect(OracleDialect.getInstance(), storage));
+        return (OracleSchemaManager) withStorage(OracleDialect.getInstance(), storage).schemaManager();
     }
 
-    private record StorageDialect(Dialect delegate, UuidStorage storage) implements Dialect {
-        @Override
-        public String sqlName(SqlIdentifier identifier) {
-            return delegate.sqlName(identifier);
-        }
-
-        @Override
-        public String catalogName(SqlIdentifier identifier) {
-            return delegate.catalogName(identifier);
-        }
-
-        @Override
-        public String jdbcColumnLabel(SqlIdentifier identifier) {
-            return delegate.jdbcColumnLabel(identifier);
-        }
-
-        @Override
-        public SqlGenerator sqlGenerator() {
-            return delegate.sqlGenerator();
-        }
-
-        @Override
-        public JdbcValueMapper valueMapper() {
-            return new DefaultJdbcValueMapper(storage);
-        }
-
-        @Override
-        public void createTable(Connection c, EntityModel model) throws SQLException {
-            delegate.createTable(c, model);
-        }
-
-        @Override
-        public void syncTable(Connection c, EntityModel model) throws SQLException {
-            delegate.syncTable(c, model);
-        }
-
-        @Override
-        public void dropTable(Connection c, EntityModel model) throws SQLException {
-            delegate.dropTable(c, model);
-        }
+    private static Dialect withStorage(Dialect dialect, UuidStorage storage) {
+        return dialect.withValueMapper(new DefaultJdbcValueMapper(storage));
     }
 }

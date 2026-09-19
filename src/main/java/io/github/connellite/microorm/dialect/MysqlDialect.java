@@ -1,6 +1,5 @@
 package io.github.connellite.microorm.dialect;
 
-import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.MysqlSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.sql.MysqlSqlGenerator;
@@ -9,15 +8,10 @@ import io.github.connellite.microorm.type.DefaultJdbcValueMapper;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.UuidStorage;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-
 /** MySQL / MariaDB — unquoted identifiers lower-cased; UUID stored as binary. */
 public final class MysqlDialect extends AbstractDialect {
 
     private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY);
-    private final SqlGenerator sqlGenerator = new MysqlSqlGenerator(this);
-    private final SchemaManager schemaManager = new MysqlSchemaManager(this);
 
     private MysqlDialect() {
     }
@@ -41,27 +35,17 @@ public final class MysqlDialect extends AbstractDialect {
     }
 
     @Override
-    public SqlGenerator sqlGenerator() {
-        return sqlGenerator;
+    protected SqlGenerator createSqlGenerator(Dialect owner) {
+        return new MysqlSqlGenerator(owner);
+    }
+
+    @Override
+    protected SchemaManager createSchemaManager(Dialect owner) {
+        return new MysqlSchemaManager(owner);
     }
 
     @Override
     public JdbcValueMapper valueMapper() {
         return valueMapper;
-    }
-
-    @Override
-    public void createTable(Connection c, EntityModel model) throws SQLException {
-        schemaManager.createTable(c, model);
-    }
-
-    @Override
-    public void syncTable(Connection c, EntityModel model) throws SQLException {
-        schemaManager.syncTable(c, model);
-    }
-
-    @Override
-    public void dropTable(Connection c, EntityModel model) throws SQLException {
-        schemaManager.dropTable(c, model);
     }
 }

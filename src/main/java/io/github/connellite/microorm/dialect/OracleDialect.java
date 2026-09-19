@@ -1,7 +1,6 @@
 package io.github.connellite.microorm.dialect;
 
 import io.github.connellite.microorm.generation.SequenceTarget;
-import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.OracleSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.sql.OracleSqlGenerator;
@@ -10,15 +9,10 @@ import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.microorm.type.OracleJdbcValueMapper;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-
 /** Oracle Database — unquoted identifiers upper-cased; booleans mapped to NUMBER(1). */
 public final class OracleDialect extends AbstractDialect {
 
     private final JdbcValueMapper valueMapper = new OracleJdbcValueMapper();
-    private final SqlGenerator sqlGenerator = new OracleSqlGenerator(this);
-    private final SchemaManager schemaManager = new OracleSchemaManager(this);
 
     private OracleDialect() {
     }
@@ -42,8 +36,13 @@ public final class OracleDialect extends AbstractDialect {
     }
 
     @Override
-    public SqlGenerator sqlGenerator() {
-        return sqlGenerator;
+    protected SqlGenerator createSqlGenerator(Dialect owner) {
+        return new OracleSqlGenerator(owner);
+    }
+
+    @Override
+    protected SchemaManager createSchemaManager(Dialect owner) {
+        return new OracleSchemaManager(owner);
     }
 
     @Override
@@ -78,20 +77,5 @@ public final class OracleDialect extends AbstractDialect {
     @Override
     public String nextSequenceValueSql(SequenceTarget target) {
         return "SELECT " + sequenceSqlName(target) + ".NEXTVAL FROM dual";
-    }
-
-    @Override
-    public void createTable(Connection c, EntityModel model) throws SQLException {
-        schemaManager.createTable(c, model);
-    }
-
-    @Override
-    public void syncTable(Connection c, EntityModel model) throws SQLException {
-        schemaManager.syncTable(c, model);
-    }
-
-    @Override
-    public void dropTable(Connection c, EntityModel model) throws SQLException {
-        schemaManager.dropTable(c, model);
     }
 }

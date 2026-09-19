@@ -4,12 +4,14 @@ import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Objects;
 
 /**
  * Database-specific identifier quoting, DDL, DML SQL generation, and JDBC value mapping.
@@ -32,11 +34,57 @@ public interface Dialect {
         return catalogName(identifier);
     }
 
-    /** Dialect-specific {@link SqlGenerator} for entity CRUD statements. */
+    /** Dialect-specific {@link SqlGenerator} bound to this instance. */
     SqlGenerator sqlGenerator();
+
+    /**
+     * SQL generator using this dialect's syntax, bound to {@code owner}.
+     * Wrappers pass themselves so generated SQL uses the owner's {@link #valueMapper()}.
+     */
+    default SqlGenerator sqlGenerator(Dialect owner) {
+        Objects.requireNonNull(owner, "owner");
+        if (owner == this) {
+            return sqlGenerator();
+        }
+        throw unsupportedRebind("sqlGenerator");
+    }
+
+    /** Schema manager bound to this instance. */
+    default SchemaManager schemaManager() {
+        return schemaManager(this);
+    }
+
+    /**
+     * Schema manager using this dialect's DDL, bound to {@code owner}.
+     * Wrappers pass themselves so UUID column types follow the owner's {@link #valueMapper()}.
+     */
+    default SchemaManager schemaManager(Dialect owner) {
+        Objects.requireNonNull(owner, "owner");
+        throw unsupportedRebind("schemaManager");
+    }
 
     /** Converts Java field values to JDBC parameters and back (UUID storage, booleans, etc.). */
     JdbcValueMapper valueMapper();
+
+    /**
+     * Returns a dialect that keeps this vendor's SQL/DDL syntax but uses {@code valueMapper}.
+     * {@link #sqlGenerator()} and {@link #schemaManager()} are rebound to the returned instance.
+     */
+    default Dialect withValueMapper(JdbcValueMapper valueMapper) {
+        Objects.requireNonNull(valueMapper, "valueMapper");
+        if (valueMapper() == valueMapper) {
+            return this;
+        }
+        return new ValueMapperDialect(this, valueMapper);
+    }
+
+    /**
+     * Underlying vendor dialect when this instance is a {@link #withValueMapper(JdbcValueMapper) mapper wrapper};
+     * otherwise {@code this}.
+     */
+    default Dialect unwrap() {
+        return this;
+    }
 
     /** Returns whether this dialect supports standalone sequence-backed primary keys. */
     default boolean supportsSequences() {
@@ -113,5 +161,10 @@ public interface Dialect {
 
     private MicroOrmException unsupportedSequences() {
         return new MicroOrmException("GenerationType.SEQUENCE is not supported by " + getClass().getSimpleName());
+    }
+
+    private MicroOrmException unsupportedRebind(String method) {
+        return new MicroOrmException(getClass().getSimpleName()
+                + " must override " + method + "(Dialect) to support withValueMapper");
     }
 }
