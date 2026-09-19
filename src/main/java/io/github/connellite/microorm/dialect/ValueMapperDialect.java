@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.dynamic.DynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
@@ -19,12 +21,16 @@ final class ValueMapperDialect implements Dialect {
     private final JdbcValueMapper valueMapper;
     private final SqlGenerator sqlGenerator;
     private final SchemaManager schemaManager;
+    private final DynamicSqlGenerator dynamicSqlGenerator;
+    private final DynamicSchemaManager dynamicSchemaManager;
 
     ValueMapperDialect(Dialect delegate, JdbcValueMapper valueMapper) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.valueMapper = Objects.requireNonNull(valueMapper, "valueMapper");
         this.sqlGenerator = delegate.sqlGenerator(this);
         this.schemaManager = delegate.schemaManager(this);
+        this.dynamicSqlGenerator = delegate.dynamicSqlGenerator(this);
+        this.dynamicSchemaManager = delegate.dynamicSchemaManager(this);
     }
 
     @Override
@@ -60,6 +66,26 @@ final class ValueMapperDialect implements Dialect {
     @Override
     public SchemaManager schemaManager(Dialect owner) {
         return owner == this ? schemaManager : delegate.schemaManager(owner);
+    }
+
+    @Override
+    public DynamicSqlGenerator dynamicSqlGenerator() {
+        return dynamicSqlGenerator;
+    }
+
+    @Override
+    public DynamicSqlGenerator dynamicSqlGenerator(Dialect owner) {
+        return delegate.dynamicSqlGenerator(owner);
+    }
+
+    @Override
+    public DynamicSchemaManager dynamicSchemaManager() {
+        return dynamicSchemaManager;
+    }
+
+    @Override
+    public DynamicSchemaManager dynamicSchemaManager(Dialect owner) {
+        return owner == this ? dynamicSchemaManager : delegate.dynamicSchemaManager(owner);
     }
 
     @Override

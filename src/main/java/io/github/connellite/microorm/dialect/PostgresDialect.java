@@ -1,5 +1,9 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.dynamic.DefaultDynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.DynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
+import io.github.connellite.microorm.dynamic.schema.PostgresDynamicSchemaManager;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.schema.PostgresSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -43,6 +47,16 @@ public final class PostgresDialect extends AbstractDialect {
     @Override
     protected SchemaManager createSchemaManager(Dialect owner) {
         return new PostgresSchemaManager(owner);
+    }
+
+    @Override
+    protected DynamicSqlGenerator createDynamicSqlGenerator(Dialect owner) {
+        return new DefaultDynamicSqlGenerator(owner);
+    }
+
+    @Override
+    protected DynamicSchemaManager createDynamicSchemaManager(Dialect owner) {
+        return new PostgresDynamicSchemaManager(owner);
     }
 
     @Override

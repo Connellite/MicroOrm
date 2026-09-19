@@ -6,7 +6,6 @@ import io.github.connellite.microorm.dialect.MysqlDialect;
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.dialect.PostgresDialect;
 import io.github.connellite.microorm.dialect.SqliteDialect;
-import io.github.connellite.microorm.dynamic.DynamicDialectSupport;
 import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.type.DefaultJdbcValueMapper;
 import io.github.connellite.microorm.type.UuidStorage;
@@ -59,23 +58,23 @@ class DynamicSchemaUuidStorageTest {
     }
 
     private static SqliteDynamicSchemaManager sqlite(UuidStorage storage) {
-        return (SqliteDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(SqliteDialect.getInstance(), storage));
+        return (SqliteDynamicSchemaManager) withStorage(SqliteDialect.getInstance(), storage).dynamicSchemaManager();
     }
 
     private static PostgresDynamicSchemaManager postgres(UuidStorage storage) {
-        return (PostgresDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(PostgresDialect.getInstance(), storage));
+        return (PostgresDynamicSchemaManager) withStorage(PostgresDialect.getInstance(), storage).dynamicSchemaManager();
     }
 
     private static MysqlDynamicSchemaManager mysql(UuidStorage storage) {
-        return (MysqlDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(MysqlDialect.getInstance(), storage));
+        return (MysqlDynamicSchemaManager) withStorage(MysqlDialect.getInstance(), storage).dynamicSchemaManager();
     }
 
     private static MssqlDynamicSchemaManager mssql(UuidStorage storage) {
-        return (MssqlDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(MssqlDialect.getInstance(), storage));
+        return (MssqlDynamicSchemaManager) withStorage(MssqlDialect.getInstance(), storage).dynamicSchemaManager();
     }
 
     private static OracleDynamicSchemaManager oracle(UuidStorage storage) {
-        return (OracleDynamicSchemaManager) DynamicDialectSupport.schemaManager(withStorage(OracleDialect.getInstance(), storage));
+        return (OracleDynamicSchemaManager) withStorage(OracleDialect.getInstance(), storage).dynamicSchemaManager();
     }
 
     private static Dialect withStorage(Dialect dialect, UuidStorage storage) {

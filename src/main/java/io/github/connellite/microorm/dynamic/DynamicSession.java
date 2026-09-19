@@ -45,8 +45,8 @@ public final class DynamicSession implements AutoCloseable {
         this.provider = Objects.requireNonNull(provider, "provider");
         this.registry = Objects.requireNonNull(registry, "registry");
         this.dialect = Objects.requireNonNull(dialect, "dialect");
-        this.sql = DynamicDialectSupport.sqlGenerator(dialect);
-        this.schema = DynamicDialectSupport.schemaManager(dialect);
+        this.sql = dialect.dynamicSqlGenerator();
+        this.schema = dialect.dynamicSchemaManager();
         this.valueBinder = new DynamicValueBinder(dialect);
     }
 

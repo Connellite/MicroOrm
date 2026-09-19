@@ -1,5 +1,9 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.dynamic.DynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.MssqlDynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
+import io.github.connellite.microorm.dynamic.schema.MssqlDynamicSchemaManager;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.schema.MssqlSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -39,6 +43,16 @@ public final class MssqlDialect extends AbstractDialect {
     @Override
     protected SchemaManager createSchemaManager(Dialect owner) {
         return new MssqlSchemaManager(owner);
+    }
+
+    @Override
+    protected DynamicSqlGenerator createDynamicSqlGenerator(Dialect owner) {
+        return new MssqlDynamicSqlGenerator(owner);
+    }
+
+    @Override
+    protected DynamicSchemaManager createDynamicSchemaManager(Dialect owner) {
+        return new MssqlDynamicSchemaManager(owner);
     }
 
     @Override

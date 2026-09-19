@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.dynamic.DynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.mapping.EntityField;
@@ -63,12 +65,44 @@ public interface Dialect {
         throw unsupportedRebind("schemaManager");
     }
 
+    /** Dynamic-table SQL generator bound to this instance. */
+    default DynamicSqlGenerator dynamicSqlGenerator() {
+        throw unsupportedDynamic();
+    }
+
+    /**
+     * Dynamic-table SQL generator using this dialect's syntax, bound to {@code owner}.
+     * Wrappers pass themselves so generated SQL uses the owner's {@link #valueMapper()}.
+     */
+    default DynamicSqlGenerator dynamicSqlGenerator(Dialect owner) {
+        Objects.requireNonNull(owner, "owner");
+        if (owner == this) {
+            return dynamicSqlGenerator();
+        }
+        throw unsupportedRebind("dynamicSqlGenerator");
+    }
+
+    /** Dynamic-table schema manager bound to this instance. */
+    default DynamicSchemaManager dynamicSchemaManager() {
+        return dynamicSchemaManager(this);
+    }
+
+    /**
+     * Dynamic-table schema manager using this dialect's DDL, bound to {@code owner}.
+     * Wrappers pass themselves so UUID column types follow the owner's {@link #valueMapper()}.
+     */
+    default DynamicSchemaManager dynamicSchemaManager(Dialect owner) {
+        Objects.requireNonNull(owner, "owner");
+        throw unsupportedDynamic();
+    }
+
     /** Converts Java field values to JDBC parameters and back (UUID storage, booleans, etc.). */
     JdbcValueMapper valueMapper();
 
     /**
      * Returns a dialect that keeps this vendor's SQL/DDL syntax but uses {@code valueMapper}.
-     * {@link #sqlGenerator()} and {@link #schemaManager()} are rebound to the returned instance.
+     * {@link #sqlGenerator()}, {@link #schemaManager()}, {@link #dynamicSqlGenerator()},
+     * and {@link #dynamicSchemaManager()} are rebound to the returned instance.
      */
     default Dialect withValueMapper(JdbcValueMapper valueMapper) {
         Objects.requireNonNull(valueMapper, "valueMapper");
@@ -161,6 +195,10 @@ public interface Dialect {
 
     private MicroOrmException unsupportedSequences() {
         return new MicroOrmException("GenerationType.SEQUENCE is not supported by " + getClass().getSimpleName());
+    }
+
+    private MicroOrmException unsupportedDynamic() {
+        return new MicroOrmException("Unsupported dialect for dynamic tables: " + getClass().getName());
     }
 
     private MicroOrmException unsupportedRebind(String method) {

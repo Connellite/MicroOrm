@@ -1,5 +1,9 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.dynamic.DynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.OracleDynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
+import io.github.connellite.microorm.dynamic.schema.OracleDynamicSchemaManager;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.schema.OracleSchemaManager;
 import io.github.connellite.microorm.schema.SchemaManager;
@@ -43,6 +47,16 @@ public final class OracleDialect extends AbstractDialect {
     @Override
     protected SchemaManager createSchemaManager(Dialect owner) {
         return new OracleSchemaManager(owner);
+    }
+
+    @Override
+    protected DynamicSqlGenerator createDynamicSqlGenerator(Dialect owner) {
+        return new OracleDynamicSqlGenerator(owner);
+    }
+
+    @Override
+    protected DynamicSchemaManager createDynamicSchemaManager(Dialect owner) {
+        return new OracleDynamicSchemaManager(owner);
     }
 
     @Override

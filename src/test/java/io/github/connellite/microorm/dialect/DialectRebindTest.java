@@ -26,6 +26,8 @@ class DialectRebindTest {
         assertSame(sqlite, dialect.unwrap());
         assertNotSame(sqlite.sqlGenerator(), dialect.sqlGenerator());
         assertNotSame(sqlite.schemaManager(), dialect.schemaManager());
+        assertNotSame(sqlite.dynamicSqlGenerator(), dialect.dynamicSqlGenerator());
+        assertNotSame(sqlite.dynamicSchemaManager(), dialect.dynamicSchemaManager());
         assertEquals("SELECT archive()", dialect.sqlGenerator().functionSql("archive", List.of()));
     }
 

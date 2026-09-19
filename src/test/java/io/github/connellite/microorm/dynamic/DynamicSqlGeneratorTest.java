@@ -46,7 +46,7 @@ class DynamicSqlGeneratorTest {
                 .column("name", LogicalType.STRING, Column.Builder::notNull)
                 .column("removed", LogicalType.BOOL)
                 .build();
-        sql = DynamicDialectSupport.sqlGenerator(SqliteDialect.getInstance());
+        sql = SqliteDialect.getInstance().dynamicSqlGenerator();
     }
 
     @Test
@@ -113,7 +113,7 @@ class DynamicSqlGeneratorTest {
 
     @Test
     void existsUsesMssqlTopOne() {
-        DynamicSqlGenerator generator = DynamicDialectSupport.sqlGenerator(MssqlDialect.getInstance());
+        DynamicSqlGenerator generator = MssqlDialect.getInstance().dynamicSqlGenerator();
 
         BoundStatement stmt = generator.exists(table, Map.of("id", UUID.randomUUID()));
 
@@ -122,7 +122,7 @@ class DynamicSqlGeneratorTest {
 
     @Test
     void existsUsesOracleFetchFirst() {
-        DynamicSqlGenerator generator = DynamicDialectSupport.sqlGenerator(OracleDialect.getInstance());
+        DynamicSqlGenerator generator = OracleDialect.getInstance().dynamicSqlGenerator();
 
         BoundStatement stmt = generator.exists(table, Map.of("id", UUID.randomUUID()));
 
@@ -205,7 +205,7 @@ class DynamicSqlGeneratorTest {
 
     @Test
     void fluentSelectUsesMssqlPagination() {
-        DynamicSqlGenerator generator = DynamicDialectSupport.sqlGenerator(MssqlDialect.getInstance());
+        DynamicSqlGenerator generator = MssqlDialect.getInstance().dynamicSqlGenerator();
 
         BoundStatement top = generator.select(table, DynamicSelect.from("docs").limit(10));
         BoundStatement offset = generator.select(table, DynamicSelect.from("docs").offset(5));
@@ -216,7 +216,7 @@ class DynamicSqlGeneratorTest {
 
     @Test
     void fluentSelectUsesOraclePagination() {
-        DynamicSqlGenerator generator = DynamicDialectSupport.sqlGenerator(OracleDialect.getInstance());
+        DynamicSqlGenerator generator = OracleDialect.getInstance().dynamicSqlGenerator();
 
         BoundStatement stmt = generator.select(table, DynamicSelect.from("docs").limit(10).offset(5));
 
@@ -226,15 +226,15 @@ class DynamicSqlGeneratorTest {
     @Test
     void schemaManagerMatchesDialect() {
         assertInstanceOf(SqliteDynamicSchemaManager.class,
-                DynamicDialectSupport.schemaManager(SqliteDialect.getInstance()));
+                SqliteDialect.getInstance().dynamicSchemaManager());
         assertInstanceOf(PostgresDynamicSchemaManager.class,
-                DynamicDialectSupport.schemaManager(PostgresDialect.getInstance()));
+                PostgresDialect.getInstance().dynamicSchemaManager());
         assertInstanceOf(MysqlDynamicSchemaManager.class,
-                DynamicDialectSupport.schemaManager(MysqlDialect.getInstance()));
+                MysqlDialect.getInstance().dynamicSchemaManager());
         assertInstanceOf(MssqlDynamicSchemaManager.class,
-                DynamicDialectSupport.schemaManager(MssqlDialect.getInstance()));
+                MssqlDialect.getInstance().dynamicSchemaManager());
         assertInstanceOf(OracleDynamicSchemaManager.class,
-                DynamicDialectSupport.schemaManager(OracleDialect.getInstance()));
+                OracleDialect.getInstance().dynamicSchemaManager());
     }
 
     @Test
@@ -276,6 +276,6 @@ class DynamicSqlGeneratorTest {
             }
         };
 
-        assertThrows(MicroOrmException.class, () -> DynamicDialectSupport.schemaManager(unsupported));
+        assertThrows(MicroOrmException.class, () -> unsupported.dynamicSchemaManager());
     }
 }

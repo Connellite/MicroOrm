@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.dialect;
 
+import io.github.connellite.microorm.dynamic.DynamicSqlGenerator;
+import io.github.connellite.microorm.dynamic.schema.DynamicSchemaManager;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.schema.SchemaManager;
 import io.github.connellite.microorm.sql.SqlGenerator;
@@ -15,6 +17,8 @@ public abstract class AbstractDialect implements Dialect {
 
     private volatile SqlGenerator sqlGenerator;
     private volatile SchemaManager schemaManager;
+    private volatile DynamicSqlGenerator dynamicSqlGenerator;
+    private volatile DynamicSchemaManager dynamicSchemaManager;
 
     @Override
     public final String sqlName(SqlIdentifier identifier) {
@@ -76,6 +80,44 @@ public abstract class AbstractDialect implements Dialect {
     }
 
     @Override
+    public final DynamicSqlGenerator dynamicSqlGenerator() {
+        return dynamicSqlGenerator(this);
+    }
+
+    @Override
+    public final DynamicSqlGenerator dynamicSqlGenerator(Dialect owner) {
+        Objects.requireNonNull(owner, "owner");
+        if (owner != this) {
+            return createDynamicSqlGenerator(owner);
+        }
+        DynamicSqlGenerator cached = dynamicSqlGenerator;
+        if (cached == null) {
+            cached = createDynamicSqlGenerator(this);
+            dynamicSqlGenerator = cached;
+        }
+        return cached;
+    }
+
+    @Override
+    public final DynamicSchemaManager dynamicSchemaManager() {
+        return dynamicSchemaManager(this);
+    }
+
+    @Override
+    public final DynamicSchemaManager dynamicSchemaManager(Dialect owner) {
+        Objects.requireNonNull(owner, "owner");
+        if (owner != this) {
+            return createDynamicSchemaManager(owner);
+        }
+        DynamicSchemaManager cached = dynamicSchemaManager;
+        if (cached == null) {
+            cached = createDynamicSchemaManager(this);
+            dynamicSchemaManager = cached;
+        }
+        return cached;
+    }
+
+    @Override
     public final void createTable(Connection c, EntityModel model) throws SQLException {
         schemaManager(this).createTable(c, model);
     }
@@ -95,6 +137,10 @@ public abstract class AbstractDialect implements Dialect {
     protected abstract SqlGenerator createSqlGenerator(Dialect owner);
 
     protected abstract SchemaManager createSchemaManager(Dialect owner);
+
+    protected abstract DynamicSqlGenerator createDynamicSqlGenerator(Dialect owner);
+
+    protected abstract DynamicSchemaManager createDynamicSchemaManager(Dialect owner);
 
     protected String unquotedSqlName(String identifier) {
         return unquotedCatalogName(identifier);
