@@ -50,7 +50,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.WeakHashMap;
 import java.util.function.Function;
 
 /** Thread-safe registry of entity metadata built from annotations. */
@@ -59,7 +59,7 @@ public final class EntityModelRegistry {
     private static final int CACHE_INITIAL_CAPACITY = 64;
 
     private final PhysicalNamingStrategy physicalNamingStrategy;
-    private final Set<Class<?>> registered = ConcurrentHashMap.newKeySet();
+    private final Set<Class<?>> registered = Collections.newSetFromMap(Collections.synchronizedMap(new WeakHashMap<>()));
     private final ConcurrentReferenceHashMap<Class<?>, EntityModel> cache =
             new ConcurrentReferenceHashMap<>(CACHE_INITIAL_CAPACITY, ConcurrentReferenceHashMap.ReferenceType.WEAK);
 
