@@ -11,10 +11,12 @@ import java.util.Objects;
  * The name may be either the Java field name or the physical column name. Joined fields use
  * {@code relation.field} and require a matching {@link EntitySelect#join(String)} declaration.
  * The path is resolved against the registered entity model when the query is executed.
+ * {@link #lower()} wraps compared SQL expressions in {@code LOWER(...)} for case-insensitive matching.
  *
  * @param name Java field name, mapped column name, or joined path
+ * @param ignoreCase whether predicates and sort orders wrap expressions in {@code LOWER(...)}
  */
-public record FieldPath(String name) {
+public record FieldPath(String name, boolean ignoreCase) {
 
     public FieldPath {
         if (name == null || name.isBlank()) {
@@ -22,12 +24,30 @@ public record FieldPath(String name) {
         }
     }
 
+    /** Creates a case-sensitive field path. */
+    public FieldPath(String name) {
+        this(name, false);
+    }
+
+    /**
+     * Wraps this field in SQL {@code LOWER(...)} for subsequent predicates and sort orders.
+     * Bound values are also wrapped so {@code lower().eq("Ada")} matches {@code ada}.
+     */
+    public FieldPath lower() {
+        return ignoreCase ? this : new FieldPath(name, true);
+    }
+
     /** Builds {@code field = value}. A {@code null} value is rendered as {@code IS NULL}. */
     public Criterion eq(Object value) {
         if (value == null) {
             return isNull();
         }
-        return FieldCriterion.comparison(name, ComparisonOperator.EQ, value);
+        return FieldCriterion.comparison(name, ComparisonOperator.EQ, value, ignoreCase);
+    }
+
+    /** Builds {@code LOWER(field) = LOWER(value)}. */
+    public Criterion equalsIgnoreCase(String value) {
+        return lower().eq(value);
     }
 
     /** Builds {@code field <> value}. A {@code null} value is rendered as {@code IS NOT NULL}. */
@@ -35,37 +55,62 @@ public record FieldPath(String name) {
         if (value == null) {
             return isNotNull();
         }
-        return FieldCriterion.comparison(name, ComparisonOperator.NE, value);
+        return FieldCriterion.comparison(name, ComparisonOperator.NE, value, ignoreCase);
+    }
+
+    /** Builds {@code LOWER(field) <> LOWER(value)}. */
+    public Criterion notEqualsIgnoreCase(String value) {
+        return lower().ne(value);
     }
 
     /** Builds {@code field < value}. */
     public Criterion lt(Object value) {
-        return FieldCriterion.comparison(name, ComparisonOperator.LT, value);
+        return FieldCriterion.comparison(name, ComparisonOperator.LT, value, ignoreCase);
     }
 
     /** Builds {@code field <= value}. */
     public Criterion le(Object value) {
-        return FieldCriterion.comparison(name, ComparisonOperator.LE, value);
+        return FieldCriterion.comparison(name, ComparisonOperator.LE, value, ignoreCase);
     }
 
     /** Builds {@code field > value}. */
     public Criterion gt(Object value) {
-        return FieldCriterion.comparison(name, ComparisonOperator.GT, value);
+        return FieldCriterion.comparison(name, ComparisonOperator.GT, value, ignoreCase);
     }
 
     /** Builds {@code field >= value}. */
     public Criterion ge(Object value) {
-        return FieldCriterion.comparison(name, ComparisonOperator.GE, value);
+        return FieldCriterion.comparison(name, ComparisonOperator.GE, value, ignoreCase);
     }
 
     /** Builds {@code field IN (...)}. Empty collections are rejected. */
     public Criterion in(Collection<?> values) {
-        return FieldCriterion.in(name, values);
+        return FieldCriterion.in(name, values, ignoreCase);
+    }
+
+    /** Builds {@code field IN (subquery)}. */
+    public Criterion in(Query query) {
+        return InSubqueryCriterion.in(name, query, ignoreCase);
+    }
+
+    /** Builds {@code field IN (entity subquery)}. */
+    public Criterion in(EntitySelect<?> query) {
+        return InSubqueryCriterion.in(name, query, ignoreCase);
     }
 
     /** Builds {@code field NOT IN (...)}. Empty collections are rejected. */
     public Criterion notIn(Collection<?> values) {
-        return FieldCriterion.notIn(name, values);
+        return FieldCriterion.notIn(name, values, ignoreCase);
+    }
+
+    /** Builds {@code field NOT IN (subquery)}. */
+    public Criterion notIn(Query query) {
+        return InSubqueryCriterion.notIn(name, query, ignoreCase);
+    }
+
+    /** Builds {@code field NOT IN (entity subquery)}. */
+    public Criterion notIn(EntitySelect<?> query) {
+        return InSubqueryCriterion.notIn(name, query, ignoreCase);
     }
 
     /** Builds {@code field = ANY (subquery)}. */
@@ -210,22 +255,32 @@ public record FieldPath(String name) {
 
     /** Builds {@code field LIKE pattern}. */
     public Criterion like(String pattern) {
-        return FieldCriterion.like(name, pattern);
+        return FieldCriterion.like(name, pattern, ignoreCase);
+    }
+
+    /** Builds {@code LOWER(field) LIKE LOWER(pattern)}. */
+    public Criterion likeIgnoreCase(String pattern) {
+        return lower().like(pattern);
     }
 
     /** Builds {@code field NOT LIKE pattern}. */
     public Criterion notLike(String pattern) {
-        return FieldCriterion.notLike(name, pattern);
+        return FieldCriterion.notLike(name, pattern, ignoreCase);
+    }
+
+    /** Builds {@code LOWER(field) NOT LIKE LOWER(pattern)}. */
+    public Criterion notLikeIgnoreCase(String pattern) {
+        return lower().notLike(pattern);
     }
 
     /** Builds {@code field BETWEEN lower AND upper}. */
     public Criterion between(Object lower, Object upper) {
-        return FieldCriterion.between(name, lower, upper);
+        return FieldCriterion.between(name, lower, upper, ignoreCase);
     }
 
     /** Builds {@code field NOT BETWEEN lower AND upper}. */
     public Criterion notBetween(Object lower, Object upper) {
-        return FieldCriterion.notBetween(name, lower, upper);
+        return FieldCriterion.notBetween(name, lower, upper, ignoreCase);
     }
 
     /** Builds {@code field IS NULL}. */
@@ -240,21 +295,21 @@ public record FieldPath(String name) {
 
     /** Builds ascending {@code ORDER BY field ASC}. */
     public Order asc() {
-        return new Order(name, OrderDirection.ASC);
+        return new Order(name, OrderDirection.ASC, ignoreCase);
     }
 
     /** Builds descending {@code ORDER BY field DESC}. */
     public Order desc() {
-        return new Order(name, OrderDirection.DESC);
+        return new Order(name, OrderDirection.DESC, ignoreCase);
     }
 
     private Criterion quantified(ComparisonOperator operator, SubqueryQuantifier quantifier, Query query) {
         Objects.requireNonNull(operator, "operator");
-        return new QuantifiedSubqueryCriterion(name, operator, quantifier, query, null);
+        return new QuantifiedSubqueryCriterion(name, operator, quantifier, query, null, ignoreCase);
     }
 
     private Criterion quantified(ComparisonOperator operator, SubqueryQuantifier quantifier, EntitySelect<?> query) {
         Objects.requireNonNull(operator, "operator");
-        return new QuantifiedSubqueryCriterion(name, operator, quantifier, null, query);
+        return new QuantifiedSubqueryCriterion(name, operator, quantifier, null, query, ignoreCase);
     }
 }

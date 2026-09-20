@@ -22,6 +22,7 @@ import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.query.EntityUpdate;
 import io.github.connellite.microorm.query.ExistsCriterion;
 import io.github.connellite.microorm.query.FieldCriterion;
+import io.github.connellite.microorm.query.InSubqueryCriterion;
 import io.github.connellite.microorm.query.Join;
 import io.github.connellite.microorm.query.JoinType;
 import io.github.connellite.microorm.query.NotCriterion;
@@ -420,7 +421,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             List<String> orderSql = new ArrayList<>();
             for (Order order : query.orders()) {
                 ColumnRef column = resolveColumn(model, joinContext, order.fieldName());
-                orderSql.add(column.sql() + " " + order.direction().name());
+                orderSql.add(applyIgnoreCase(column.sql(), order.ignoreCase()) + " " + order.direction().name());
             }
             sql += " ORDER BY " + String.join(", ", orderSql);
         }
@@ -674,8 +675,22 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
                 mergeSubqueryParameters(quantified.query(), params, collectionParams);
                 subquerySql = quantified.query().sql();
             }
-            return column.sql() + " " + quantified.operator().sql() + " " + quantified.quantifier().name()
+            return applyIgnoreCase(column.sql(), quantified.ignoreCase()) + " " + quantified.operator().sql() + " "
+                    + quantified.quantifier().name()
                     + " (" + subquerySql + ")";
+        }
+        if (criterion instanceof InSubqueryCriterion inSubquery) {
+            ColumnRef column = resolveColumn(model, joinContext, inSubquery.fieldName());
+            String subquerySql;
+            if (inSubquery.entitySelect() != null) {
+                subquerySql = renderEntitySubquery(inSubquery.entitySelect(), registry, params, collectionParams, paramCounter, true);
+            } else {
+                mergeSubqueryParameters(inSubquery.query(), params, collectionParams);
+                subquerySql = inSubquery.query().sql();
+            }
+            return applyIgnoreCase(column.sql(), inSubquery.ignoreCase())
+                    + (inSubquery.negated() ? " NOT IN (" : " IN (")
+                    + subquerySql + ")";
         }
         throw new MicroOrmException("Unsupported criterion type: " + criterion.getClass().getName());
     }
@@ -693,7 +708,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         String projectionSql;
         if (requireProjection) {
             if (query.projectionField() == null) {
-                throw new MicroOrmException("ANY/ALL entity subquery requires a single selected field");
+                throw new MicroOrmException("Entity subquery requires a single selected field");
             }
             projectionSql = resolveColumn(model, joinContext, query.projectionField()).sql();
         } else {
@@ -719,7 +734,7 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             List<String> orderSql = new ArrayList<>();
             for (Order order : query.orders()) {
                 ColumnRef column = resolveColumn(model, joinContext, order.fieldName());
-                orderSql.add(column.sql() + " " + order.direction().name());
+                orderSql.add(applyIgnoreCase(column.sql(), order.ignoreCase()) + " " + order.direction().name());
             }
             sql += " ORDER BY " + String.join(", ", orderSql);
         }
@@ -746,20 +761,21 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
         ColumnRef column = resolveColumn(model, joinContext, criterion.fieldName());
+        String columnSql = applyIgnoreCase(column.sql(), criterion.ignoreCase());
         return switch (criterion.kind()) {
-            case COMPARISON -> renderComparison(column.field(), column.sql(), criterion, params, paramCounter);
-            case IN, NOT_IN -> renderIn(column.field(), column.sql(), criterion, collectionParams, paramCounter);
+            case COMPARISON -> renderComparison(column.field(), columnSql, criterion, params, paramCounter);
+            case IN, NOT_IN -> renderIn(column.field(), columnSql, criterion, params, collectionParams, paramCounter);
             case LIKE -> {
                 String param = nextParam(paramCounter);
                 params.put(param, dialect.valueMapper().toJdbcValue(column.field(), criterion.value()));
-                yield column.sql() + " LIKE :" + param;
+                yield columnSql + " LIKE " + applyIgnoreCase(":" + param, criterion.ignoreCase());
             }
             case NOT_LIKE -> {
                 String param = nextParam(paramCounter);
                 params.put(param, dialect.valueMapper().toJdbcValue(column.field(), criterion.value()));
-                yield column.sql() + " NOT LIKE :" + param;
+                yield columnSql + " NOT LIKE " + applyIgnoreCase(":" + param, criterion.ignoreCase());
             }
-            case BETWEEN, NOT_BETWEEN -> renderBetween(column.field(), column.sql(), criterion, params, paramCounter);
+            case BETWEEN, NOT_BETWEEN -> renderBetween(column.field(), columnSql, criterion, params, paramCounter);
             case IS_NULL -> column.sql() + " IS NULL";
             case IS_NOT_NULL -> column.sql() + " IS NOT NULL";
         };
@@ -778,15 +794,29 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
         String param = nextParam(paramCounter);
         params.put(param, dialect.valueMapper().toJdbcValue(field, criterion.value()));
-        return column + " " + criterion.operator().sql() + " :" + param;
+        return column + " " + criterion.operator().sql() + " " + applyIgnoreCase(":" + param, criterion.ignoreCase());
     }
 
     private String renderIn(
             EntityField field,
             String column,
             FieldCriterion criterion,
+            Map<String, Object> params,
             Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
+        String operator = criterion.kind() == CriterionKind.NOT_IN ? "NOT IN" : "IN";
+        if (criterion.ignoreCase()) {
+            List<String> slots = new ArrayList<>();
+            for (Object value : criterion.values()) {
+                if (value == null) {
+                    throw new MicroOrmException("IN criterion does not support null values for field: " + criterion.fieldName());
+                }
+                String param = nextParam(paramCounter);
+                params.put(param, dialect.valueMapper().toJdbcValue(field, value));
+                slots.add(applyIgnoreCase(":" + param, true));
+            }
+            return column + " " + operator + " (" + String.join(", ", slots) + ")";
+        }
         List<Object> values = new ArrayList<>();
         for (Object value : criterion.values()) {
             if (value == null) {
@@ -796,7 +826,6 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         }
         String param = nextParam(paramCounter);
         collectionParams.put(param, values);
-        String operator = criterion.kind() == CriterionKind.NOT_IN ? "NOT IN" : "IN";
         return column + " " + operator + " (:" + param + ")";
     }
 
@@ -816,11 +845,16 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
         String operator = criterion.kind() == CriterionKind.NOT_BETWEEN
                 ? "NOT BETWEEN"
                 : "BETWEEN";
-        return column + " " + operator + " :" + lowerParam + " AND :" + upperParam;
+        return column + " " + operator + " " + applyIgnoreCase(":" + lowerParam, criterion.ignoreCase())
+                + " AND " + applyIgnoreCase(":" + upperParam, criterion.ignoreCase());
     }
 
     private static String nextParam(int[] paramCounter) {
         return "p" + paramCounter[0]++;
+    }
+
+    private static String applyIgnoreCase(String sql, boolean ignoreCase) {
+        return ignoreCase ? "LOWER(" + sql + ")" : sql;
     }
 
     private static void requireMutable(EntityModel model, String operation) {

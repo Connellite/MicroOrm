@@ -638,6 +638,28 @@ class SqliteOrmTest {
     }
 
     @Test
+    void entitySelectMatchesIgnoreCaseNames() throws SQLException {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
+            try (Session s = orm.openSession()) {
+                s.dropEntity(Widget.class);
+                s.createEntity(Widget.class);
+                s.insertRows(List.of(newWidget("Ada"), newWidget("bob")));
+
+                List<Widget> selected = s.selectRows(EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").equalsIgnoreCase("ADA")));
+                assertEquals(1, selected.size());
+                assertEquals("Ada", selected.get(0).getName());
+
+                List<Widget> liked = s.selectRows(EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").likeIgnoreCase("B%")));
+                assertEquals(1, liked.size());
+                assertEquals("bob", liked.get(0).getName());
+            }
+        }
+    }
+
+    @Test
     void sessionSingleResultHelpersHandleEmptySingleAndDuplicateRows() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);

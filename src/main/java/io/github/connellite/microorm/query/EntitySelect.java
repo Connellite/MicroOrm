@@ -29,6 +29,9 @@ import java.util.function.Function;
  *         .leftJoin("customer")
  *         .where(EntitySelect.field("customer.name").eq("Acme"));
  *
+ * EntitySelect<Item> inSubquery = EntitySelect.of(Item.class)
+ *         .where(EntitySelect.field("id").in(EntitySelect.of(ItemRef.class).select("itemId")));
+ *
  * List<User> users = session.selectRows(query);
  * }</pre>
  *

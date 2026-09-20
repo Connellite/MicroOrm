@@ -358,6 +358,69 @@ class EntitySelectTest {
     }
 
     @Test
+    void rendersInAndNotInEntityAndRawSubqueries() {
+        EntitySelect<Item> query = EntitySelect.of(Item.class)
+                .where(EntitySelect.field("id").in(EntitySelect.of(ItemRef.class)
+                        .select("itemId")
+                        .where(EntitySelect.field("active").eq(true))))
+                .and(EntitySelect.field("id").notIn(EntitySelect.of(ArchivedItem.class)
+                        .select("itemId")
+                        .where(EntitySelect.field("year").lt(2020))))
+                .and(EntitySelect.field("id").in(Query.of(
+                        "SELECT r.item_id FROM item_refs r WHERE r.active = :refActive")
+                        .set("refActive", true)))
+                .and(EntitySelect.field("id").notIn(Query.of(
+                        "SELECT archived.item_id FROM archived_items archived WHERE archived.year < :archiveYear")
+                        .set("archiveYear", 2020)));
+
+        BoundStatement statement = SqliteDialect.getInstance().sqlGenerator().select(model, query);
+
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE (entity_query_items.id IN (SELECT item_refs.itemId FROM item_refs "
+                        + "WHERE item_refs.active = :p1) "
+                        + "AND entity_query_items.id NOT IN (SELECT archived_items.itemId FROM archived_items "
+                        + "WHERE archived_items.year < :p2) "
+                        + "AND entity_query_items.id IN (SELECT r.item_id FROM item_refs r WHERE r.active = :refActive) "
+                        + "AND entity_query_items.id NOT IN (SELECT archived.item_id FROM archived_items archived "
+                        + "WHERE archived.year < :archiveYear))",
+                statement.sql());
+        assertEquals(true, statement.parameters().get("p1"));
+        assertEquals(2020, statement.parameters().get("p2"));
+        assertEquals(true, statement.parameters().get("refActive"));
+        assertEquals(2020, statement.parameters().get("archiveYear"));
+
+        assertThrows(MicroOrmException.class, () -> SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class)
+                        .where(EntitySelect.field("id").in(EntitySelect.of(ItemRef.class)))));
+    }
+
+    @Test
+    void rendersIgnoreCasePredicatesAndOrdering() {
+        EntitySelect<Item> query = EntitySelect.of(Item.class)
+                .where(EntitySelect.field("name").equalsIgnoreCase("Ada"))
+                .and(EntitySelect.field("description").likeIgnoreCase("%note%"))
+                .and(EntitySelect.field("name").lower().in(List.of("Ada", "Bob")))
+                .orderBy(EntitySelect.field("name").lower().asc());
+
+        BoundStatement statement = SqliteDialect.getInstance().sqlGenerator().select(model, query);
+
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE (LOWER(entity_query_items.name) = LOWER(:p1) "
+                        + "AND LOWER(entity_query_items.description) LIKE LOWER(:p2) "
+                        + "AND LOWER(entity_query_items.name) IN (LOWER(:p3), LOWER(:p4))) "
+                        + "ORDER BY LOWER(entity_query_items.name) ASC",
+                statement.sql());
+        assertEquals("Ada", statement.parameters().get("p1"));
+        assertEquals("%note%", statement.parameters().get("p2"));
+        assertEquals("Ada", statement.parameters().get("p3"));
+        assertEquals("Bob", statement.parameters().get("p4"));
+    }
+
+    @Test
     void rendersRawSqlSubquery() {
         EntitySelect<Item> query = EntitySelect.of(Item.class)
                 .where(EntitySelect.exists(Query.of(

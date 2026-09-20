@@ -12,13 +12,15 @@ import java.util.Objects;
  * @param quantifier SQL quantifier
  * @param query raw subquery producing comparable values
  * @param entitySelect entity subquery producing comparable values
+ * @param ignoreCase whether to wrap the compared column in {@code LOWER(...)}
  */
 public record QuantifiedSubqueryCriterion(
         String fieldName,
         ComparisonOperator operator,
         SubqueryQuantifier quantifier,
         Query query,
-        EntitySelect<?> entitySelect) implements Criterion {
+        EntitySelect<?> entitySelect,
+        boolean ignoreCase) implements Criterion {
 
     public QuantifiedSubqueryCriterion {
         if (fieldName == null || fieldName.isBlank()) {

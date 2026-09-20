@@ -12,7 +12,8 @@ package io.github.connellite.microorm.query;
  * }</pre>
  */
 public sealed interface Criterion
-        permits FieldCriterion, CompositeCriterion, NotCriterion, ExistsCriterion, QuantifiedSubqueryCriterion {
+        permits FieldCriterion, CompositeCriterion, NotCriterion, ExistsCriterion, QuantifiedSubqueryCriterion,
+        InSubqueryCriterion {
 
     /**
      * Combines this criterion and {@code other} with SQL {@code AND}.

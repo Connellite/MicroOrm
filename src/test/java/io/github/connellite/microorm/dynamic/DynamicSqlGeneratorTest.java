@@ -14,7 +14,9 @@ import io.github.connellite.microorm.dynamic.schema.PostgresDynamicSchemaManager
 import io.github.connellite.microorm.dynamic.schema.SqliteDynamicSchemaManager;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityModel;
+import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.sql.BoundStatement;
+import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.JdbcValueMapper;
@@ -161,6 +163,24 @@ class DynamicSqlGeneratorTest {
         assertEquals(List.of("alpha", "beta"), stmt.collectionParameters().get("p1"));
         assertEquals("a", stmt.parameters().get("p2"));
         assertEquals("z", stmt.parameters().get("p3"));
+    }
+
+    @Test
+    void fluentSelectRendersInSubqueryAndIgnoreCase() {
+        BoundStatement inQuery = sql.select(table, DynamicSelect.from("docs")
+                .where(field("name").in(Query.of("SELECT n FROM names WHERE active = :active").set("active", true)))
+                .and(field("name").equalsIgnoreCase("Ada"))
+                .orderBy(field("name").lower().desc()));
+
+        assertEquals("SELECT documents.id, documents.name, documents.removed FROM documents"
+                + " WHERE (documents.name IN (SELECT n FROM names WHERE active = :active)"
+                + " AND LOWER(documents.name) = LOWER(:p1))"
+                + " ORDER BY LOWER(documents.name) DESC", inQuery.sql());
+        assertEquals(true, inQuery.parameters().get("active"));
+        assertEquals("Ada", inQuery.parameters().get("p1"));
+
+        assertThrows(MicroOrmException.class, () -> sql.select(table, DynamicSelect.from("docs")
+                .where(field("name").in(EntitySelect.of(String.class).select("name")))));
     }
 
     @Test
