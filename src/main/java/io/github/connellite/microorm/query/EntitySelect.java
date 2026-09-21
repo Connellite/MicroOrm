@@ -32,6 +32,9 @@ import java.util.function.Function;
  * EntitySelect<Item> inSubquery = EntitySelect.of(Item.class)
  *         .where(EntitySelect.field("id").in(EntitySelect.of(ItemRef.class).select("itemId")));
  *
+ * EntitySelect<Doc> converted = EntitySelect.of(Doc.class)
+ *         .where(EntitySelect.field("objectId").eq(EntitySelect.fn("dbo.uuid2obj", uuid)));
+ *
  * List<User> users = session.selectRows(query);
  * }</pre>
  *
@@ -94,6 +97,15 @@ public final class EntitySelect<T> {
     public static FieldPath field(Attribute<?, ?> attribute) {
         Objects.requireNonNull(attribute, "attribute");
         return field(attribute.name());
+    }
+
+    /**
+     * Builds a scalar database function call for criteria and sort orders.
+     * {@code name} may be schema-qualified ({@code dbo.uuid2obj}). Arguments may be field paths,
+     * nested function calls, literals (bound as parameters), or {@code null} (SQL {@code NULL}).
+     */
+    public static FunctionPath fn(String name, Object... args) {
+        return QueryExpressions.fn(name, args);
     }
 
     /**

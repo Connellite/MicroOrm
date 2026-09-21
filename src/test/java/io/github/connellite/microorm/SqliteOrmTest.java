@@ -660,6 +660,11 @@ class SqliteOrmTest {
                         .where(EntitySelect.field("name").likeIgnoreCase("B%")));
                 assertEquals(1, liked.size());
                 assertEquals("bob", liked.get(0).getName());
+
+                List<Widget> byFn = s.selectRows(EntitySelect.of(Widget.class)
+                        .where(EntitySelect.fn("lower", EntitySelect.field("name")).eq("ada")));
+                assertEquals(1, byFn.size());
+                assertEquals("Ada", byFn.get(0).getName());
             }
         }
     }

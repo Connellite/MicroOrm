@@ -12,6 +12,8 @@ import io.github.connellite.microorm.query.InSubqueryCriterion;
 import io.github.connellite.microorm.query.NotCriterion;
 import io.github.connellite.microorm.query.Order;
 import io.github.connellite.microorm.query.QuantifiedSubqueryCriterion;
+import io.github.connellite.microorm.query.QueryExpression;
+import io.github.connellite.microorm.query.QueryExpressions;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 
@@ -138,8 +140,8 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
         if (!query.orders().isEmpty()) {
             List<String> orderSql = new ArrayList<>();
             for (Order order : query.orders()) {
-                Column column = resolveColumn(table, order.fieldName());
-                orderSql.add(applyIgnoreCase(columnSql(table, column), order.ignoreCase()) + " " + order.direction().name());
+                RenderedExpr expr = renderExpression(table, order.expression(), params, paramCounter);
+                orderSql.add(applyIgnoreCase(expr.sql(), order.ignoreCase()) + " " + order.direction().name());
             }
             sql += " ORDER BY " + String.join(", ", orderSql);
         }
@@ -305,18 +307,18 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
             if (quantified.entitySelect() != null) {
                 throw new MicroOrmException("Dynamic criteria do not support EntitySelect subqueries");
             }
-            Column column = resolveColumn(table, quantified.fieldName());
+            RenderedExpr left = renderExpression(table, quantified.expression(), params, paramCounter);
             mergeSubqueryParameters(quantified.query(), params, collectionParams);
-            return applyIgnoreCase(columnSql(table, column), quantified.ignoreCase()) + " " + quantified.operator().sql()
+            return applyIgnoreCase(left.sql(), quantified.ignoreCase()) + " " + quantified.operator().sql()
                     + " " + quantified.quantifier().name() + " (" + quantified.query().sql() + ")";
         }
         if (criterion instanceof InSubqueryCriterion inSubquery) {
             if (inSubquery.entitySelect() != null) {
                 throw new MicroOrmException("Dynamic criteria do not support EntitySelect subqueries");
             }
-            Column column = resolveColumn(table, inSubquery.fieldName());
+            RenderedExpr left = renderExpression(table, inSubquery.expression(), params, paramCounter);
             mergeSubqueryParameters(inSubquery.query(), params, collectionParams);
-            return applyIgnoreCase(columnSql(table, column), inSubquery.ignoreCase())
+            return applyIgnoreCase(left.sql(), inSubquery.ignoreCase())
                     + (inSubquery.negated() ? " NOT IN (" : " IN (")
                     + inSubquery.query().sql() + ")";
         }
@@ -329,29 +331,30 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
             Map<String, Object> params,
             Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
-        Column column = resolveColumn(table, criterion.fieldName());
-        String columnSql = applyIgnoreCase(columnSql(table, column), criterion.ignoreCase());
+        RenderedExpr left = renderExpression(table, criterion.expression(), params, paramCounter);
+        String columnSql = applyIgnoreCase(left.sql(), criterion.ignoreCase());
         return switch (criterion.kind()) {
-            case COMPARISON -> renderComparison(column, columnSql, criterion, params, paramCounter);
-            case IN, NOT_IN -> renderIn(column, columnSql, criterion, params, collectionParams, paramCounter);
+            case COMPARISON -> renderComparison(table, left, columnSql, criterion, params, paramCounter);
+            case IN, NOT_IN -> renderIn(table, left, columnSql, criterion, params, collectionParams, paramCounter);
             case LIKE -> {
                 String param = nextParam(paramCounter);
-                params.put(param, valueBinder.toJdbc(column, criterion.value()));
+                params.put(param, jdbcValue(left.column(), criterion.value()));
                 yield columnSql + " LIKE " + applyIgnoreCase(":" + param, criterion.ignoreCase());
             }
             case NOT_LIKE -> {
                 String param = nextParam(paramCounter);
-                params.put(param, valueBinder.toJdbc(column, criterion.value()));
+                params.put(param, jdbcValue(left.column(), criterion.value()));
                 yield columnSql + " NOT LIKE " + applyIgnoreCase(":" + param, criterion.ignoreCase());
             }
-            case BETWEEN, NOT_BETWEEN -> renderBetween(column, columnSql, criterion, params, paramCounter);
-            case IS_NULL -> columnSql(table, column) + " IS NULL";
-            case IS_NOT_NULL -> columnSql(table, column) + " IS NOT NULL";
+            case BETWEEN, NOT_BETWEEN -> renderBetween(table, left, columnSql, criterion, params, paramCounter);
+            case IS_NULL -> left.sql() + " IS NULL";
+            case IS_NOT_NULL -> left.sql() + " IS NOT NULL";
         };
     }
 
     private String renderComparison(
-            Column column,
+            DynamicTable table,
+            RenderedExpr left,
             String columnSql,
             FieldCriterion criterion,
             Map<String, Object> params,
@@ -361,13 +364,21 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
                     ? columnSql + " IS NOT NULL"
                     : columnSql + " IS NULL";
         }
+        QueryExpression rhs = QueryExpressions.asExpression(criterion.value());
+        if (rhs != null) {
+            String rightSql = applyIgnoreCase(
+                    renderExpression(table, rhs, params, paramCounter).sql(),
+                    criterion.ignoreCase());
+            return columnSql + " " + criterion.operator().sql() + " " + rightSql;
+        }
         String param = nextParam(paramCounter);
-        params.put(param, valueBinder.toJdbc(column, criterion.value()));
+        params.put(param, jdbcValue(left.column(), criterion.value()));
         return columnSql + " " + criterion.operator().sql() + " " + applyIgnoreCase(":" + param, criterion.ignoreCase());
     }
 
     private String renderIn(
-            Column column,
+            DynamicTable table,
+            RenderedExpr left,
             String columnSql,
             FieldCriterion criterion,
             Map<String, Object> params,
@@ -377,24 +388,38 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
             return criterion.kind() == CriterionKind.NOT_IN ? "1 = 1" : "1 = 0";
         }
         String operator = criterion.kind() == CriterionKind.NOT_IN ? "NOT IN" : "IN";
-        if (criterion.ignoreCase()) {
+        boolean slotwise = criterion.ignoreCase();
+        for (Object value : criterion.values()) {
+            if (QueryExpressions.isExpression(value)) {
+                slotwise = true;
+                break;
+            }
+        }
+        if (slotwise) {
             List<String> slots = new ArrayList<>();
             for (Object value : criterion.values()) {
                 if (value == null) {
-                    throw new MicroOrmException("IN criterion does not support null values for column: " + criterion.fieldName());
+                    throw QueryExpressions.unsupportedNullIn("column: " + criterion.fieldName());
                 }
-                String param = nextParam(paramCounter);
-                params.put(param, valueBinder.toJdbc(column, value));
-                slots.add(applyIgnoreCase(":" + param, true));
+                QueryExpression expr = QueryExpressions.asExpression(value);
+                if (expr != null) {
+                    slots.add(applyIgnoreCase(
+                            renderExpression(table, expr, params, paramCounter).sql(),
+                            criterion.ignoreCase()));
+                } else {
+                    String param = nextParam(paramCounter);
+                    params.put(param, jdbcValue(left.column(), value));
+                    slots.add(applyIgnoreCase(":" + param, criterion.ignoreCase()));
+                }
             }
             return columnSql + " " + operator + " (" + String.join(", ", slots) + ")";
         }
         List<Object> values = new ArrayList<>();
         for (Object value : criterion.values()) {
             if (value == null) {
-                throw new MicroOrmException("IN criterion does not support null values for column: " + criterion.fieldName());
+                throw QueryExpressions.unsupportedNullIn("column: " + criterion.fieldName());
             }
-            values.add(valueBinder.toJdbc(column, value));
+            values.add(jdbcValue(left.column(), value));
         }
         String param = nextParam(paramCounter);
         collectionParams.put(param, values);
@@ -402,7 +427,8 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
     }
 
     private String renderBetween(
-            Column column,
+            DynamicTable table,
+            RenderedExpr left,
             String columnSql,
             FieldCriterion criterion,
             Map<String, Object> params,
@@ -410,13 +436,59 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
         if (criterion.values().size() != 2) {
             throw new MicroOrmException("BETWEEN criterion requires exactly two bounds for column: " + criterion.fieldName());
         }
-        String lowerParam = nextParam(paramCounter);
-        String upperParam = nextParam(paramCounter);
-        params.put(lowerParam, valueBinder.toJdbc(column, criterion.values().get(0)));
-        params.put(upperParam, valueBinder.toJdbc(column, criterion.values().get(1)));
         String operator = criterion.kind() == CriterionKind.NOT_BETWEEN ? "NOT BETWEEN" : "BETWEEN";
-        return columnSql + " " + operator + " " + applyIgnoreCase(":" + lowerParam, criterion.ignoreCase())
-                + " AND " + applyIgnoreCase(":" + upperParam, criterion.ignoreCase());
+        return columnSql + " " + operator + " "
+                + renderBound(table, left.column(), criterion.values().get(0), criterion.ignoreCase(), params, paramCounter)
+                + " AND "
+                + renderBound(table, left.column(), criterion.values().get(1), criterion.ignoreCase(), params, paramCounter);
+    }
+
+    private String renderBound(
+            DynamicTable table,
+            Column column,
+            Object value,
+            boolean ignoreCase,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        QueryExpression expr = QueryExpressions.asExpression(value);
+        if (expr != null) {
+            return applyIgnoreCase(renderExpression(table, expr, params, paramCounter).sql(), ignoreCase);
+        }
+        String param = nextParam(paramCounter);
+        params.put(param, jdbcValue(column, value));
+        return applyIgnoreCase(":" + param, ignoreCase);
+    }
+
+    private RenderedExpr renderExpression(
+            DynamicTable table,
+            QueryExpression expression,
+            Map<String, Object> params,
+            int[] paramCounter) {
+        if (expression instanceof QueryExpression.Field field) {
+            Column column = resolveColumn(table, field.name());
+            return new RenderedExpr(columnSql(table, column), column);
+        }
+        if (expression instanceof QueryExpression.Function function) {
+            List<String> args = new ArrayList<>();
+            for (QueryExpression argument : function.arguments()) {
+                args.add(renderExpression(table, argument, params, paramCounter).sql());
+            }
+            String name = QueryExpressions.qualifiedFunctionName(function.name(), dialect::sqlName);
+            return new RenderedExpr(name + "(" + String.join(", ", args) + ")", null);
+        }
+        if (expression instanceof QueryExpression.Bound bound) {
+            String param = nextParam(paramCounter);
+            params.put(param, bound.value());
+            return new RenderedExpr(":" + param, null);
+        }
+        return new RenderedExpr("NULL", null);
+    }
+
+    private Object jdbcValue(Column column, Object value) {
+        if (column == null) {
+            return value;
+        }
+        return valueBinder.toJdbc(column, value);
     }
 
     private String renderColumns(DynamicTable table, List<String> columnNames) {
@@ -493,5 +565,8 @@ public abstract class AbstractDynamicSqlGenerator implements DynamicSqlGenerator
 
     private static String paramName(String prefix, String columnName) {
         return prefix + "_" + columnName;
+    }
+
+    private record RenderedExpr(String sql, Column column) {
     }
 }

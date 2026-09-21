@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static io.github.connellite.microorm.dynamic.DynamicSelect.field;
+import static io.github.connellite.microorm.dynamic.DynamicSelect.fn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -174,6 +175,24 @@ class DynamicSqlGeneratorTest {
         BoundStatement emptyNotIn = sql.select(table, DynamicSelect.from("docs").where(field("name").notIn(List.of())));
         assertEquals("SELECT documents.id, documents.name, documents.removed FROM documents WHERE 1 = 1", emptyNotIn.sql());
         assertTrue(emptyNotIn.collectionParameters().isEmpty());
+    }
+
+    @Test
+    void fluentSelectRendersDatabaseFunctions() {
+        BoundStatement onRight = sql.select(table, DynamicSelect.from("docs")
+                .where(field("id").eq(fn("dbo.uuid2obj", "abc"))));
+        assertEquals("SELECT documents.id, documents.name, documents.removed FROM documents"
+                + " WHERE documents.id = dbo.uuid2obj(:p1)", onRight.sql());
+        assertEquals("abc", onRight.parameters().get("p1"));
+
+        BoundStatement onLeft = sql.select(table, DynamicSelect.from("docs")
+                .where(fn("coalesce", field("name"), field("removed"), "n/a").eq("x"))
+                .orderBy(fn("lower", field("name")).asc()));
+        assertEquals("SELECT documents.id, documents.name, documents.removed FROM documents"
+                + " WHERE coalesce(documents.name, documents.removed, :p1) = :p2"
+                + " ORDER BY lower(documents.name) ASC", onLeft.sql());
+        assertEquals("n/a", onLeft.parameters().get("p1"));
+        assertEquals("x", onLeft.parameters().get("p2"));
     }
 
     @Test

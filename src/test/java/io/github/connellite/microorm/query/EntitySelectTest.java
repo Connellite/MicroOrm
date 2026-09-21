@@ -556,6 +556,59 @@ class EntitySelectTest {
     }
 
     @Test
+    void rendersDatabaseFunctions() {
+        BoundStatement onRight = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class)
+                        .where(EntitySelect.field("id").eq(EntitySelect.fn("dbo.uuid2obj", "abc"))));
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE entity_query_items.id = dbo.uuid2obj(:p1)",
+                onRight.sql());
+        assertEquals("abc", onRight.parameters().get("p1"));
+
+        BoundStatement onLeft = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class)
+                        .where(EntitySelect.fn("dbo.obj2uuid", EntitySelect.field("id")).eq("abc")));
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE dbo.obj2uuid(entity_query_items.id) = :p1",
+                onLeft.sql());
+        assertEquals("abc", onLeft.parameters().get("p1"));
+
+        BoundStatement coalesce = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class)
+                        .where(EntitySelect.fn(
+                                "coalesce",
+                                EntitySelect.field("name"),
+                                EntitySelect.field("description"),
+                                "n/a").eq("x"))
+                        .orderBy(EntitySelect.fn("dbo.obj2uuid", EntitySelect.field("id")).asc()));
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE coalesce(entity_query_items.name, entity_query_items.description, :p1) = :p2 "
+                        + "ORDER BY dbo.obj2uuid(entity_query_items.id) ASC",
+                coalesce.sql());
+        assertEquals("n/a", coalesce.parameters().get("p1"));
+        assertEquals("x", coalesce.parameters().get("p2"));
+
+        BoundStatement zeroArg = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class).where(EntitySelect.fn("now").isNotNull()));
+        assertTrue(zeroArg.sql().contains("WHERE now() IS NOT NULL"));
+
+        BoundStatement withNullArg = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class)
+                        .where(EntitySelect.fn("coalesce", EntitySelect.field("name"), null).eq("x")));
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items "
+                        + "WHERE coalesce(entity_query_items.name, NULL) = :p1",
+                withNullArg.sql());
+    }
+
+    @Test
     void rejectsInvalidCriteria() {
         assertThrows(NullPointerException.class, () -> EntitySelect.field("name").notLike(null));
         assertThrows(NullPointerException.class, () -> EntitySelect.field("id").between(null, 2));
@@ -564,6 +617,8 @@ class EntitySelectTest {
                 .select(model, EntitySelect.of(Item.class).where(EntitySelect.field("missing").eq(1))));
         assertThrows(MicroOrmException.class, () -> SqliteDialect.getInstance().sqlGenerator()
                 .select(model, EntitySelect.of(String.class)));
+        assertThrows(IllegalArgumentException.class, () -> EntitySelect.fn(""));
+        assertThrows(MicroOrmException.class, () -> EntitySelect.fn("dbo.bad-name"));
     }
 
     @Test

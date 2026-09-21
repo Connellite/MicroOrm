@@ -3,7 +3,9 @@ package io.github.connellite.microorm.dynamic;
 import io.github.connellite.microorm.query.Criterion;
 import io.github.connellite.microorm.query.EntitySelect;
 import io.github.connellite.microorm.query.FieldPath;
+import io.github.connellite.microorm.query.FunctionPath;
 import io.github.connellite.microorm.query.Order;
+import io.github.connellite.microorm.query.QueryExpressions;
 import io.github.connellite.microorm.sql.Query;
 
 import java.util.ArrayList;
@@ -37,6 +39,15 @@ public final class DynamicSelect {
     /** Creates a column reference for criteria and sort orders. */
     public static FieldPath field(String columnName) {
         return new FieldPath(columnName);
+    }
+
+    /**
+     * Builds a scalar database function call for criteria and sort orders.
+     * {@code name} may be schema-qualified ({@code dbo.uuid2obj}). Arguments may be field paths,
+     * nested function calls, literals (bound as parameters), or {@code null} (SQL {@code NULL}).
+     */
+    public static FunctionPath fn(String name, Object... args) {
+        return QueryExpressions.fn(name, args);
     }
 
     /** Creates an SQL {@code EXISTS (...)} criterion from a named-parameter subquery. */
