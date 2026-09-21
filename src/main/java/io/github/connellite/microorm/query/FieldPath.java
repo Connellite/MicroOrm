@@ -83,7 +83,7 @@ public record FieldPath(String name, boolean ignoreCase) {
         return FieldCriterion.comparison(name, ComparisonOperator.GE, value, ignoreCase);
     }
 
-    /** Builds {@code field IN (...)}. Empty collections are rejected. */
+    /** Builds {@code field IN (...)}. An empty collection is rendered as {@code 1 = 0}. */
     public Criterion in(Collection<?> values) {
         return FieldCriterion.in(name, values, ignoreCase);
     }
@@ -98,7 +98,7 @@ public record FieldPath(String name, boolean ignoreCase) {
         return InSubqueryCriterion.in(name, query, ignoreCase);
     }
 
-    /** Builds {@code field NOT IN (...)}. Empty collections are rejected. */
+    /** Builds {@code field NOT IN (...)}. An empty collection is rendered as {@code 1 = 1}. */
     public Criterion notIn(Collection<?> values) {
         return FieldCriterion.notIn(name, values, ignoreCase);
     }

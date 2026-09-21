@@ -36,23 +36,19 @@ public record FieldCriterion(
     }
 
     static FieldCriterion in(String fieldName, Collection<?> values, boolean ignoreCase) {
-        return collection(fieldName, CriterionKind.IN, values, "IN values cannot be empty", ignoreCase);
+        return collection(fieldName, CriterionKind.IN, values, ignoreCase);
     }
 
     static FieldCriterion notIn(String fieldName, Collection<?> values, boolean ignoreCase) {
-        return collection(fieldName, CriterionKind.NOT_IN, values, "NOT IN values cannot be empty", ignoreCase);
+        return collection(fieldName, CriterionKind.NOT_IN, values, ignoreCase);
     }
 
     private static FieldCriterion collection(
             String fieldName,
             CriterionKind kind,
             Collection<?> values,
-            String emptyMessage,
             boolean ignoreCase) {
         Objects.requireNonNull(values, "values");
-        if (values.isEmpty()) {
-            throw new IllegalArgumentException(emptyMessage);
-        }
         return new FieldCriterion(fieldName, kind, null, null, List.copyOf(values), ignoreCase);
     }
 

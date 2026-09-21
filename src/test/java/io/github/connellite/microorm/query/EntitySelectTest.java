@@ -537,9 +537,26 @@ class EntitySelectTest {
     }
 
     @Test
+    void rendersEmptyInAsContradictionAndEmptyNotInAsTautology() {
+        BoundStatement emptyIn = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class).where(EntitySelect.field("name").in(List.of())));
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items WHERE 1 = 0",
+                emptyIn.sql());
+        assertTrue(emptyIn.collectionParameters().isEmpty());
+
+        BoundStatement emptyNotIn = SqliteDialect.getInstance().sqlGenerator()
+                .select(model, EntitySelect.of(Item.class).where(EntitySelect.field("name").notIn(List.of())));
+        assertEquals(
+                "SELECT entity_query_items.id, entity_query_items.name, entity_query_items.enabled, "
+                        + "entity_query_items.description FROM entity_query_items WHERE 1 = 1",
+                emptyNotIn.sql());
+        assertTrue(emptyNotIn.collectionParameters().isEmpty());
+    }
+
+    @Test
     void rejectsInvalidCriteria() {
-        assertThrows(IllegalArgumentException.class, () -> EntitySelect.field("name").in(List.of()));
-        assertThrows(IllegalArgumentException.class, () -> EntitySelect.field("name").notIn(List.of()));
         assertThrows(NullPointerException.class, () -> EntitySelect.field("name").notLike(null));
         assertThrows(NullPointerException.class, () -> EntitySelect.field("id").between(null, 2));
         assertThrows(NullPointerException.class, () -> EntitySelect.field("id").notBetween(1, null));

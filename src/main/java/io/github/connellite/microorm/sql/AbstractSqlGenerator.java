@@ -804,6 +804,9 @@ public abstract class AbstractSqlGenerator implements SqlGenerator, RelationSqlG
             Map<String, Object> params,
             Map<String, Collection<?>> collectionParams,
             int[] paramCounter) {
+        if (criterion.values().isEmpty()) {
+            return criterion.kind() == CriterionKind.NOT_IN ? "1 = 1" : "1 = 0";
+        }
         String operator = criterion.kind() == CriterionKind.NOT_IN ? "NOT IN" : "IN";
         if (criterion.ignoreCase()) {
             List<String> slots = new ArrayList<>();

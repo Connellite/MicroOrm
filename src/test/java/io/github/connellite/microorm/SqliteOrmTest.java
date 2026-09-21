@@ -633,6 +633,11 @@ class SqliteOrmTest {
                 try (var rows = s.streamRows(query)) {
                     assertEquals(2, rows.count());
                 }
+
+                assertTrue(s.selectRows(EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").in(List.of()))).isEmpty());
+                assertEquals(4, s.selectRows(EntitySelect.of(Widget.class)
+                        .where(EntitySelect.field("name").notIn(List.of()))).size());
             }
         }
     }

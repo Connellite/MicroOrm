@@ -166,6 +166,17 @@ class DynamicSqlGeneratorTest {
     }
 
     @Test
+    void fluentSelectRendersEmptyInAsContradiction() {
+        BoundStatement emptyIn = sql.select(table, DynamicSelect.from("docs").where(field("name").in(List.of())));
+        assertEquals("SELECT documents.id, documents.name, documents.removed FROM documents WHERE 1 = 0", emptyIn.sql());
+        assertTrue(emptyIn.collectionParameters().isEmpty());
+
+        BoundStatement emptyNotIn = sql.select(table, DynamicSelect.from("docs").where(field("name").notIn(List.of())));
+        assertEquals("SELECT documents.id, documents.name, documents.removed FROM documents WHERE 1 = 1", emptyNotIn.sql());
+        assertTrue(emptyNotIn.collectionParameters().isEmpty());
+    }
+
+    @Test
     void fluentSelectRendersInSubqueryAndIgnoreCase() {
         BoundStatement inQuery = sql.select(table, DynamicSelect.from("docs")
                 .where(field("name").in(Query.of("SELECT n FROM names WHERE active = :active").set("active", true)))
