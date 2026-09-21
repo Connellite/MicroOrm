@@ -280,6 +280,18 @@ class EntitySelectTest {
     }
 
     @Test
+    void rendersInAndNotInVarargs() {
+        EntitySelect<Item> query = EntitySelect.of(Item.class)
+                .where(EntitySelect.field("name").in("a", "b"))
+                .and(EntitySelect.field("description").notIn("first", "second"));
+
+        BoundStatement statement = SqliteDialect.getInstance().sqlGenerator().select(model, query);
+
+        assertEquals(List.of("a", "b"), statement.collectionParameters().get("p1"));
+        assertEquals(List.of("first", "second"), statement.collectionParameters().get("p2"));
+    }
+
+    @Test
     void rendersAdditionalPredicateHelpers() {
         EntitySelect<Item> query = EntitySelect.of(Item.class)
                 .where(EntitySelect.field("name").notIn(List.of("a", "b")))

@@ -67,6 +67,16 @@ public final class Query {
         return this;
     }
 
+    /**
+     * Binds individual values for {@code IN (:name)} expansion.
+     *
+     * @throws IllegalArgumentException when {@code values} is empty or the name is already bound
+     */
+    public Query setCollection(String name, Object... values) {
+        Objects.requireNonNull(values, "values");
+        return setCollection(name, List.of(values));
+    }
+
     /** SQL text with {@code :name} placeholders (unchanged after binding). */
     public String sql() {
         return sql;

@@ -3,7 +3,7 @@ package io.github.connellite.microorm.relation;
 import io.github.connellite.microorm.mapping.CollectionRelation;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -11,22 +11,45 @@ import java.util.Objects;
  * Eager one-to-many collection of related entities. Child rows are materialized when the owning
  * entity is hydrated, so {@link #get()} never performs a database round-trip.
  * <p>
- * For writes use {@link #of(List)}, {@link #empty()}, or {@link #builder()} before insert/update.
+ * For writes use {@link #of(Collection)}, {@link #of(Object[])}, {@link #empty()}, or {@link #builder()}
+ * before insert/update.
  */
 public final class EagerCollection<T> extends EntityCollection<T> {
 
-    private EagerCollection(Object ownerId, List<T> elements) {
+    private EagerCollection(Object ownerId, Collection<? extends T> elements) {
         super(ownerId, elements, true);
     }
 
     /** Creates a materialized collection for insert/update. */
-    public static <T> EagerCollection<T> of(List<T> elements) {
+    public static <T> EagerCollection<T> of(Collection<? extends T> elements) {
+        Objects.requireNonNull(elements, "elements");
         return new EagerCollection<>(null, elements);
     }
 
+    /**
+     * Creates a materialized collection for insert/update from individual child entities.
+     */
+    @SafeVarargs
+    @SuppressWarnings("varargs")
+    public static <T> EagerCollection<T> of(T... elements) {
+        Objects.requireNonNull(elements, "elements");
+        return of(List.of(elements));
+    }
+
     /** Creates a materialized collection for an already hydrated owner. */
-    public static <T> EagerCollection<T> of(Object ownerId, List<T> elements) {
+    public static <T> EagerCollection<T> of(Object ownerId, Collection<? extends T> elements) {
+        Objects.requireNonNull(elements, "elements");
         return new EagerCollection<>(ownerId, elements);
+    }
+
+    /**
+     * Creates a materialized collection for an already hydrated owner from individual child entities.
+     */
+    @SafeVarargs
+    @SuppressWarnings("varargs")
+    public static <T> EagerCollection<T> of(Object ownerId, T... elements) {
+        Objects.requireNonNull(elements, "elements");
+        return of(ownerId, List.of(elements));
     }
 
     /** Creates an empty materialized collection for insert/update. */
@@ -56,7 +79,7 @@ public final class EagerCollection<T> extends EntityCollection<T> {
         return new Builder<>();
     }
 
-    /** Mutable builder that produces an {@link #of(List)} collection. */
+    /** Mutable builder that produces an {@link #of(Collection)} collection. */
     public static final class Builder<T> {
         private final List<T> items = new ArrayList<>();
 
@@ -66,9 +89,26 @@ public final class EagerCollection<T> extends EntityCollection<T> {
             return this;
         }
 
+        /** Appends all elements from the given collection. */
+        public Builder<T> addAll(Collection<? extends T> more) {
+            Objects.requireNonNull(more, "items");
+            for (T item : more) {
+                add(item);
+            }
+            return this;
+        }
+
+        /** Appends individual non-null elements. */
+        @SafeVarargs
+        @SuppressWarnings("varargs")
+        public final Builder<T> add(T... more) {
+            Objects.requireNonNull(more, "items");
+            return addAll(List.of(more));
+        }
+
         /** Builds an immutable materialized collection for insert/update. */
         public EagerCollection<T> build() {
-            return EagerCollection.of(Collections.unmodifiableList(items));
+            return EagerCollection.of(items);
         }
     }
 }

@@ -3,6 +3,7 @@ package io.github.connellite.microorm.query;
 import io.github.connellite.microorm.sql.Query;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -73,6 +74,12 @@ public interface ExprPath {
         return FieldCriterion.in(expression(), values, ignoreCase());
     }
 
+    /** Builds {@code expr IN (...)} from individual values. */
+    default Criterion in(Object... values) {
+        Objects.requireNonNull(values, "values");
+        return in(List.of(values));
+    }
+
     /** Builds {@code expr IN (subquery)}. */
     default Criterion in(Query query) {
         return InSubqueryCriterion.in(expression(), query, ignoreCase());
@@ -86,6 +93,12 @@ public interface ExprPath {
     /** Builds {@code expr NOT IN (...)}. An empty collection is rendered as {@code 1 = 1}. */
     default Criterion notIn(Collection<?> values) {
         return FieldCriterion.notIn(expression(), values, ignoreCase());
+    }
+
+    /** Builds {@code expr NOT IN (...)} from individual values. */
+    default Criterion notIn(Object... values) {
+        Objects.requireNonNull(values, "values");
+        return notIn(List.of(values));
     }
 
     /** Builds {@code expr NOT IN (subquery)}. */

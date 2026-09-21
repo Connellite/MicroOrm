@@ -35,6 +35,12 @@ class QueryTest {
     }
 
     @Test
+    void setCollectionBindsVarargs() {
+        Query query = Query.of("SELECT 1 WHERE id IN (:ids)").setCollection("ids", 1, 2, 3);
+        assertEquals(List.of(1, 2, 3), query.collectionParameters().get("ids"));
+    }
+
+    @Test
     void rejectsDuplicateParameterNames() {
         Query query = Query.of("SELECT 1 WHERE a = :x AND b = :y").set("x", 1);
         assertThrows(IllegalArgumentException.class, () -> query.set("x", 2));

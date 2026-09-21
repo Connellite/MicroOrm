@@ -3,7 +3,9 @@ package io.github.connellite.microorm.relation;
 import io.github.connellite.microorm.mapping.CollectionRelation;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Base class for collection relation wrappers declared on {@code @OneToMany} or {@code @ManyToMany} fields.
@@ -20,14 +22,14 @@ public abstract class EntityCollection<T> {
     private List<T> elements;
     private boolean loaded;
 
-    protected EntityCollection(Object ownerId, List<T> elements, boolean loaded) {
+    protected EntityCollection(Object ownerId, Collection<? extends T> elements, boolean loaded) {
         this.ownerId = ownerId;
         this.elements = elements == null ? null : List.copyOf(elements);
         this.loaded = loaded;
     }
 
-    protected final void materialize(List<T> elements) {
-        this.elements = List.copyOf(elements);
+    protected final void materialize(Collection<? extends T> elements) {
+        this.elements = List.copyOf(Objects.requireNonNull(elements, "elements"));
         this.loaded = true;
     }
 
