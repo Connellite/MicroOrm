@@ -3,6 +3,7 @@ package io.github.connellite.microorm.mapping;
 import io.github.connellite.collections.ConcurrentReferenceHashMap;
 import io.github.connellite.collections.MultiValueHashMap;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.reflection.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -39,7 +40,7 @@ public final class LifecycleCallbacks {
         }
         for (Method method : methods) {
             try {
-                method.invoke(entity);
+                ReflectionUtil.invoke(method, entity);
             } catch (IllegalAccessException e) {
                 throw new MicroOrmException("Cannot invoke lifecycle callback " + callbackName(entity.getClass(), method, event), e);
             } catch (InvocationTargetException e) {
@@ -55,11 +56,8 @@ public final class LifecycleCallbacks {
 
     private static MultiValueHashMap<LifecycleEvent, Method> scan(Class<?> entityClass) {
         MultiValueHashMap<LifecycleEvent, Method> callbacks = new MultiValueHashMap<>(LifecycleEvent.values().length);
-        for (Method method : entityClass.getDeclaredMethods()) {
-            for (LifecycleEvent event : LifecycleEvent.values()) {
-                if (!method.isAnnotationPresent(event.annotationType())) {
-                    continue;
-                }
+        for (LifecycleEvent event : LifecycleEvent.values()) {
+            for (Method method : ReflectionUtil.getAllMethodsByAnnotation(entityClass, event.annotationType())) {
                 validateMethod(entityClass, method, event);
                 callbacks.add(event, method);
             }

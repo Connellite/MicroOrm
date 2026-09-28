@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.connection;
 
+import io.github.connellite.reflection.ReflectionUtil;
 import lombok.experimental.UtilityClass;
 
 import javax.sql.DataSource;
@@ -67,12 +68,12 @@ public final class SpringJdbcSupport {
             if (CONNECTION_PROXY.equals(type.getName())) {
                 return true;
             }
-            for (Class<?> iface : type.getInterfaces()) {
-                if (CONNECTION_PROXY.equals(iface.getName())) {
-                    return true;
-                }
-            }
             type = type.getSuperclass();
+        }
+        for (Class<?> iface : ReflectionUtil.getAllInterfaces(connection.getClass())) {
+            if (CONNECTION_PROXY.equals(iface.getName())) {
+                return true;
+            }
         }
         return false;
     }
@@ -100,7 +101,7 @@ public final class SpringJdbcSupport {
 
     private static Method findMethod(String className, String methodName, Class<?>... parameterTypes) {
         try {
-            return Class.forName(className).getMethod(methodName, parameterTypes);
+            return ReflectionUtil.findMethod(Class.forName(className), methodName, parameterTypes);
         } catch (ReflectiveOperationException | LinkageError e) {
             return null;
         }
@@ -108,7 +109,7 @@ public final class SpringJdbcSupport {
 
     private static Connection invokeConnection(Method method, Object... args) throws SQLException {
         try {
-            return (Connection) method.invoke(null, args);
+            return (Connection) ReflectionUtil.invoke(method, null, args);
         } catch (IllegalAccessException e) {
             throw new SQLException("Cannot access Spring JDBC method " + method.getName(), e);
         } catch (InvocationTargetException e) {
@@ -118,7 +119,7 @@ public final class SpringJdbcSupport {
 
     private static void invokeVoid(Method method, Object... args) throws SQLException {
         try {
-            method.invoke(null, args);
+            ReflectionUtil.invoke(method, null, args);
         } catch (IllegalAccessException e) {
             throw new SQLException("Cannot access Spring JDBC method " + method.getName(), e);
         } catch (InvocationTargetException e) {
@@ -128,7 +129,7 @@ public final class SpringJdbcSupport {
 
     private static boolean invokeBoolean(Method method, Object... args) {
         try {
-            return Boolean.TRUE.equals(method.invoke(null, args));
+            return Boolean.TRUE.equals(ReflectionUtil.invoke(method, null, args));
         } catch (IllegalAccessException | InvocationTargetException e) {
             return false;
         }

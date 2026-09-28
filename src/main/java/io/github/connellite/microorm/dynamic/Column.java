@@ -9,8 +9,6 @@ import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
 import io.github.connellite.reflection.ReflectionUtil;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -312,7 +310,7 @@ public final class Column {
                 throw new MicroOrmException("Cannot instantiate converter " + converterClass.getName()
                         + " for dynamic column '" + name + "'", e);
             }
-            List<Class<?>> types = converterTypes(converterClass);
+            List<Class<?>> types = ReflectionUtil.getGenericInterfaceParameterClasses(converterClass, AttributeConverter.class);
             if (types.size() < 2) {
                 throw new MicroOrmException("Converter " + converterClass.getName()
                         + " must declare AttributeConverter<Attribute, Database>");
@@ -412,31 +410,6 @@ public final class Column {
                 throw new MicroOrmException("Converter database type " + converterDatabaseType.getName()
                         + " does not match dynamic column '" + columnName + "' logical type " + type);
             }
-        }
-
-        private static List<Class<?>> converterTypes(Class<?> converterClass) {
-            for (Type genericInterface : converterClass.getGenericInterfaces()) {
-                List<Class<?>> classes = converterTypes(genericInterface);
-                if (!classes.isEmpty()) {
-                    return classes;
-                }
-            }
-            Class<?> superClass = converterClass.getSuperclass();
-            return superClass == null || superClass == Object.class ? List.of() : converterTypes(superClass);
-        }
-
-        private static List<Class<?>> converterTypes(Type type) {
-            if (type instanceof ParameterizedType parameterized
-                    && parameterized.getRawType() == AttributeConverter.class) {
-                return ReflectionUtil.getAllGenericParameterClasses(parameterized);
-            }
-            if (type instanceof Class<?> clazz) {
-                return converterTypes(clazz);
-            }
-            if (type instanceof ParameterizedType parameterized && parameterized.getRawType() instanceof Class<?> rawClass) {
-                return converterTypes(rawClass);
-            }
-            return List.of();
         }
     }
 

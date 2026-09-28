@@ -13,11 +13,8 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.lang.invoke.MethodHandles;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,50 +57,11 @@ public final class RepositoryProxyFactory {
     }
 
     private static Class<?> resolveEntityType(Class<?> repositoryType) {
-        Type entityType = resolveEntityType(repositoryType, Map.of());
+        Type entityType = ReflectionUtil.resolveTypeArgument(repositoryType, EntityRepository.class, 0);
         if (entityType instanceof Class<?> entityClass) {
             return entityClass;
         }
         throw new MicroOrmException("Cannot resolve entity type for repository " + repositoryType.getName() + "; declare it as EntityRepository<Entity, Id>");
-    }
-
-    private static Type resolveEntityType(Type type, Map<TypeVariable<?>, Type> variables) {
-        if (type instanceof Class<?> clazz) {
-            for (Type genericInterface : clazz.getGenericInterfaces()) {
-                Type resolved = resolveEntityType(genericInterface, variables);
-                if (resolved != null) {
-                    return resolved;
-                }
-            }
-            return null;
-        }
-        if (!(type instanceof ParameterizedType parameterizedType)) {
-            return null;
-        }
-        Class<?> rawType = (Class<?>) parameterizedType.getRawType();
-        Map<TypeVariable<?>, Type> nextVariables = new HashMap<>(variables);
-        TypeVariable<?>[] parameters = rawType.getTypeParameters();
-        Type[] arguments = parameterizedType.getActualTypeArguments();
-        for (int i = 0; i < parameters.length; i++) {
-            nextVariables.put(parameters[i], resolveType(arguments[i], variables));
-        }
-        if (rawType == EntityRepository.class) {
-            Type entityArgument = resolveType(arguments[0], variables);
-            if (entityArgument instanceof Class<?>) {
-                return entityArgument;
-            }
-            List<Class<?>> classes = ReflectionUtil.getAllGenericParameterClasses(entityArgument);
-            return classes.isEmpty() ? entityArgument : classes.get(0);
-        }
-        return resolveEntityType(rawType, nextVariables);
-    }
-
-    private static Type resolveType(Type type, Map<TypeVariable<?>, Type> variables) {
-        // intermediate interface variables, e.g. Repo -> BaseRepo<User, Long> -> EntityRepository<T, ID>.
-        while (type instanceof TypeVariable<?> variable && variables.containsKey(variable)) {
-            type = variables.get(variable);
-        }
-        return type;
     }
 
     private record RepositoryInvocationHandler(
@@ -113,7 +71,7 @@ public final class RepositoryProxyFactory {
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            if (method.getDeclaringClass() == Object.class) {
+            if (ReflectionUtil.isObjectMethod(method)) {
                 return invokeObjectMethod(proxy, method, args);
             }
             var queryAnnotation = method.getAnnotation(io.github.connellite.microorm.annotation.Query.class);
@@ -151,19 +109,20 @@ public final class RepositoryProxyFactory {
         }
 
         private Object invokeObjectMethod(Object proxy, Method method, Object[] args) {
-            return switch (method.getName()) {
-                case "toString" -> repositoryType.getName() + " repository for " + entityType.getName();
-                case "hashCode" -> System.identityHashCode(proxy);
-                case "equals" -> proxy == args[0];
-                default -> throw new MicroOrmException("Unsupported Object method: " + method.getName());
-            };
+            if (ReflectionUtil.isToStringMethod(method)) {
+                return repositoryType.getName() + " repository for " + entityType.getName();
+            }
+            if (ReflectionUtil.isHashCodeMethod(method)) {
+                return System.identityHashCode(proxy);
+            }
+            if (ReflectionUtil.isEqualsMethod(method)) {
+                return proxy == args[0];
+            }
+            throw new MicroOrmException("Unsupported Object method: " + method.getName());
         }
 
         private Object invokeDefaultMethod(Object proxy, Method method, Object[] args) throws Throwable {
-            return MethodHandles.privateLookupIn(method.getDeclaringClass(), MethodHandles.lookup())
-                    .unreflectSpecial(method, method.getDeclaringClass())
-                    .bindTo(proxy)
-                    .invokeWithArguments(args == null ? new Object[0] : args);
+            return ReflectionUtil.invokeDefault(proxy, method, args);
         }
 
         @SuppressWarnings("unchecked")

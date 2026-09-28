@@ -2,6 +2,7 @@ package io.github.connellite.microorm.dynamic;
 
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.reflection.ReflectionUtil;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -55,7 +56,10 @@ final class ValueBinderFields {
 
     private static void register(LogicalType type, String fieldName) {
         try {
-            Field javaField = ValueBinderFields.class.getDeclaredField(fieldName);
+            Field javaField = ReflectionUtil.findDeclaredField(ValueBinderFields.class, fieldName);
+            if (javaField == null) {
+                throw new NoSuchFieldException(fieldName);
+            }
             FIELDS.put(type, new EntityField(javaField, "_stub", false, false, true));
         } catch (NoSuchFieldException e) {
             throw new ExceptionInInitializerError(e);
