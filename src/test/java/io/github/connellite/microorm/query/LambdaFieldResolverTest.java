@@ -27,19 +27,19 @@ class LambdaFieldResolverTest {
 
     @Test
     void resolvesGetterReferencesUsingMyBatisPropertyNamingRules() {
-        assertEquals("URL", LambdaFieldResolver.fieldName((EntitySelect.Getter<AccessorNames, String>) AccessorNames::getURL));
-        assertEquals("nMetaType", LambdaFieldResolver.fieldName(
-                (EntitySelect.Getter<AccessorNames, String>) AccessorNames::getnMetaType));
-        assertEquals("NMetaType", LambdaFieldResolver.fieldName(
-                (EntitySelect.Getter<AccessorNames, String>) AccessorNames::getNMetaType));
-        assertEquals("enabled", LambdaFieldResolver.fieldName(
-                (EntitySelect.Getter<AccessorNames, Boolean>) AccessorNames::isEnabled));
+        assertEquals("URL", EntitySelect.field((EntitySelect.Getter<AccessorNames, String>) AccessorNames::getURL).name());
+        assertEquals("nMetaType", EntitySelect.field(
+                (EntitySelect.Getter<AccessorNames, String>) AccessorNames::getnMetaType).name());
+        assertEquals("NMetaType", EntitySelect.field(
+                (EntitySelect.Getter<AccessorNames, String>) AccessorNames::getNMetaType).name());
+        assertEquals("enabled", EntitySelect.field(
+                (EntitySelect.Getter<AccessorNames, Boolean>) AccessorNames::isEnabled).name());
     }
 
     @Test
     void rejectsPlainLambdaExpressions() {
         assertThrows(IllegalArgumentException.class,
-                () -> LambdaFieldResolver.fieldName(
+                () -> EntitySelect.field(
                         (EntitySelect.Getter<AccessorNames, String>) value -> value.getURL()));
     }
 }

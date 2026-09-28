@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.jdbc;
 
+import io.github.connellite.collections.DelegatingNullSkippingCollection;
+import io.github.connellite.collections.LinkedCaseInsensitiveSet;
 import io.github.connellite.collections.ListUtils;
 import io.github.connellite.jdbc.NamedPreparedStatement;
 import io.github.connellite.jdbc.NamedQuery;
@@ -15,8 +17,8 @@ import io.github.connellite.microorm.dynamic.DynamicValueBinder;
 import io.github.connellite.microorm.dynamic.MapRowMapper;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
-import io.github.connellite.microorm.util.Logger;
-import io.github.connellite.microorm.util.LoggerFactory;
+import io.github.connellite.logger.Logger;
+import io.github.connellite.logger.LoggerFactory;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.util.TypeCoercionUtil;
 
@@ -413,22 +415,16 @@ public final class SqlExecutor {
             DynamicTable table,
             Dialect dialect,
             Collection<String> columnLabels) {
+        Collection<String> expected = new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
+        for (Column column : table.columns()) {
+            expected.add(dialect.jdbcColumnLabel(column.columnIdentifier()));
+        }
         for (String label : columnLabels) {
-            if (!isDynamicColumnLabel(table, dialect, label)) {
+            if (!expected.contains(label)) {
                 throw new MicroOrmException("Unknown column label '" + label
                         + "' for dynamic table '" + table.name() + "'");
             }
         }
-    }
-
-    private static boolean isDynamicColumnLabel(DynamicTable table, Dialect dialect, String label) {
-        for (Column column : table.columns()) {
-            String expected = dialect.jdbcColumnLabel(column.columnIdentifier());
-            if (label.equals(expected) || label.equalsIgnoreCase(expected)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static void closeQuietly(ResultSet resultSet, NamedPreparedStatement statement) {

@@ -1,11 +1,10 @@
 package io.github.connellite.microorm.schema;
 
-import io.github.connellite.collections.CaseInsensitiveHashMap;
-import io.github.connellite.collections.DelegatingNullSkippingMap;
+import io.github.connellite.jdbc.DatabaseMetaDataUtils;
+import io.github.connellite.logger.Logger;
+import io.github.connellite.logger.LoggerFactory;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
-import io.github.connellite.microorm.util.Logger;
-import io.github.connellite.microorm.util.LoggerFactory;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
 import io.github.connellite.microorm.mapping.ManyToManyField;
@@ -16,14 +15,12 @@ import io.github.connellite.microorm.mapping.TableUniqueConstraint;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
@@ -56,7 +53,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     @Override
     public void syncTable(Connection connection, EntityModel model) throws SQLException {
         requirePhysicalMutableTable(model, "syncTable");
-        Set<String> existingColumns = existingColumns(connection, model);
+        Collection<String> existingColumns = existingColumns(connection, model);
         if (existingColumns.isEmpty()) {
             createTable(connection, model);
             return;
@@ -189,23 +186,14 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         return baseTypeForJava(field.jdbcJavaType(), field.length());
     }
 
-    protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        Set<String> columns = caseInsensitiveNullSkippingSet();
+    protected Collection<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
         String catalog = metadataCatalog(model);
         String schema = metadataSchema(model);
         String table = model.catalogTableName(dialect);
-        try (ResultSet rs = connection.getMetaData().getColumns(catalog, schema, table, null)) {
-            while (rs.next()) {
-                columns.add(rs.getString("COLUMN_NAME"));
-            }
-        }
+        Collection<String> columns = DatabaseMetaDataUtils.getColumns(connection, catalog, schema, table);
         if (columns.isEmpty()) {
             LogHolder.logger.trace(() -> "No columns found for table " + table + ", retrying with uppercase name");
-            try (ResultSet rs = connection.getMetaData().getColumns(catalog, schema, table.toUpperCase(Locale.ROOT), null)) {
-                while (rs.next()) {
-                    columns.add(rs.getString("COLUMN_NAME"));
-                }
-            }
+            columns = DatabaseMetaDataUtils.getColumns(connection, catalog, schema, table.toUpperCase(Locale.ROOT));
         }
         return columns;
     }
@@ -282,13 +270,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
             String schemaName,
             String tableName,
             String indexName) throws SQLException {
-        Set<String> indexes = caseInsensitiveNullSkippingSet();
-        try (ResultSet rs = connection.getMetaData().getIndexInfo(catalogName, schemaName, tableName, false, false)) {
-            while (rs.next()) {
-                indexes.add(rs.getString("INDEX_NAME"));
-            }
-        }
-        return indexes.contains(indexName);
+        return DatabaseMetaDataUtils.getIndexInfo(connection, catalogName, schemaName, tableName).contains(indexName);
     }
 
     protected String metadataCatalog(EntityModel model) {
@@ -450,10 +432,7 @@ public abstract class AbstractSchemaManager implements SchemaManager {
     }
 
     protected boolean tableExists(Connection connection, String schema, String table) throws SQLException {
-        try (ResultSet rs = connection.getMetaData().getTables(
-                connection.getCatalog(), schema, table, new String[] {"TABLE"})) {
-            return rs.next();
-        }
+        return !DatabaseMetaDataUtils.getTables(connection, connection.getCatalog(), schema, table).isEmpty();
     }
 
     private static void requirePhysicalMutableTable(EntityModel model, String operation) {
@@ -486,10 +465,6 @@ public abstract class AbstractSchemaManager implements SchemaManager {
 
     protected String indexName(EntityModel model, EntityField field) {
         return INDEX_NAME_SANITIZER.matcher("idx_" + model.tableName() + "_" + field.columnName()).replaceAll("_");
-    }
-
-    protected Set<String> caseInsensitiveNullSkippingSet() {
-        return Collections.newSetFromMap(new DelegatingNullSkippingMap<>(new CaseInsensitiveHashMap<>()));
     }
 
     protected abstract String autoIncrementPrimaryKeyDefinition(EntityField field);

@@ -223,12 +223,7 @@ public final class EntityHydrator {
             return true;
         }
         String label = dialect == null ? identifier.text() : dialect.jdbcColumnLabel(identifier);
-        for (String column : availableColumns) {
-            if (column.equals(label) || column.equalsIgnoreCase(label)) {
-                return true;
-            }
-        }
-        return false;
+        return availableColumns.contains(label);
     }
 
     private static Object coerceToTargetPk(Object raw, EntityField targetPk, JdbcValueMapper valueMapper) {

@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.schema;
 
+import io.github.connellite.collections.DelegatingNullSkippingCollection;
+import io.github.connellite.collections.LinkedCaseInsensitiveSet;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
@@ -12,8 +14,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 public final class OracleSchemaManager extends AbstractSchemaManager {
@@ -23,13 +25,13 @@ public final class OracleSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
+    protected Collection<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
         String owner = owner(model);
         String table = model.catalogTableName(dialect);
         if (!tableExists(connection, owner, table)) {
-            return Set.of();
+            return new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         }
-        Set<String> columns = caseInsensitiveNullSkippingSet();
+        Collection<String> columns = new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT column_name
                 FROM all_tab_columns

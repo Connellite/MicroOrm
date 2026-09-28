@@ -61,11 +61,6 @@ public final class MapRowMapper {
             return true;
         }
         String label = dialect.jdbcColumnLabel(column.columnIdentifier());
-        for (String availableColumn : availableColumns) {
-            if (availableColumn.equals(label) || availableColumn.equalsIgnoreCase(label)) {
-                return true;
-            }
-        }
-        return false;
+        return availableColumns.contains(label);
     }
 }

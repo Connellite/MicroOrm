@@ -1,5 +1,8 @@
 package io.github.connellite.microorm.dynamic.schema;
 
+import io.github.connellite.jdbc.DatabaseMetaDataUtils;
+import io.github.connellite.logger.Logger;
+import io.github.connellite.logger.LoggerFactory;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
@@ -7,16 +10,12 @@ import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.sql.SqlIdentifier;
-import io.github.connellite.microorm.util.Logger;
-import io.github.connellite.microorm.util.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.Locale;
-import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
@@ -48,7 +47,7 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
 
     @Override
     public void syncTable(Connection connection, DynamicTable table) throws SQLException {
-        Set<String> existingColumns = existingColumns(connection, table);
+        Collection<String> existingColumns = existingColumns(connection, table);
         if (existingColumns.isEmpty()) {
             createTable(connection, table);
             return;
@@ -56,7 +55,7 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
         createSequences(connection, table);
         try (Statement st = connection.createStatement()) {
             for (Column column : table.columns()) {
-                if (existingColumns.contains(normalize(dialect.catalogName(column.columnIdentifier())))) {
+                if (existingColumns.contains(dialect.catalogName(column.columnIdentifier()))) {
                     continue;
                 }
                 validateAddColumn(table, column);
@@ -135,21 +134,12 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
         }
     }
 
-    protected Set<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
-        Set<String> columns = new HashSet<>();
+    protected Collection<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
         String tableName = dialect.catalogName(table.tableIdentifier());
-        try (ResultSet rs = connection.getMetaData().getColumns(null, null, tableName, null)) {
-            while (rs.next()) {
-                columns.add(normalize(rs.getString("COLUMN_NAME")));
-            }
-        }
+        Collection<String> columns = DatabaseMetaDataUtils.getColumns(connection, null, null, tableName);
         if (columns.isEmpty()) {
             LogHolder.logger.trace(() -> "No columns found for table " + tableName + ", retrying with uppercase name");
-            try (ResultSet rs = connection.getMetaData().getColumns(null, null, tableName.toUpperCase(Locale.ROOT), null)) {
-                while (rs.next()) {
-                    columns.add(normalize(rs.getString("COLUMN_NAME")));
-                }
-            }
+            columns = DatabaseMetaDataUtils.getColumns(connection, null, null, tableName.toUpperCase(Locale.ROOT));
         }
         return columns;
     }
@@ -207,20 +197,8 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
         return INDEX_NAME_SANITIZER.matcher("idx_" + table.tableName() + "_" + column.name()).replaceAll("_");
     }
 
-    protected String normalize(String identifier) {
-        return identifier == null ? "" : identifier.toLowerCase(Locale.ROOT);
-    }
-
     private boolean findIndex(Connection connection, String tableName, String indexName) throws SQLException {
-        try (ResultSet rs = connection.getMetaData().getIndexInfo(null, null, tableName, false, false)) {
-            while (rs.next()) {
-                String name = rs.getString("INDEX_NAME");
-                if (name != null && normalize(name).equals(normalize(indexName))) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return DatabaseMetaDataUtils.getIndexInfo(connection, null, null, tableName).contains(indexName);
     }
 
     private static void executeSql(Statement statement, String sql) throws SQLException {

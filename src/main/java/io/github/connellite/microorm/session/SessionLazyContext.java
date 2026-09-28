@@ -12,8 +12,8 @@ import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.sql.SqlGenerator;
-import io.github.connellite.microorm.util.Logger;
-import io.github.connellite.microorm.util.LoggerFactory;
+import io.github.connellite.logger.Logger;
+import io.github.connellite.logger.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
