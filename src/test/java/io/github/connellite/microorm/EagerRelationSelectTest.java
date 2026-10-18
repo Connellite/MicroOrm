@@ -189,6 +189,7 @@ class EagerRelationSelectTest {
 
         try (Session session = orm.openSession()) {
             session.insertRow(order);
+            session.evict(order);
             Order loaded = session.selectRow(Order.class, order.id);
             assertEquals("New", loaded.getTitle());
             assertEquals(CUSTOMER_ID, loaded.getCustomer().get().getId());

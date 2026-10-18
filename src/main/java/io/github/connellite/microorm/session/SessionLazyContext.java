@@ -83,7 +83,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 dialect.valueMapper(),
                 this,
                 registry)) {
-            return (List<T>) rows.toList();
+            return session.cachedOrStoreAll(childModel, (List<T>) rows.toList());
         }
     }
 
@@ -101,7 +101,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 dialect.valueMapper(),
                 this,
                 registry)) {
-            return (List<T>) rows.toList();
+            return session.cachedOrStoreAll(targetModel, (List<T>) rows.toList());
         }
     }
 
@@ -127,7 +127,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 registry)) {
             @SuppressWarnings("unchecked")
             T found = (T) rows.findFirst().orElse(null);
-            return found;
+            return session.cachedOrStore(targetModel, found);
         }
     }
 

@@ -60,6 +60,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     private final Dialect dialect;
     private final List<TransactionalEventVisitorRegistration<?>> transactionalEventListeners = new ArrayList<>();
     private final List<Object> transactionEvents = new NullSkippingArrayList<>();
+    private final EntityContext context = new EntityContext();
     private SessionLazyContext lazyContext;
     private boolean activeStream;
     private boolean localTransactionActive;
@@ -232,6 +233,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         EntityModel m = registry.register(entityClass);
         requireMutable(m, "dropEntity");
         dialect.dropTable(connection, m);
+        context.evict(m.entityClass());
     }
 
     /**
@@ -252,6 +254,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         BoundStatement bs = sql.insert(m, entity);
         SqlExecutor.executeInsertReturning(connection, bs, m, entity);
         LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_PERSIST);
+        store(m, entity);
         return entity;
     }
 
@@ -305,6 +308,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
                 entities);
         for (T entity : entities) {
             LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_PERSIST);
+            store(m, entity);
         }
         return inserted;
     }
@@ -325,6 +329,9 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         int updated = SqlExecutor.executeUpdate(connection, sql.update(m, entity));
         if (updated > 0) {
             LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_UPDATE);
+            store(m, entity);
+        } else {
+            evict(m, pkValue(entity, m));
         }
         return updated;
     }
@@ -341,6 +348,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
             return RelationPersister.delete(this, entity);
         }
         EntityHydrator.requirePkSet(entity, m.primaryKey());
+        evict(m, pkValue(entity, m));
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_REMOVE);
         int deleted = SqlExecutor.executeUpdate(connection, sql.delete(m, entity));
         if (deleted > 0) {
@@ -357,6 +365,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         EntityModel m = registry.get(entityClass);
         requireMutable(m, "deleteById");
         EntityHydrator.requirePkValue(id, m.primaryKey());
+        evict(m, id);
         return SqlExecutor.executeUpdate(connection, sql.deleteById(m, id));
     }
 
@@ -367,6 +376,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     public int deleteAllRows(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
         requireMutable(m, "deleteAllRows");
+        context.evict(m.entityClass());
         String q = "DELETE FROM " + m.sqlTableName(dialect);
         return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, Map.of()));
     }
@@ -378,7 +388,15 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     public boolean existsById(Class<?> type, Object id) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
-        return SqlExecutor.queryExists(connection, sql.existsById(m, id));
+        Object key = cacheKey(m, id);
+        if (context.contains(m.entityClass(), key)) {
+            return true;
+        }
+        boolean found = SqlExecutor.queryExists(connection, sql.existsById(m, id));
+        if (found) {
+            context.remember(m.entityClass(), key);
+        }
+        return found;
     }
 
     /**
@@ -389,19 +407,25 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         return selectRow(type, id, lazyLoadContext());
     }
 
-    <T> T selectRow(Class<T> type, Object id, SessionLazyContext context) {
+    <T> T selectRow(Class<T> type, Object id, SessionLazyContext lazy) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
+        Object key = cacheKey(m, id);
+        T cached = context.get(m.entityClass(), key);
+        if (cached != null) {
+            return cached;
+        }
         try (Stream<T> rows = SqlExecutor.queryEntitiesStream(
-                connection, sql.selectById(m, id), m, dialect, dialect.valueMapper(), context, registry)) {
+                connection, sql.selectById(m, id), m, dialect, dialect.valueMapper(), lazy, registry)) {
             List<T> list = rows.toList();
             if (list.isEmpty()) {
+                context.remove(m.entityClass(), key);
                 return null;
             }
             if (list.size() > 1) {
                 throw new MicroOrmException("Expected at most one row, got " + list.size());
             }
-            return list.get(0);
+            return storeLoaded(m, list.get(0));
         }
     }
 
@@ -410,6 +434,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Hydrated entities receive a session-scoped {@link io.github.connellite.microorm.relation.LazyLoadContext}
      * so lazy relation wrappers can load related rows until {@link #close()}.
      * Prefer {@link EntitySession#selectRows(Class)} when the full result fits in memory.
+     * Streamed rows are not stored in the session context.
      */
     @Override
     public <T> Stream<T> streamRows(Class<T> type) {
@@ -505,6 +530,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         Objects.requireNonNull(update, "update cannot be null");
         EntityModel m = registry.get(update.entityType());
         requireMutable(m, "execute update");
+        context.evict(m.entityClass());
         return SqlExecutor.executeUpdate(connection, sql.update(m, update));
     }
 
@@ -518,6 +544,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         Objects.requireNonNull(delete, "delete cannot be null");
         EntityModel m = registry.get(delete.entityType());
         requireMutable(m, "execute delete");
+        context.evict(m.entityClass());
         return SqlExecutor.executeUpdate(connection, sql.delete(m, delete));
     }
 
@@ -642,7 +669,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
 
     /**
      * Hibernate {@code ForeignKeys.isTransient} / persister lookup for an assigned identifier:
-     * {@code false} when the PK is unset, otherwise a database exists-check (no persistence context).
+     * {@code false} when the PK is unset, otherwise the session context and then a database exists-check.
      *
      * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/engine/internal/ForeignKeys.java#L298">ForeignKeys.isTransient</a>
      */
@@ -674,6 +701,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_PERSIST);
         SqlExecutor.executeInsertReturning(connection, bs, model, entity);
         LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_PERSIST);
+        store(model, entity);
     }
 
     @Override
@@ -690,6 +718,9 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
                 connection, relationSql().update(model, entity, registry, deferred, this::existsByPrimaryKey));
         if (updated > 0) {
             LifecycleCallbacks.invoke(entity, LifecycleEvent.POST_UPDATE);
+            store(model, entity);
+        } else {
+            evict(model, pkValue(entity, model));
         }
         return updated;
     }
@@ -733,6 +764,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     public int deleteEntityRow(Object entity, EntityModel model) {
         requireMutable(model, "deleteEntityRow");
         EntityHydrator.requirePkSet(entity, model.primaryKey());
+        evict(model, pkValue(entity, model));
         LifecycleCallbacks.invoke(entity, LifecycleEvent.PRE_REMOVE);
         int deleted = SqlExecutor.executeUpdate(connection, sql.delete(model, entity));
         if (deleted > 0) {
@@ -915,6 +947,83 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
         return dialect.valueMapper().fromJdbcValue(pk, jdbcValue);
     }
 
+    private Object cacheKey(EntityModel model, Object id) {
+        Object normalized = normalizePk(model, id);
+        return normalized != null ? normalized : id;
+    }
+
+    private void store(EntityModel model, Object entity) {
+        Object id = EntityHydrator.getFieldValue(entity, model.primaryKey());
+        if (id == null || EntityHydrator.isUnsetPkValue(id, model.primaryKey())) {
+            return;
+        }
+        context.put(model.entityClass(), cacheKey(model, id), entity);
+    }
+
+    private <T> T storeLoaded(EntityModel model, T loaded) {
+        if (loaded == null) {
+            return null;
+        }
+        Object id = EntityHydrator.getFieldValue(loaded, model.primaryKey());
+        if (id == null || EntityHydrator.isUnsetPkValue(id, model.primaryKey())) {
+            return loaded;
+        }
+        Object key = cacheKey(model, id);
+        T existing = context.get(model.entityClass(), key);
+        if (existing != null) {
+            return existing;
+        }
+        context.put(model.entityClass(), key, loaded);
+        return loaded;
+    }
+
+    <T> T cachedOrStore(EntityModel model, T loaded) {
+        return storeLoaded(model, loaded);
+    }
+
+    <T> List<T> cachedOrStoreAll(EntityModel model, List<T> loaded) {
+        List<T> adopted = new ArrayList<>(loaded.size());
+        for (T row : loaded) {
+            adopted.add(storeLoaded(model, row));
+        }
+        return adopted;
+    }
+
+    private void evict(EntityModel model, Object id) {
+        if (id == null || EntityHydrator.isUnsetPkValue(id, model.primaryKey())) {
+            return;
+        }
+        context.remove(model.entityClass(), cacheKey(model, id));
+    }
+
+    @Override
+    public void clear() {
+        context.clear();
+    }
+
+    @Override
+    public void evict(Object entity) {
+        Objects.requireNonNull(entity, "entity");
+        EntityModel model = registry.get(entity.getClass());
+        evict(model, pkValue(entity, model));
+    }
+
+    @Override
+    public void evict(Class<?> entityClass, Object id) {
+        EntityModel model = registry.get(entityClass);
+        evict(model, id);
+    }
+
+    @Override
+    public void evict(Class<?> entityClass) {
+        context.evict(registry.get(entityClass).entityClass());
+    }
+
+    @Override
+    public int cachedCount() {
+        return context.size();
+    }
+
     private static void requireMutable(EntityModel model, String operation) {
         if (model.immutable()) {
             throw new MicroOrmException("Entity " + model.entityClass().getName() + " is immutable; operation is not allowed: " + operation);
@@ -927,6 +1036,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      */
     @Override
     public void close() throws SQLException {
+        context.clear();
         if (lazyContext != null) {
             lazyContext.markClosed();
         }

@@ -334,10 +334,9 @@ public final class RelationPersister {
                         persist(session, child, inProgress, inserted, deferred);
                     }
                 } else if (transientTarget) {
+                    // Assigned ids are checked once in validatePersistManyToManyTargets before the owner insert.
                     throw RelationValues.requiredTransientAssociation(
                             ownerModel.entityClass(), relation.javaField().getName());
-                } else if (!inserted.contains(child) && !session.existsByPrimaryKey(child, childModel)) {
-                    throw RelationValues.requiredTransientAssociation(ownerModel.entityClass(), relation.javaField().getName());
                 }
                 Object childPk = session.pkValue(child, childModel);
                 if (childPk == null) {

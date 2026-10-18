@@ -201,6 +201,7 @@ class RelationSelectDialectTest {
                 inserted.title = "New";
                 inserted.customer = LazyRef.toId(LazyCustomer.class, LAZY_CUSTOMER_ID);
                 session.insertRow(inserted);
+                session.evict(inserted);
                 assertEquals(LAZY_CUSTOMER_ID, session.selectRow(LazyOrder.class, inserted.id).getCustomer().get().getId());
 
                 LazyOrder toUpdate = session.selectRow(LazyOrder.class, LAZY_ORDER_ID);
@@ -235,6 +236,7 @@ class RelationSelectDialectTest {
                 orphan.title = "No customer";
                 orphan.lines = EagerCollection.empty();
                 session.insertRow(orphan);
+                session.evict(orphan);
 
                 EagerOrder loaded = session.selectRow(EagerOrder.class, orphan.id);
                 assertTrue(loaded.getCustomer().isNull());
@@ -246,6 +248,7 @@ class RelationSelectDialectTest {
                 inserted.customer = EagerRef.toId(EagerCustomer.class, EAGER_CUSTOMER_ID);
                 inserted.lines = EagerCollection.empty();
                 session.insertRow(inserted);
+                session.evict(inserted);
                 assertEquals(EAGER_CUSTOMER_ID, session.selectRow(EagerOrder.class, inserted.id).getCustomer().get().getId());
             }
         }

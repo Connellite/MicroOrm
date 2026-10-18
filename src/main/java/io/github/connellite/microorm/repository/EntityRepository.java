@@ -103,4 +103,22 @@ public interface EntityRepository<T, ID> {
 
     /** Returns zero or one row from a custom SQL query. */
     Optional<T> findOne(Query query);
+
+    /**
+     * Drops every cached instance and known id in the bound session.
+     * Useful when the repository comes from {@link io.github.connellite.microorm.session.Session#repository(Class)}.
+     */
+    void clear();
+
+    /** Drops this instance. The next read of its id goes to the database. */
+    void evict(T entity);
+
+    /** Drops the cached instance or known id of this entity type. */
+    void evictById(ID id);
+
+    /** Drops every cached instance and known id of this entity type. Other types stay. */
+    void evictAll();
+
+    /** Number of entity instances held in the bound session context. Known ids without an instance are not counted. */
+    int cachedCount();
 }

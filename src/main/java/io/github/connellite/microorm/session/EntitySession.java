@@ -47,6 +47,31 @@ public interface EntitySession {
 
     int deleteAllRows(Class<?> entityClass);
 
+    /**
+     * Drops every cached instance and known id. The next read goes to the database.
+     */
+    void clear();
+
+    /**
+     * Drops one cached instance. The next read of that id goes to the database.
+     */
+    void evict(Object entity);
+
+    /**
+     * Drops the cached instance or known id for {@code (entityClass, id)}.
+     */
+    void evict(Class<?> entityClass, Object id);
+
+    /**
+     * Drops every cached instance and known id of {@code entityClass}. Other classes stay.
+     */
+    void evict(Class<?> entityClass);
+
+    /**
+     * Number of entity instances held in the session context. Known ids without an instance are not counted.
+     */
+    int cachedCount();
+
     int execute(EntityInsert<?> insert);
 
     int execute(EntityUpdate<?> update);

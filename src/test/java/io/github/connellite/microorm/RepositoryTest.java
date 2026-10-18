@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -185,6 +186,37 @@ class RepositoryTest {
                 try (Stream<RepositoryItem> streamed = repository.streamNativeByName("tx")) {
                     assertEquals("tx", streamed.findFirst().orElseThrow().getName());
                 }
+            }
+        }
+    }
+
+    @Test
+    void sessionBoundRepositoryEvictsCachedRows() throws SQLException {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            MicroOrm orm = MicroOrm.sqlite(connection);
+            try (Session session = orm.openSession()) {
+                RepositoryItemRepository repository = session.repository(RepositoryItemRepository.class);
+                repository.createEntity();
+                RepositoryItem item = repository.insertRow(new RepositoryItem("cached"));
+
+                assertSame(item, repository.selectRow(item.getId()));
+                assertEquals(1, repository.cachedCount());
+
+                repository.evict(item);
+                RepositoryItem reloaded = repository.selectRow(item.getId());
+                assertEquals("cached", reloaded.getName());
+                assertEquals(1, repository.cachedCount());
+
+                repository.evictById(item.getId());
+                assertEquals(0, repository.cachedCount());
+
+                repository.selectRow(item.getId());
+                repository.evictAll();
+                assertEquals(0, repository.cachedCount());
+
+                repository.selectRow(item.getId());
+                repository.clear();
+                assertEquals(0, repository.cachedCount());
             }
         }
     }

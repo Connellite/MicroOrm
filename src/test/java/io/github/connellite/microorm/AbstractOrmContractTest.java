@@ -250,6 +250,7 @@ abstract class AbstractOrmContractTest {
                                         + " SET " + quote("name") + " = :name WHERE " + quote("id") + " = :id")
                         .set("name", "updated")
                         .set("id", first.getId())));
+                session.evict(first);
                 assertEquals("updated", session.selectRow(NumericWidget.class, first.getId()).getName());
             }
         }

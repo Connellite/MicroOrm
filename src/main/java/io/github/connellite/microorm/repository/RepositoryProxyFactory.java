@@ -150,6 +150,15 @@ public final class RepositoryProxyFactory {
                     case "deleteAllRows" -> session.deleteAllRows(entityType);
                     case "selectRows" -> session.selectRows(entityType);
                     case "streamRows" -> session.streamRows(entityType);
+                    case "clear" -> {
+                        session.clear();
+                        yield null;
+                    }
+                    case "evictAll" -> {
+                        session.evict(entityType);
+                        yield null;
+                    }
+                    case "cachedCount" -> session.cachedCount();
                     default -> unsupported(method);
                 };
             }
@@ -176,6 +185,14 @@ public final class RepositoryProxyFactory {
                     }
                     case "findById" -> {
                         return session.findById(entityType, arg);
+                    }
+                    case "evict" -> {
+                        session.evict(arg);
+                        return null;
+                    }
+                    case "evictById" -> {
+                        session.evict(entityType, arg);
+                        return null;
                     }
                 }
                 if ("insertRows".equals(name) && List.class.isAssignableFrom(parameters[0])) {

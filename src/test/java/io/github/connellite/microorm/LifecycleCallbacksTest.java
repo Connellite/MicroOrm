@@ -119,6 +119,7 @@ class LifecycleCallbacksTest {
                 session.insertRow(item);
                 item.setName("updated");
                 session.updateRow(item);
+                session.evict(item);
                 session.selectRow(LifecycleItem.class, item.id);
                 session.deleteRow(item);
             }

@@ -441,6 +441,7 @@ abstract class AbstractOneToOneWriteTest {
 
         try (Session session = orm.openSession()) {
             session.insertRow(user);
+            session.evict(user);
             PlainUser loaded = session.selectRow(PlainUser.class, user.id);
             assertEquals("No cascade", loaded.name);
             assertNull(loaded.profile.get());
@@ -478,6 +479,7 @@ abstract class AbstractOneToOneWriteTest {
 
         try (Session session = orm.openSession()) {
             session.insertRow(user);
+            session.evict(user);
             PlainUser loaded = session.selectRow(PlainUser.class, user.id);
             assertEquals("Assigned missing", loaded.name);
             assertNull(loaded.profile.get());
