@@ -78,7 +78,7 @@ public final class LifecycleCallbacks {
         if (method.getReturnType() != void.class) {
             throw new MicroOrmException("Lifecycle callback must return void: " + callbackName(entityClass, method, event));
         }
-        method.trySetAccessible();
+        ReflectionUtil.open(method);
     }
 
     private static String callbackName(Class<?> entityClass, Method method, LifecycleEvent event) {

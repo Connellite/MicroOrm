@@ -39,7 +39,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <extralib.version>1.4</extralib.version>
+        <extralib.version>1.5</extralib.version>
         <lombok.version>1.18.42</lombok.version>
         <junit.version>5.10.2</junit.version>
         <sqlite-jdbc.version>3.46.1.0</sqlite-jdbc.version>

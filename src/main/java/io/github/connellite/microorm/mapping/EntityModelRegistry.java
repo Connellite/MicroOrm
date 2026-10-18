@@ -129,7 +129,7 @@ public final class EntityModelRegistry {
             if (f.getAnnotation(Transient.class) != null) {
                 continue;
             }
-            f.trySetAccessible();
+            ReflectionUtil.open(f);
             if (isToOneRef(f)) {
                 addToOneRelation(entityClass, f, manyToOneRelations, oneToOneRelations);
                 continue;

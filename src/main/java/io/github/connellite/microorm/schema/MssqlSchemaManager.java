@@ -36,6 +36,9 @@ public final class MssqlSchemaManager extends AbstractSchemaManager {
         if (t == String.class) {
             return "NVARCHAR(" + (length > 0 ? length : 255) + ")";
         }
+        if (t == char.class || t == Character.class) {
+            return "NCHAR(1)";
+        }
         if (t == UUID.class) {
             UuidStorage storage = dialect.valueMapper().uuidStorage();
             if (storage == UuidStorage.MICROSOFT_GUID || storage == UuidStorage.NATIVE) {

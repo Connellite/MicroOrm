@@ -82,6 +82,9 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
         if (t == String.class) {
             return "TEXT";
         }
+        if (t == char.class || t == Character.class) {
+            return "CHAR(1)";
+        }
         if (t == java.util.UUID.class) {
             UuidStorage storage = dialect.valueMapper().uuidStorage();
             if (storage == UuidStorage.MICROSOFT_GUID) {
