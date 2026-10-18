@@ -1,14 +1,14 @@
 package io.github.connellite.microorm.query;
 
+import io.github.connellite.function.SerializableFunction;
 import io.github.connellite.microorm.sql.Query;
+import io.github.connellite.reflection.LambdaPropertyUtil;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
-import java.util.function.Function;
 
 /**
  * Fluent, named-parameter query builder for selecting mapped entities.
@@ -87,7 +87,7 @@ public final class EntitySelect<T> {
      */
     public static <T, R> FieldPath field(Getter<T, R> getter) {
         Objects.requireNonNull(getter, "getter");
-        return field(LambdaFieldResolver.fieldName(getter));
+        return field(LambdaPropertyUtil.propertyName(getter));
     }
 
     /**
@@ -145,7 +145,7 @@ public final class EntitySelect<T> {
      * Serializable getter reference used by {@link #field(Getter)}.
      */
     @FunctionalInterface
-    public interface Getter<T, R> extends Function<T, R>, Serializable {
+    public interface Getter<T, R> extends SerializableFunction<T, R> {
     }
 
     /**

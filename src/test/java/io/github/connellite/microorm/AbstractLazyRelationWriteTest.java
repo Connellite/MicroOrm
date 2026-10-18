@@ -691,6 +691,7 @@ abstract class AbstractLazyRelationWriteTest {
 
         try (Session session = orm.openSession()) {
             session.insertRow(doc);
+            session.evict(doc);
             Document loaded = session.selectRow(Document.class, doc.id);
             assertEquals("Orphaned", loaded.title);
             assertNull(loaded.folder.get());
@@ -753,6 +754,7 @@ abstract class AbstractLazyRelationWriteTest {
 
         try (Session session = orm.openSession()) {
             session.insertRow(doc);
+            session.evict(doc);
             assertNotNull(session.selectRow(Document.class, doc.id));
             assertNull(session.selectRow(Document.class, doc.id).folder.get());
             assertNull(session.selectRow(Folder.class, folder.id));

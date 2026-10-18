@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.schema;
 
+import io.github.connellite.collections.DelegatingNullSkippingCollection;
+import io.github.connellite.collections.LinkedCaseInsensitiveSet;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
@@ -11,7 +13,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Set;
+import java.util.Collection;
 
 public final class SqliteSchemaManager extends AbstractSchemaManager {
 
@@ -80,6 +82,9 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
         if (t == String.class) {
             return "TEXT";
         }
+        if (t == char.class || t == Character.class) {
+            return "CHAR(1)";
+        }
         if (t == java.util.UUID.class) {
             UuidStorage storage = dialect.valueMapper().uuidStorage();
             if (storage == UuidStorage.MICROSOFT_GUID) {
@@ -115,8 +120,8 @@ public final class SqliteSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        Set<String> columns = caseInsensitiveNullSkippingSet();
+    protected Collection<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
+        Collection<String> columns = new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         try (Statement st = connection.createStatement();
              ResultSet rs = st.executeQuery(pragmaTableInfo(model))) {
             while (rs.next()) {

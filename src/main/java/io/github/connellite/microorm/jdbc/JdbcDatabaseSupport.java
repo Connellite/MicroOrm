@@ -1,9 +1,9 @@
 package io.github.connellite.microorm.jdbc;
 
+import io.github.connellite.logger.Logger;
+import io.github.connellite.logger.LoggerFactory;
 import io.github.connellite.microorm.dialect.OracleDialect;
 import io.github.connellite.microorm.mapping.EntityModel;
-import io.github.connellite.microorm.util.Logger;
-import io.github.connellite.microorm.util.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;

@@ -1,8 +1,8 @@
 package io.github.connellite.microorm.jdbc;
 
 import io.github.connellite.exception.TypeCoercionException;
+import io.github.connellite.reflection.InstanceFactory;
 import io.github.connellite.reflection.MethodHandleReflectionUtil;
-import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
@@ -87,8 +87,8 @@ public final class EntityHydrator {
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(EntityModel model) {
         try {
-            return (T) ReflectionUtil.getInstance(model.entityClass());
-        } catch (ReflectiveOperationException e) {
+            return (T) InstanceFactory.newInstance(model.entityClass());
+        } catch (RuntimeException e) {
             throw new MicroOrmException("Cannot instantiate " + model.entityClass().getName(), e);
         }
     }
@@ -223,12 +223,7 @@ public final class EntityHydrator {
             return true;
         }
         String label = dialect == null ? identifier.text() : dialect.jdbcColumnLabel(identifier);
-        for (String column : availableColumns) {
-            if (column.equals(label) || column.equalsIgnoreCase(label)) {
-                return true;
-            }
-        }
-        return false;
+        return availableColumns.contains(label);
     }
 
     private static Object coerceToTargetPk(Object raw, EntityField targetPk, JdbcValueMapper valueMapper) {

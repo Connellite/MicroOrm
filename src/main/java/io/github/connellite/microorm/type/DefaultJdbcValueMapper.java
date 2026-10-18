@@ -3,6 +3,7 @@ package io.github.connellite.microorm.type;
 import io.github.connellite.exception.TypeCoercionException;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
+import io.github.connellite.util.StringUtils;
 import io.github.connellite.util.TypeCoercionUtil;
 import io.github.connellite.util.UuidUtil;
 
@@ -118,23 +119,10 @@ public record DefaultJdbcValueMapper(UuidStorage uuidStorage) implements JdbcVal
         if (value instanceof Instant instant) {
             return instant.toEpochMilli();
         }
-        if (value instanceof String text && !text.isBlank() && isDigits(text)) {
+        if (value instanceof String text && !text.isBlank() && StringUtils.isDigits(text)) {
             return Long.parseLong(text);
         }
         return null;
-    }
-
-    private static boolean isDigits(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (i == 0 && c == '-') {
-                continue;
-            }
-            if (c < '0' || c > '9') {
-                return false;
-            }
-        }
-        return !text.equals("-");
     }
 
     private static <T> T coerce(Object value, Class<T> targetType, EntityField field) {

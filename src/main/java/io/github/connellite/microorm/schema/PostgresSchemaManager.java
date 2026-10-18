@@ -35,6 +35,9 @@ public final class PostgresSchemaManager extends AbstractSchemaManager {
         if (t == String.class) {
             return length > 0 ? "VARCHAR(" + length + ")" : "TEXT";
         }
+        if (t == char.class || t == Character.class) {
+            return "CHAR(1)";
+        }
         if (t == UUID.class) {
             UuidStorage storage = dialect.valueMapper().uuidStorage();
             if (storage == UuidStorage.MICROSOFT_GUID) {

@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.dynamic.schema;
 
+import io.github.connellite.collections.DelegatingNullSkippingCollection;
+import io.github.connellite.collections.LinkedCaseInsensitiveSet;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
@@ -11,8 +13,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Collection;
 
 /** SQLite DDL for runtime tables. */
 public final class SqliteDynamicSchemaManager extends AbstractDynamicSchemaManager {
@@ -39,12 +40,12 @@ public final class SqliteDynamicSchemaManager extends AbstractDynamicSchemaManag
     }
 
     @Override
-    protected Set<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
-        Set<String> columns = new HashSet<>();
+    protected Collection<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
+        Collection<String> columns = new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         try (Statement st = connection.createStatement();
              ResultSet rs = st.executeQuery("PRAGMA table_info(" + dialect.sqlName(table.tableIdentifier()) + ")")) {
             while (rs.next()) {
-                columns.add(normalize(rs.getString("name")));
+                columns.add(rs.getString("name"));
             }
         }
         return columns;

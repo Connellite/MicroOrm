@@ -38,11 +38,8 @@ import io.github.connellite.microorm.type.EnumeratedOrdinalConverter;
 import io.github.connellite.microorm.type.EnumeratedStringConverter;
 import io.github.connellite.microorm.type.TemporalAttributeConverter;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -132,7 +129,7 @@ public final class EntityModelRegistry {
             if (f.getAnnotation(Transient.class) != null) {
                 continue;
             }
-            f.trySetAccessible();
+            ReflectionUtil.open(f);
             if (isToOneRef(f)) {
                 addToOneRelation(entityClass, f, manyToOneRelations, oneToOneRelations);
                 continue;
@@ -523,20 +520,15 @@ public final class EntityModelRegistry {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean isEntity(Class<?> type) {
-        return hasTypeOrPackageAnnotation(type, Entity.class);
+        return ReflectionUtil.hasClassOrPackageAnnotation(type, Entity.class);
     }
 
     private static boolean isImmutable(Class<?> type) {
-        return hasTypeOrPackageAnnotation(type, Immutable.class);
+        return ReflectionUtil.hasClassOrPackageAnnotation(type, Immutable.class);
     }
 
     private static boolean isMappedSuperclass(Class<?> type) {
-        return hasTypeOrPackageAnnotation(type, MappedSuperclass.class);
-    }
-
-    private static boolean hasTypeOrPackageAnnotation(Class<?> type, Class<? extends Annotation> annotationType) {
-        Package packageInfo = type.getPackage();
-        return type.getAnnotation(annotationType) != null || packageInfo != null && packageInfo.getAnnotation(annotationType) != null;
+        return ReflectionUtil.hasClassOrPackageAnnotation(type, MappedSuperclass.class);
     }
 
     private static void validateIdField(Class<?> entityClass, Field field, IdGeneration idGeneration, ConverterMetadata converter) {
@@ -790,7 +782,7 @@ public final class EntityModelRegistry {
             throw new MicroOrmException("Cannot instantiate converter " + convert.converter().getName()
                     + " for " + entityClass.getName() + "." + field.getName(), e);
         }
-        List<Class<?>> types = converterTypes(convert.converter());
+        List<Class<?>> types = ReflectionUtil.getGenericInterfaceParameterClasses(convert.converter(), AttributeConverter.class);
         if (types.size() < 2) {
             throw new MicroOrmException("Converter " + convert.converter().getName()
                     + " must declare AttributeConverter<Attribute, Database>");
@@ -838,31 +830,6 @@ public final class EntityModelRegistry {
         return type == java.util.Date.class || type == Calendar.class;
     }
 
-    private static List<Class<?>> converterTypes(Class<?> converterClass) {
-        for (Type genericInterface : converterClass.getGenericInterfaces()) {
-            List<Class<?>> classes = converterTypes(genericInterface);
-            if (!classes.isEmpty()) {
-                return classes;
-            }
-        }
-        Class<?> superClass = converterClass.getSuperclass();
-        return superClass == null || superClass == Object.class ? List.of() : converterTypes(superClass);
-    }
-
-    private static List<Class<?>> converterTypes(Type type) {
-        if (type instanceof ParameterizedType parameterized
-                && parameterized.getRawType() == AttributeConverter.class) {
-            return ReflectionUtil.getAllGenericParameterClasses(parameterized);
-        }
-        if (type instanceof Class<?> clazz) {
-            return converterTypes(clazz);
-        }
-        if (type instanceof ParameterizedType parameterized && parameterized.getRawType() instanceof Class<?> rawClass) {
-            return converterTypes(rawClass);
-        }
-        return List.of();
-    }
-
     private record ConverterMetadata(
             AttributeConverter<?, ?> converter,
             Class<?> attributeType,
@@ -870,15 +837,12 @@ public final class EntityModelRegistry {
     }
 
     private static List<Field> mappedFields(Class<?> entityClass) {
-        List<Class<?>> hierarchy = new ArrayList<>();
-        for (Class<?> current = entityClass; current != null && current != Object.class; current = current.getSuperclass()) {
-            if (current == entityClass || isMappedSuperclass(current)) {
-                hierarchy.add(0, current);
-            }
-        }
         List<Field> fields = new ArrayList<>();
-        for (Class<?> type : hierarchy) {
-            Collections.addAll(fields, type.getDeclaredFields());
+        for (Field field : ReflectionUtil.getAllDeclaredFields(entityClass)) {
+            Class<?> declaring = field.getDeclaringClass();
+            if (declaring == entityClass || isMappedSuperclass(declaring)) {
+                fields.add(field);
+            }
         }
         return fields;
     }

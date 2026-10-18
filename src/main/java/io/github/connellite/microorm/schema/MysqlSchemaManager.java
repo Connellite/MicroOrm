@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.schema;
 
+import io.github.connellite.collections.DelegatingNullSkippingCollection;
+import io.github.connellite.collections.LinkedCaseInsensitiveSet;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.microorm.mapping.EntityModel;
@@ -10,7 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Set;
+import java.util.Collection;
 import java.util.UUID;
 
 public final class MysqlSchemaManager extends AbstractSchemaManager {
@@ -38,6 +40,9 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
         }
         if (t == String.class) {
             return "VARCHAR(" + (length > 0 ? length : 255) + ")";
+        }
+        if (t == char.class || t == Character.class) {
+            return "CHAR(1)";
         }
         if (t == UUID.class) {
             UuidStorage storage = dialect.valueMapper().uuidStorage();
@@ -115,8 +120,8 @@ public final class MysqlSchemaManager extends AbstractSchemaManager {
     }
 
     @Override
-    protected Set<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
-        Set<String> columns = caseInsensitiveNullSkippingSet();
+    protected Collection<String> existingColumns(Connection connection, EntityModel model) throws SQLException {
+        Collection<String> columns = new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         String catalog = currentCatalog(connection, model);
         String table = model.catalogTableName(dialect);
         try (PreparedStatement ps = connection.prepareStatement("""

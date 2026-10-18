@@ -1,5 +1,7 @@
 package io.github.connellite.microorm.dynamic.schema;
 
+import io.github.connellite.collections.DelegatingNullSkippingCollection;
+import io.github.connellite.collections.LinkedCaseInsensitiveSet;
 import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
@@ -11,8 +13,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Collection;
 
 /** Oracle Database DDL for runtime tables. */
 public final class OracleDynamicSchemaManager extends AbstractDynamicSchemaManager {
@@ -22,12 +23,12 @@ public final class OracleDynamicSchemaManager extends AbstractDynamicSchemaManag
     }
 
     @Override
-    protected Set<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
+    protected Collection<String> existingColumns(Connection connection, DynamicTable table) throws SQLException {
         String tableName = dialect.catalogName(table.tableIdentifier());
         if (!tableExists(connection, tableName)) {
-            return Set.of();
+            return new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         }
-        Set<String> columns = new HashSet<>();
+        Collection<String> columns = new DelegatingNullSkippingCollection<>(new LinkedCaseInsensitiveSet());
         try (PreparedStatement ps = connection.prepareStatement("""
                 SELECT column_name
                 FROM all_tab_columns
@@ -37,7 +38,7 @@ public final class OracleDynamicSchemaManager extends AbstractDynamicSchemaManag
             ps.setString(1, tableName);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    columns.add(normalize(rs.getString("column_name")));
+                    columns.add(rs.getString("column_name"));
                 }
             }
         }

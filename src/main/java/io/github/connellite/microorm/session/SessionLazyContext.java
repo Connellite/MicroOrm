@@ -12,8 +12,8 @@ import io.github.connellite.microorm.mapping.OneToManyField;
 import io.github.connellite.microorm.mapping.OneToOneField;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.sql.SqlGenerator;
-import io.github.connellite.microorm.util.Logger;
-import io.github.connellite.microorm.util.LoggerFactory;
+import io.github.connellite.logger.Logger;
+import io.github.connellite.logger.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -83,7 +83,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 dialect.valueMapper(),
                 this,
                 registry)) {
-            return (List<T>) rows.toList();
+            return session.cachedOrStoreAll(childModel, (List<T>) rows.toList());
         }
     }
 
@@ -101,7 +101,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 dialect.valueMapper(),
                 this,
                 registry)) {
-            return (List<T>) rows.toList();
+            return session.cachedOrStoreAll(targetModel, (List<T>) rows.toList());
         }
     }
 
@@ -127,7 +127,7 @@ final class SessionLazyContext implements LazyLoadContext {
                 registry)) {
             @SuppressWarnings("unchecked")
             T found = (T) rows.findFirst().orElse(null);
-            return found;
+            return session.cachedOrStore(targetModel, found);
         }
     }
 
