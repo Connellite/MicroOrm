@@ -16,7 +16,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 /** PostgreSQL — unquoted identifiers folded to lower case; UUID stored natively. */
 public final class PostgresDialect extends AbstractDialect {
 
-    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.NATIVE);
+    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.NATIVE, this);
 
     private PostgresDialect() {
     }

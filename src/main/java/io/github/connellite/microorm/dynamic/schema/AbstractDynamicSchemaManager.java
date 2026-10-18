@@ -8,6 +8,8 @@ import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.LogicalType;
 import io.github.connellite.microorm.exception.MicroOrmException;
+import io.github.connellite.microorm.sql.SqlGenerator;
+import io.github.connellite.microorm.type.JdbcType;
 import io.github.connellite.microorm.generation.SequenceTarget;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 
@@ -112,7 +114,20 @@ public abstract class AbstractDynamicSchemaManager implements DynamicSchemaManag
         if (!column.sqlTypeOverride().isBlank()) {
             return column.sqlTypeOverride();
         }
+        if (column.jdbcType() != null) {
+            return jdbcTypeSql(column.jdbcType(), column.name());
+        }
         return baseTypeForLogical(column.type(), column.length());
+    }
+
+    private String jdbcTypeSql(JdbcType jdbcType, String columnName) {
+        String sqlType = jdbcType.sqlType(dialect);
+        if (sqlType == null || sqlType.isBlank()) {
+            throw new MicroOrmException("JdbcType " + jdbcType.getClass().getName()
+                    + " returned a blank SQL type for column '" + columnName + "'");
+        }
+        SqlGenerator.validateSqlType(sqlType, columnName);
+        return sqlType;
     }
 
     protected abstract String baseTypeForLogical(LogicalType type, int length);

@@ -7,6 +7,8 @@ import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
+import io.github.connellite.microorm.type.JdbcType;
+import io.github.connellite.microorm.type.JdbcTypes;
 import io.github.connellite.reflection.ReflectionUtil;
 
 import java.util.HashMap;
@@ -32,6 +34,7 @@ public final class Column {
     private final AttributeConverter<Object, Object> converter;
     private final Class<?> converterAttributeType;
     private final Class<?> converterDatabaseType;
+    private final JdbcType jdbcType;
 
     private Column(
             SqlIdentifier columnIdentifier,
@@ -45,7 +48,8 @@ public final class Column {
             int length,
             AttributeConverter<?, ?> converter,
             Class<?> converterAttributeType,
-            Class<?> converterDatabaseType) {
+            Class<?> converterDatabaseType,
+            JdbcType jdbcType) {
         this.columnIdentifier = columnIdentifier;
         this.type = Objects.requireNonNull(type, "type");
         this.sqlTypeOverride = sqlTypeOverride == null ? "" : sqlTypeOverride;
@@ -60,6 +64,7 @@ public final class Column {
         this.converter = typedConverter;
         this.converterAttributeType = converterAttributeType;
         this.converterDatabaseType = converterDatabaseType;
+        this.jdbcType = jdbcType;
     }
 
     /** Logical column name used as the key in insert/update/select maps. */
@@ -80,6 +85,11 @@ public final class Column {
     /** Optional explicit SQL type ({@code NVARCHAR(255)}, {@code NUMBER(10)}, etc.). */
     public String sqlTypeOverride() {
         return sqlTypeOverride;
+    }
+
+    /** {@link JdbcType} used when {@link #sqlTypeOverride()} is blank, or {@code null}. */
+    public JdbcType jdbcType() {
+        return jdbcType;
     }
 
     /** {@code true} when this column is the table primary key. */
@@ -186,6 +196,7 @@ public final class Column {
         private AttributeConverter<?, ?> converter;
         private Class<?> converterAttributeType;
         private Class<?> converterDatabaseType;
+        private JdbcType jdbcType;
 
         private Builder(String name, LogicalType type) {
             this.name = name;
@@ -294,6 +305,12 @@ public final class Column {
             return this;
         }
 
+        /** Resolves the SQL type from {@link JdbcType#sqlType} unless {@link #sqlType(String)} is set. */
+        public Builder jdbcType(Class<? extends JdbcType> jdbcType) {
+            this.jdbcType = JdbcTypes.get(jdbcType);
+            return this;
+        }
+
         /** Sets a length hint for string DDL ({@code VARCHAR(n)}). */
         public Builder length(int length) {
             this.length = length;
@@ -351,7 +368,8 @@ public final class Column {
                     length,
                     converter,
                     converterAttributeType,
-                    converterDatabaseType);
+                    converterDatabaseType,
+                    jdbcType);
         }
 
         private IdGeneration resolveIdGeneration() {

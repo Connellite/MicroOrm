@@ -12,7 +12,9 @@ import io.github.connellite.microorm.mapping.ManyToOneField;
 import io.github.connellite.microorm.mapping.TableCheck;
 import io.github.connellite.microorm.mapping.TableIndex;
 import io.github.connellite.microorm.mapping.TableUniqueConstraint;
+import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
+import io.github.connellite.microorm.type.JdbcType;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -183,7 +185,19 @@ public abstract class AbstractSchemaManager implements SchemaManager {
         if (!field.sqlType().isBlank()) {
             return field.sqlType();
         }
+        if (field.jdbcType() != null) {
+            return jdbcTypeSql(field.jdbcType(), field.javaField().getDeclaringClass().getName() + "." + field.javaField().getName());
+        }
         return baseTypeForJava(field.jdbcJavaType(), field.length());
+    }
+
+    private String jdbcTypeSql(JdbcType jdbcType, String context) {
+        String sqlType = jdbcType.sqlType(dialect);
+        if (sqlType == null || sqlType.isBlank()) {
+            throw new MicroOrmException("JdbcType " + jdbcType.getClass().getName() + " returned a blank SQL type for " + context);
+        }
+        SqlGenerator.validateSqlType(sqlType, context);
+        return sqlType;
     }
 
     protected Collection<String> existingColumns(Connection connection, EntityModel model) throws SQLException {

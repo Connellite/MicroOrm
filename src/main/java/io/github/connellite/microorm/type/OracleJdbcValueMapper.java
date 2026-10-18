@@ -1,5 +1,6 @@
 package io.github.connellite.microorm.type;
 
+import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.mapping.EntityField;
 
 import java.sql.ResultSet;
@@ -10,13 +11,23 @@ import java.sql.SQLException;
  */
 public final class OracleJdbcValueMapper implements JdbcValueMapper {
 
-    private final DefaultJdbcValueMapper delegate = new DefaultJdbcValueMapper(UuidStorage.BINARY);
+    private final Dialect dialect;
+    private final DefaultJdbcValueMapper delegate;
+
+    public OracleJdbcValueMapper() {
+        this(null);
+    }
+
+    public OracleJdbcValueMapper(Dialect dialect) {
+        this.dialect = dialect;
+        this.delegate = new DefaultJdbcValueMapper(UuidStorage.BINARY, dialect);
+    }
 
     @Override
     public Object toJdbcValue(EntityField field, Object value) {
         value = field.convertToDatabaseColumn(value);
         if (value != null && (field.jdbcJavaType() == boolean.class || field.jdbcJavaType() == Boolean.class)) {
-            return Boolean.TRUE.equals(value) ? 1 : 0;
+            return applyJdbcType(field, Boolean.TRUE.equals(value) ? 1 : 0);
         }
         return delegate.toJdbcValue(field, value, false);
     }
@@ -40,6 +51,13 @@ public final class OracleJdbcValueMapper implements JdbcValueMapper {
     @Override
     public UuidStorage uuidStorage() {
         return delegate.uuidStorage();
+    }
+
+    private Object applyJdbcType(EntityField field, Object value) {
+        if (value == null || field.jdbcType() == null) {
+            return value;
+        }
+        return field.jdbcType().toJdbc(dialect, value);
     }
 
     private static Object normalizeResultSetValue(

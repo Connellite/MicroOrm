@@ -14,11 +14,11 @@ import io.github.connellite.microorm.dynamic.Column;
 import io.github.connellite.microorm.relation.LazyLoadContext;
 import io.github.connellite.microorm.dynamic.DynamicTable;
 import io.github.connellite.microorm.dynamic.DynamicValueBinder;
-import io.github.connellite.microorm.dynamic.MapRowMapper;
 import io.github.connellite.microorm.sql.BoundStatement;
 import io.github.connellite.microorm.sql.Query;
 import io.github.connellite.logger.Logger;
 import io.github.connellite.logger.LoggerFactory;
+import io.github.connellite.microorm.type.JdbcTypedValue;
 import io.github.connellite.microorm.type.JdbcValueMapper;
 import io.github.connellite.util.TypeCoercionUtil;
 
@@ -26,7 +26,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -220,6 +219,8 @@ public final class SqlExecutor {
         for (Map.Entry<String, Object> entry : params.entrySet()) {
             if (entry.getValue() == null) {
                 nps.setNull(entry.getKey());
+            } else if (entry.getValue() instanceof JdbcTypedValue typed) {
+                nps.setObject(entry.getKey(), typed.value(), typed.sqlType());
             } else {
                 nps.setObject(entry.getKey(), entry.getValue());
             }

@@ -1,6 +1,7 @@
 package io.github.connellite.microorm.type;
 
 import io.github.connellite.exception.TypeCoercionException;
+import io.github.connellite.microorm.dialect.Dialect;
 import io.github.connellite.microorm.exception.MicroOrmException;
 import io.github.connellite.microorm.mapping.EntityField;
 import io.github.connellite.util.StringUtils;
@@ -22,7 +23,11 @@ import java.util.UUID;
 /**
  * Default {@link JdbcValueMapper} used by most dialects. UUID encoding follows {@link UuidStorage}.
  */
-public record DefaultJdbcValueMapper(UuidStorage uuidStorage) implements JdbcValueMapper {
+public record DefaultJdbcValueMapper(UuidStorage uuidStorage, Dialect dialect) implements JdbcValueMapper {
+
+    public DefaultJdbcValueMapper(UuidStorage uuidStorage) {
+        this(uuidStorage, null);
+    }
 
     @Override
     public Object toJdbcValue(EntityField field, Object value) {
@@ -38,14 +43,14 @@ public record DefaultJdbcValueMapper(UuidStorage uuidStorage) implements JdbcVal
         }
         if (field.jdbcJavaType() == UUID.class) {
             UUID uuid = coerce(value, UUID.class, field);
-            return switch (uuidStorage) {
+            value = switch (uuidStorage) {
                 case NATIVE -> uuid;
                 case BINARY -> UuidUtil.uuid2binary(uuid);
                 case MICROSOFT_GUID -> UuidUtil.uuid2MicrosoftGuidBinary(uuid);
                 case STRING -> uuid.toString();
             };
         }
-        return value;
+        return applyJdbcType(field, value);
     }
 
     @Override
@@ -68,6 +73,13 @@ public record DefaultJdbcValueMapper(UuidStorage uuidStorage) implements JdbcVal
             dbValue = coerce(value, field.jdbcJavaType(), field);
         }
         return convertAttribute ? field.convertToEntityAttribute(dbValue) : dbValue;
+    }
+
+    private Object applyJdbcType(EntityField field, Object value) {
+        if (value == null || field.jdbcType() == null) {
+            return value;
+        }
+        return field.jdbcType().toJdbc(dialect, value);
     }
 
     private static boolean isSqlTemporal(Class<?> type) {

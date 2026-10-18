@@ -16,7 +16,7 @@ import io.github.connellite.microorm.type.OracleJdbcValueMapper;
 /** Oracle Database — unquoted identifiers upper-cased; booleans mapped to NUMBER(1). */
 public final class OracleDialect extends AbstractDialect {
 
-    private final JdbcValueMapper valueMapper = new OracleJdbcValueMapper();
+    private final JdbcValueMapper valueMapper = new OracleJdbcValueMapper(this);
 
     private OracleDialect() {
     }

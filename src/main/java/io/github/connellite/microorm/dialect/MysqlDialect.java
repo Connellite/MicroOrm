@@ -15,7 +15,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 /** MySQL / MariaDB — unquoted identifiers lower-cased; UUID stored as binary. */
 public final class MysqlDialect extends AbstractDialect {
 
-    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY);
+    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY, this);
 
     private MysqlDialect() {
     }

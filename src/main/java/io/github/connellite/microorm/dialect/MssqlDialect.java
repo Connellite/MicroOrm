@@ -17,7 +17,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 /** Microsoft SQL Server — bracket-quoted identifiers; UUID stored as binary. */
 public final class MssqlDialect extends AbstractDialect {
 
-    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY);
+    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.BINARY, this);
 
     private MssqlDialect() {
     }

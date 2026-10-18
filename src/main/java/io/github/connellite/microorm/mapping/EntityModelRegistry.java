@@ -1,42 +1,15 @@
 package io.github.connellite.microorm.mapping;
 
 import io.github.connellite.collections.ConcurrentReferenceHashMap;
+import io.github.connellite.microorm.annotation.*;
+import io.github.connellite.microorm.type.*;
 import io.github.connellite.reflection.ReflectionUtil;
 import io.github.connellite.microorm.exception.MicroOrmException;
-import io.github.connellite.microorm.annotation.CascadeType;
-import io.github.connellite.microorm.annotation.Check;
-import io.github.connellite.microorm.annotation.Column;
-import io.github.connellite.microorm.annotation.ColumnDefault;
-import io.github.connellite.microorm.annotation.Comment;
-import io.github.connellite.microorm.annotation.Convert;
-import io.github.connellite.microorm.annotation.Entity;
-import io.github.connellite.microorm.annotation.Enumerated;
-import io.github.connellite.microorm.annotation.EnumType;
-import io.github.connellite.microorm.annotation.Id;
-import io.github.connellite.microorm.annotation.Immutable;
-import io.github.connellite.microorm.annotation.Index;
-import io.github.connellite.microorm.annotation.JoinColumn;
-import io.github.connellite.microorm.annotation.JoinTable;
-import io.github.connellite.microorm.annotation.ManyToMany;
-import io.github.connellite.microorm.annotation.ManyToOne;
-import io.github.connellite.microorm.annotation.MappedSuperclass;
-import io.github.connellite.microorm.annotation.OneToMany;
-import io.github.connellite.microorm.annotation.OneToOne;
-import io.github.connellite.microorm.annotation.Subselect;
-import io.github.connellite.microorm.annotation.Table;
-import io.github.connellite.microorm.annotation.Temporal;
-import io.github.connellite.microorm.annotation.TemporalType;
-import io.github.connellite.microorm.annotation.Transient;
-import io.github.connellite.microorm.annotation.UniqueConstraint;
 import io.github.connellite.microorm.relation.EntityCollection;
 import io.github.connellite.microorm.relation.EntityRef;
 import io.github.connellite.microorm.generation.IdGeneration;
 import io.github.connellite.microorm.sql.SqlGenerator;
 import io.github.connellite.microorm.sql.SqlIdentifier;
-import io.github.connellite.microorm.type.AttributeConverter;
-import io.github.connellite.microorm.type.EnumeratedOrdinalConverter;
-import io.github.connellite.microorm.type.EnumeratedStringConverter;
-import io.github.connellite.microorm.type.TemporalAttributeConverter;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -172,7 +145,8 @@ public final class EntityModelRegistry {
                         defaultAnn == null ? "" : defaultAnn.value(),
                         commentAnn == null ? "" : commentAnn.value(),
                         fieldChecks(table.text(), col.text(), f.getAnnotationsByType(Check.class)),
-                        converter);
+                        converter,
+                        jdbcType(f));
                 fields.add(pk);
             } else {
                 validateFieldType(entityClass, f, converter);
@@ -191,7 +165,8 @@ public final class EntityModelRegistry {
                         defaultAnn == null ? "" : defaultAnn.value(),
                         commentAnn == null ? "" : commentAnn.value(),
                         fieldChecks(table.text(), col.text(), f.getAnnotationsByType(Check.class)),
-                        converter));
+                        converter,
+                        jdbcType(f)));
             }
         }
         if (pk == null) {
@@ -710,7 +685,8 @@ public final class EntityModelRegistry {
             String columnDefault,
             String comment,
             List<TableCheck> checks,
-            ConverterMetadata converter) {
+            ConverterMetadata converter,
+            JdbcType jdbcType) {
         if (converter == null) {
             return EntityField.builder()
                     .javaField(field)
@@ -725,6 +701,7 @@ public final class EntityModelRegistry {
                     .columnDefault(columnDefault)
                     .comment(comment)
                     .checks(checks)
+                    .jdbcType(jdbcType)
                     .build();
         }
         return EntityField.builder()
@@ -743,7 +720,16 @@ public final class EntityModelRegistry {
                 .converter(converter.converter())
                 .converterAttributeType(converter.attributeType())
                 .converterDatabaseType(converter.databaseType())
+                .jdbcType(jdbcType)
                 .build();
+    }
+
+    private static JdbcType jdbcType(Field field) {
+        Type type = field.getAnnotation(io.github.connellite.microorm.annotation.Type.class);
+        if (type == null) {
+            return null;
+        }
+        return JdbcTypes.get(type.value());
     }
 
     private static ConverterMetadata converterMetadata(Class<?> entityClass, Field field) {

@@ -13,11 +13,12 @@ import java.util.Objects;
  */
 public final class DynamicValueBinder {
 
+    private final Dialect dialect;
     private final JdbcValueMapper mapper;
 
     /** Creates a binder that uses the given dialect's value mapper. */
     public DynamicValueBinder(Dialect dialect) {
-        Objects.requireNonNull(dialect, "dialect");
+        this.dialect = Objects.requireNonNull(dialect, "dialect");
         this.mapper = dialect.valueMapper();
     }
 
@@ -27,7 +28,11 @@ public final class DynamicValueBinder {
         if (value == null) {
             return null;
         }
-        return mapper.toJdbcValue(ValueBinderFields.field(column.type()), value);
+        Object jdbc = mapper.toJdbcValue(ValueBinderFields.field(column.type()), value);
+        if (column.jdbcType() != null) {
+            jdbc = column.jdbcType().toJdbc(dialect, jdbc);
+        }
+        return jdbc;
     }
 
     /** Converts a JDBC value read from a {@link java.sql.ResultSet} to the column's Java type. */

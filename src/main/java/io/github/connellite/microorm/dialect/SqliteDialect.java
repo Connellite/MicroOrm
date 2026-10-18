@@ -15,7 +15,7 @@ import io.github.connellite.microorm.type.UuidStorage;
 /** SQLite 3 — unquoted identifiers are case-insensitive; backticks request quoted SQL. */
 public final class SqliteDialect extends AbstractDialect {
 
-    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.STRING);
+    private final JdbcValueMapper valueMapper = new DefaultJdbcValueMapper(UuidStorage.STRING, this);
 
     private SqliteDialect() {
     }

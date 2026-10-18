@@ -10,6 +10,7 @@ import java.util.List;
 
 import io.github.connellite.microorm.sql.SqlIdentifier;
 import io.github.connellite.microorm.type.AttributeConverter;
+import io.github.connellite.microorm.type.JdbcType;
 import lombok.Builder;
 
 /** One mapped scalar column and its Java field (VarHandle-backed access). */
@@ -31,6 +32,7 @@ public final class EntityField {
     private final AttributeConverter<Object, Object> converter;
     private final Class<?> converterAttributeType;
     private final Class<?> converterDatabaseType;
+    private final JdbcType jdbcType;
 
     public EntityField(Field javaField, String columnName, boolean id, boolean autoIncrement, boolean nullable) {
         this(javaField, SqlIdentifier.unquoted(columnName), id, autoIncrement, nullable, false, false, "", 0);
@@ -69,7 +71,8 @@ public final class EntityField {
             List<TableCheck> checks,
             AttributeConverter<?, ?> converter,
             Class<?> converterAttributeType,
-            Class<?> converterDatabaseType) {
+            Class<?> converterDatabaseType,
+            JdbcType jdbcType) {
         this.javaField = javaField;
         this.columnIdentifier = columnIdentifier;
         this.id = id;
@@ -87,6 +90,7 @@ public final class EntityField {
         this.converter = typedConverter;
         this.converterAttributeType = converterAttributeType;
         this.converterDatabaseType = converterDatabaseType;
+        this.jdbcType = jdbcType;
         try {
             this.varHandle = MethodHandleReflectionUtil.varHandle(javaField);
         } catch (IllegalAccessException e) {
@@ -119,6 +123,7 @@ public final class EntityField {
         this.converter = null;
         this.converterAttributeType = null;
         this.converterDatabaseType = null;
+        this.jdbcType = null;
         try {
             this.varHandle = MethodHandleReflectionUtil.varHandle(javaField);
         } catch (IllegalAccessException e) {
@@ -231,5 +236,10 @@ public final class EntityField {
     /** Converts a database-side Java value to its entity attribute value. */
     public Object convertToEntityAttribute(Object value) {
         return converter == null ? value : converter.convertToEntityAttribute(value);
+    }
+
+    /** {@link io.github.connellite.microorm.annotation.Type} strategy, or {@code null}. */
+    public JdbcType jdbcType() {
+        return jdbcType;
     }
 }
