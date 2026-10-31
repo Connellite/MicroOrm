@@ -116,12 +116,12 @@ class LifecycleCallbacksTest {
                 session.createEntity(LifecycleItem.class);
 
                 LifecycleItem item = new LifecycleItem("new");
-                session.insertRow(item);
+                session.insert(item);
                 item.setName("updated");
-                session.updateRow(item);
+                session.update(item);
                 session.evict(item);
-                session.selectRow(LifecycleItem.class, item.id);
-                session.deleteRow(item);
+                session.select(LifecycleItem.class, item.id);
+                session.delete(item);
             }
         }
 

@@ -131,11 +131,11 @@ class RepositoryTest {
             RepositoryItemRepository repository = orm.repository(RepositoryItemRepository.class);
 
             repository.createEntity();
-            RepositoryItem inserted = repository.insertRow(new RepositoryItem("first"));
+            RepositoryItem inserted = repository.insert(new RepositoryItem("first"));
 
             assertTrue(inserted.getId() > 0);
             assertTrue(repository.existsById(inserted.getId()));
-            assertEquals("first", repository.selectRow(inserted.getId()).getName());
+            assertEquals("first", repository.select(inserted.getId()).getName());
             assertEquals("first", repository.findById(inserted.getId()).orElseThrow().getName());
             assertEquals("first", repository.findByName("first").orElseThrow().getName());
             assertEquals("first", repository.findNativeByName("first").orElseThrow().getName());
@@ -161,25 +161,25 @@ class RepositoryTest {
                 repository.createEntity();
 
                 session.beginTransaction();
-                repository.insertRow(new RepositoryItem("tx"));
+                repository.insert(new RepositoryItem("tx"));
                 session.commitTransaction();
 
-                List<RepositoryItem> rows = repository.selectRows();
+                List<RepositoryItem> rows = repository.selectAll();
                 assertEquals(1, rows.size());
                 assertNotNull(rows.get(0));
                 assertEquals("tx", rows.get(0).getName());
 
-                try (Stream<RepositoryItem> streamed = repository.streamRows()) {
+                try (Stream<RepositoryItem> streamed = repository.stream()) {
                     assertEquals(List.of("tx"), streamed.map(RepositoryItem::getName).toList());
                 }
-                try (Stream<RepositoryItem> streamed = repository.streamRows(Map.of("name", "tx"))) {
+                try (Stream<RepositoryItem> streamed = repository.stream(Map.of("name", "tx"))) {
                     assertEquals("tx", streamed.findFirst().orElseThrow().getName());
                 }
-                try (Stream<RepositoryItem> streamed = repository.streamRows(EntitySelect.of(RepositoryItem.class)
+                try (Stream<RepositoryItem> streamed = repository.stream(EntitySelect.of(RepositoryItem.class)
                         .where(EntitySelect.field(RepositoryItem::getName).eq("tx")))) {
                     assertEquals(1, streamed.count());
                 }
-                try (Stream<RepositoryItem> streamed = repository.streamRows(Query.of(
+                try (Stream<RepositoryItem> streamed = repository.stream(Query.of(
                         "SELECT id, name FROM repository_items WHERE name = :name").set("name", "tx"))) {
                     assertEquals("tx", streamed.findFirst().orElseThrow().getName());
                 }
@@ -197,24 +197,24 @@ class RepositoryTest {
             try (Session session = orm.openSession()) {
                 RepositoryItemRepository repository = session.repository(RepositoryItemRepository.class);
                 repository.createEntity();
-                RepositoryItem item = repository.insertRow(new RepositoryItem("cached"));
+                RepositoryItem item = repository.insert(new RepositoryItem("cached"));
 
-                assertSame(item, repository.selectRow(item.getId()));
+                assertSame(item, repository.select(item.getId()));
                 assertEquals(1, repository.cachedCount());
 
                 repository.evict(item);
-                RepositoryItem reloaded = repository.selectRow(item.getId());
+                RepositoryItem reloaded = repository.select(item.getId());
                 assertEquals("cached", reloaded.getName());
                 assertEquals(1, repository.cachedCount());
 
                 repository.evictById(item.getId());
                 assertEquals(0, repository.cachedCount());
 
-                repository.selectRow(item.getId());
+                repository.select(item.getId());
                 repository.evictAll();
                 assertEquals(0, repository.cachedCount());
 
-                repository.selectRow(item.getId());
+                repository.select(item.getId());
                 repository.clear();
                 assertEquals(0, repository.cachedCount());
             }
@@ -229,9 +229,9 @@ class RepositoryTest {
             MicroOrm orm = dialect.createOrm(connection);
             RepositoryItemRepository repository = orm.repository(RepositoryItemRepository.class);
             repository.createEntity();
-            repository.insertRow(new RepositoryItem("streamed"));
+            repository.insert(new RepositoryItem("streamed"));
 
-            try (Stream<RepositoryItem> streamed = repository.streamRows()) {
+            try (Stream<RepositoryItem> streamed = repository.stream()) {
                 assertEquals(List.of("streamed"), streamed.map(RepositoryItem::getName).toList());
             }
             try (Stream<RepositoryItem> streamed = repository.streamNativeByName("streamed")) {
@@ -249,9 +249,9 @@ class RepositoryTest {
             IndirectRepositoryItemRepository repository = orm.repository(IndirectRepositoryItemRepository.class);
 
             repository.createEntity();
-            RepositoryItem inserted = repository.insertRow(new RepositoryItem("indirect"));
+            RepositoryItem inserted = repository.insert(new RepositoryItem("indirect"));
 
-            assertEquals("indirect", repository.selectRow(inserted.getId()).getName());
+            assertEquals("indirect", repository.select(inserted.getId()).getName());
         }
     }
 
@@ -273,7 +273,7 @@ class RepositoryTest {
 
             repository.renameByProcedure(inserted.getId(), "renamed_proc");
 
-            assertEquals("renamed_proc", repository.selectRow(inserted.getId()).getName());
+            assertEquals("renamed_proc", repository.select(inserted.getId()).getName());
         }
     }
 

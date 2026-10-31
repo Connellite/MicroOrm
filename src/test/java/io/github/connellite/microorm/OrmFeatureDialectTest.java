@@ -133,19 +133,19 @@ class OrmFeatureDialectTest {
             MicroOrm orm = dialect.createOrm(connection).register(FeatureWidget.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(FeatureWidget.class);
-                session.insertRows(List.of(widget("a"), widget("b"), widget("b"), widget("c")));
+                session.insertAll(List.of(widget("a"), widget("b"), widget("b"), widget("c")));
 
                 EntitySelect<FeatureWidget> query = EntitySelect.of(FeatureWidget.class)
                         .where(EntitySelect.field("name").in(List.of("b", "c")))
                         .orderBy(EntitySelect.field("name").desc())
                         .limit(2);
 
-                List<FeatureWidget> selected = session.selectRows(query);
+                List<FeatureWidget> selected = session.select(query);
                 assertEquals(2, selected.size());
                 assertEquals("c", selected.get(0).getName());
                 assertEquals("b", selected.get(1).getName());
 
-                try (var rows = session.streamRows(query)) {
+                try (var rows = session.stream(query)) {
                     assertEquals(2, rows.count());
                 }
             }
@@ -161,12 +161,12 @@ class OrmFeatureDialectTest {
             UUID id;
             try (Session session = orm.openSession()) {
                 session.createEntity(FeatureWidget.class);
-                FeatureWidget saved = session.insertRow(widget("kept"));
+                FeatureWidget saved = session.insert(widget("kept"));
                 id = saved.getId();
 
                 session.syncEntity(FeatureWidgetWithDescription.class);
 
-                FeatureWidgetWithDescription loaded = session.selectRow(FeatureWidgetWithDescription.class, id);
+                FeatureWidgetWithDescription loaded = session.select(FeatureWidgetWithDescription.class, id);
                 assertNotNull(loaded);
                 assertEquals(id, loaded.getId());
                 assertEquals("kept", loaded.getName());
@@ -184,14 +184,14 @@ class OrmFeatureDialectTest {
             try (Session session = orm.openSession()) {
                 session.createEntity(AssignedNumericWidget.class);
 
-                AssignedNumericWidget saved = session.insertRow(new AssignedNumericWidget(42, "answer"));
+                AssignedNumericWidget saved = session.insert(new AssignedNumericWidget(42, "answer"));
                 assertEquals(42, saved.getId());
-                assertEquals("answer", session.selectRow(AssignedNumericWidget.class, 42).getName());
+                assertEquals("answer", session.select(AssignedNumericWidget.class, 42).getName());
 
-                assertEquals(2, session.insertRows(List.of(
+                assertEquals(2, session.insertAll(List.of(
                         new AssignedNumericWidget(43, "next"),
                         new AssignedNumericWidget(44, "last")), 1));
-                assertEquals(3, session.selectRows(AssignedNumericWidget.class).size());
+                assertEquals(3, session.selectAll(AssignedNumericWidget.class).size());
             }
         }
     }
@@ -204,9 +204,9 @@ class OrmFeatureDialectTest {
             MicroOrm orm = dialect.createOrm(connection).register(InheritedWidget.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(InheritedWidget.class);
-                session.insertRow(new InheritedWidget(7, "base", "child"));
+                session.insert(new InheritedWidget(7, "base", "child"));
 
-                InheritedWidget loaded = session.selectRow(InheritedWidget.class, 7);
+                InheritedWidget loaded = session.select(InheritedWidget.class, 7);
 
                 assertEquals(7, loaded.getId());
                 assertEquals("base", loaded.getInheritedName());

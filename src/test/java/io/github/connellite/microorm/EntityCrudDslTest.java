@@ -144,9 +144,9 @@ class EntityCrudDslTest {
 
                 assertEquals(1, session.execute(EntityDelete.from(CrudItem.class)
                         .where(EntitySelect.field(CrudItem::getName).eq("renamed"))));
-                assertEquals(1, session.selectRows(CrudItem.class).size());
+                assertEquals(1, session.selectAll(CrudItem.class).size());
                 assertEquals(1, session.execute(EntityDelete.from(CrudItem.class).allRows()));
-                assertEquals(List.of(), session.selectRows(CrudItem.class));
+                assertEquals(List.of(), session.selectAll(CrudItem.class));
             }
         }
     }

@@ -173,15 +173,15 @@ abstract class AbstractManyToManyWriteTest {
         author.books = LazyCollection.of(List.of(first, second));
 
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         try (Session session = orm.openSession()) {
-            Author loaded = session.selectRow(Author.class, author.id);
+            Author loaded = session.select(Author.class, author.id);
             assertEquals("Ada", loaded.name);
             assertEquals(List.of("Notes", "Sketch"),
                     loaded.books.get().stream().map(book -> book.title).sorted().toList());
-            Book loadedBook = session.selectRow(Book.class, first.id);
+            Book loadedBook = session.select(Book.class, first.id);
             assertEquals(1, loadedBook.authors.get().size());
             assertEquals(author.id, loadedBook.authors.get().get(0).id);
         }
@@ -200,12 +200,12 @@ abstract class AbstractManyToManyWriteTest {
         author.books = LazyCollection.of(List.of(book));
 
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals(bookId, session.selectRow(Author.class, authorId).books.get().get(0).id);
-            assertEquals(authorId, session.selectRow(Book.class, bookId).authors.get().get(0).id);
+            assertEquals(bookId, session.select(Author.class, authorId).books.get().get(0).id);
+            assertEquals(authorId, session.select(Book.class, bookId).authors.get().get(0).id);
         }
     }
 
@@ -215,7 +215,7 @@ abstract class AbstractManyToManyWriteTest {
         book.id = UUID.fromString("33333333-3333-4333-8333-333333333333");
         book.title = "Standalone";
         try (Session session = orm.openSession()) {
-            session.insertRow(book);
+            session.insert(book);
         }
 
         Author author = new Author();
@@ -223,12 +223,12 @@ abstract class AbstractManyToManyWriteTest {
         author.name = "Linker";
         author.books = LazyCollection.of(List.of(book));
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals(1, session.selectRow(Author.class, author.id).books.get().size());
-            assertEquals("Standalone", session.selectRow(Author.class, author.id).books.get().get(0).title);
+            assertEquals(1, session.select(Author.class, author.id).books.get().size());
+            assertEquals("Standalone", session.select(Author.class, author.id).books.get().get(0).title);
         }
     }
 
@@ -238,7 +238,7 @@ abstract class AbstractManyToManyWriteTest {
         author.id = UUID.fromString("55555555-5555-4555-8555-555555555555");
         author.name = "Inverse";
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
         Book book = new Book();
         book.id = UUID.fromString("66666666-6666-4666-8666-666666666666");
@@ -246,14 +246,14 @@ abstract class AbstractManyToManyWriteTest {
         book.authors = LazyCollection.of(List.of(author));
 
         try (Session session = orm.openSession()) {
-            session.insertRow(book);
+            session.insert(book);
         }
 
         try (Session session = orm.openSession()) {
-            assertNotNull(session.selectRow(Book.class, book.id));
-            assertNotNull(session.selectRow(Author.class, author.id));
-            assertEquals(0, session.selectRow(Book.class, book.id).authors.get().size());
-            assertEquals(0, session.selectRow(Author.class, author.id).books.get().size());
+            assertNotNull(session.select(Book.class, book.id));
+            assertNotNull(session.select(Author.class, author.id));
+            assertEquals(0, session.select(Book.class, book.id).authors.get().size());
+            assertEquals(0, session.select(Author.class, author.id).books.get().size());
         }
     }
 
@@ -265,21 +265,21 @@ abstract class AbstractManyToManyWriteTest {
         oldBook.title = "Draft";
         author.books = LazyCollection.of(List.of(oldBook));
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         Book newBook = new Book();
         newBook.title = "Final";
         author.books = LazyCollection.of(List.of(newBook));
         try (Session session = orm.openSession()) {
-            session.updateRow(author);
+            session.update(author);
         }
 
         try (Session session = orm.openSession()) {
-            List<Book> books = session.selectRow(Author.class, author.id).books.get();
+            List<Book> books = session.select(Author.class, author.id).books.get();
             assertEquals(1, books.size());
             assertEquals("Final", books.get(0).title);
-            assertNotNull(session.selectRow(Book.class, oldBook.id));
+            assertNotNull(session.select(Book.class, oldBook.id));
         }
     }
 
@@ -291,14 +291,14 @@ abstract class AbstractManyToManyWriteTest {
         book.title = "Keep";
         author.books = LazyCollection.of(List.of(book));
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         try (Session session = orm.openSession()) {
-            session.deleteRow(author);
-            assertNull(session.selectRow(Author.class, author.id));
-            assertNotNull(session.selectRow(Book.class, book.id));
-            assertEquals(0, session.selectRow(Book.class, book.id).authors.get().size());
+            session.delete(author);
+            assertNull(session.select(Author.class, author.id));
+            assertNotNull(session.select(Book.class, book.id));
+            assertEquals(0, session.select(Book.class, book.id).authors.get().size());
         }
     }
 
@@ -310,13 +310,13 @@ abstract class AbstractManyToManyWriteTest {
         book.title = "Gone";
         author.books = LazyCollection.of(List.of(book));
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         try (Session session = orm.openSession()) {
-            session.deleteRow(author);
-            assertNull(session.selectRow(RemoveAuthor.class, author.id));
-            assertNull(session.selectRow(RemoveBook.class, book.id));
+            session.delete(author);
+            assertNull(session.select(RemoveAuthor.class, author.id));
+            assertNull(session.select(RemoveBook.class, book.id));
         }
     }
 
@@ -332,9 +332,9 @@ abstract class AbstractManyToManyWriteTest {
         try (Session session = orm.openSession()) {
             var error = assertThrows(
                     io.github.connellite.microorm.exception.MicroOrmException.class,
-                    () -> session.insertRow(author));
+                    () -> session.insert(author));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(PlainAuthor.class, author.id));
+            assertNull(session.select(PlainAuthor.class, author.id));
         }
     }
 
@@ -351,10 +351,10 @@ abstract class AbstractManyToManyWriteTest {
         try (Session session = orm.openSession()) {
             var error = assertThrows(
                     io.github.connellite.microorm.exception.MicroOrmException.class,
-                    () -> session.insertRow(author));
+                    () -> session.insert(author));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(PlainAuthor.class, author.id));
-            assertNull(session.selectRow(Book.class, book.id));
+            assertNull(session.select(PlainAuthor.class, author.id));
+            assertNull(session.select(Book.class, book.id));
         }
     }
 
@@ -366,11 +366,11 @@ abstract class AbstractManyToManyWriteTest {
         book.title = "Queryable";
         author.books = LazyCollection.of(List.of(book));
         try (Session session = orm.openSession()) {
-            session.insertRow(author);
+            session.insert(author);
         }
 
         try (Session session = orm.openSession()) {
-            List<Author> found = session.selectRows(EntitySelect.of(Author.class)
+            List<Author> found = session.select(EntitySelect.of(Author.class)
                     .join("books")
                     .where(EntitySelect.field("books.title").eq("Queryable")));
             assertEquals(1, found.size());

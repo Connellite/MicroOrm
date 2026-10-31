@@ -47,9 +47,9 @@ try (Connection connection = DriverManager.getConnection("jdbc:sqlite:app.db")) 
 
         User user = new User();
         user.setName("Ada");
-        session.insertRow(user);
+        session.insert(user);
 
-        User loaded = session.selectRow(User.class, user.getId());
+        User loaded = session.select(User.class, user.getId());
         return loaded;
     });
 }
@@ -115,7 +115,7 @@ public class User {
 
 User user = new User();
 user.setUserId("ada");
-session.insertRow(user);
+session.insert(user);
 ```
 
 `null` and blank values are treated as unset and are rejected on insert, update, and delete.
@@ -131,7 +131,7 @@ EntitySelect<User> query = EntitySelect.of(User.class)
         .orderBy(EntitySelect.field("name").asc())
         .limit(20);
 
-List<User> users = session.selectRows(query);
+List<User> users = session.select(query);
 ```
 
 Join a relation and filter on joined fields with dotted paths:
@@ -142,7 +142,7 @@ EntitySelect<Order> query = EntitySelect.of(Order.class)
         .where(EntitySelect.field("customer.name").eq("Acme"))
         .orderBy(EntitySelect.field("title").desc());
 
-List<Order> orders = session.selectRows(query);
+List<Order> orders = session.select(query);
 ```
 
 Supported join types: inner (default), left, right, full, and cross. For database-specific SQL or projections, use `Query` instead.
@@ -164,7 +164,7 @@ session.execute(EntityDelete.from(User.class)
         .where(EntitySelect.field(User::isEnabled).eq(false)));
 ```
 
-`UPDATE` and `DELETE` require `where(...)` by default. Use `allRows()` when a bulk mutation is intentional. For generated IDs and relation graph persistence, keep using `insertRow`, `updateRow`, and `deleteRow`.
+`UPDATE` and `DELETE` require `where(...)` by default. Use `allRows()` when a bulk mutation is intentional. For generated IDs and relation graph persistence, keep using `insert`, `update`, and `delete`.
 
 ## Relations
 
@@ -249,7 +249,7 @@ public class Profile {
 - **`@ManyToMany`** — owning side writes the join table (`@JoinTable` or generated `{ownerTable}_{targetTable}`); inverse side uses `mappedBy` and does not insert join rows
 - **Existing references** — `LazyRef.toId(...)` or `LazyRef.to(alreadyPersisted)` write the FK only and do not update the target unless that association cascades `MERGE`
 
-`insertRow` is persist, `updateRow` is merge, `deleteRow` is remove.
+`insert` is persist, `update` is merge, `delete` is remove.
 
 Persist order follows Hibernate: many-to-one parents are saved first, then the row, then collections. Required (`optional=false` / `JoinColumn.nullable=false`) FKs to a transient target fail like Hibernate `TransientPropertyValueException`. Optional/nullable many-to-one to an unsaved target is nullified (`ForeignKeys.Nullifier`) instead of throwing. Cyclic nullable FKs are written in a second update after both rows exist.
 

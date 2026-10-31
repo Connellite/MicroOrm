@@ -49,16 +49,16 @@ class EntityMappingAnnotationTest {
             createReadOnlyTable(connection);
             MicroOrm orm = dialect.createOrm(connection).register(ReadOnlyItem.class);
             try (Session session = orm.openSession()) {
-                List<ReadOnlyItem> rows = session.selectRows(ReadOnlyItem.class);
+                List<ReadOnlyItem> rows = session.selectAll(ReadOnlyItem.class);
 
                 assertEquals(1, rows.size());
                 assertEquals("locked", rows.get(0).name);
                 ReadOnlyItem entity = rows.get(0);
                 assertThrows(MicroOrmException.class, () -> session.createEntity(ReadOnlyItem.class));
-                assertThrows(MicroOrmException.class, () -> session.insertRow(entity));
-                assertThrows(MicroOrmException.class, () -> session.updateRow(entity));
-                assertThrows(MicroOrmException.class, () -> session.deleteRow(entity));
-                assertThrows(MicroOrmException.class, () -> session.deleteAllRows(ReadOnlyItem.class));
+                assertThrows(MicroOrmException.class, () -> session.insert(entity));
+                assertThrows(MicroOrmException.class, () -> session.update(entity));
+                assertThrows(MicroOrmException.class, () -> session.delete(entity));
+                assertThrows(MicroOrmException.class, () -> session.deleteAll(ReadOnlyItem.class));
             }
         }
     }
@@ -71,12 +71,12 @@ class EntityMappingAnnotationTest {
             createSourceTable(connection);
             MicroOrm orm = dialect.createOrm(connection).register(ActiveItem.class);
             try (Session session = orm.openSession()) {
-                List<ActiveItem> rows = session.selectRows(ActiveItem.class);
+                List<ActiveItem> rows = session.selectAll(ActiveItem.class);
 
                 assertEquals(1, rows.size());
                 assertEquals("active", rows.get(0).name);
                 assertThrows(MicroOrmException.class, () -> session.createEntity(ActiveItem.class));
-                assertThrows(MicroOrmException.class, () -> session.insertRow(rows.get(0)));
+                assertThrows(MicroOrmException.class, () -> session.insert(rows.get(0)));
                 assertThrows(MicroOrmException.class, () -> session.deleteById(ActiveItem.class, rows.get(0).id));
             }
         }

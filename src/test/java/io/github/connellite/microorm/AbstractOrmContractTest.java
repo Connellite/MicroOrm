@@ -141,26 +141,26 @@ abstract class AbstractOrmContractTest {
                 session.createEntity(UuidWidget.class);
                 assertUuidStorage(connection);
 
-                UuidWidget generated = session.insertRow(UuidWidget.of("generated", true));
+                UuidWidget generated = session.insert(UuidWidget.of("generated", true));
                 assertNotNull(generated.getId());
 
                 UUID explicitId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
                 UuidWidget explicit = UuidWidget.of("explicit", false);
                 explicit.id = explicitId;
-                session.insertRow(explicit);
+                session.insert(explicit);
 
-                UuidWidget loaded = session.selectRow(UuidWidget.class, generated.getId());
+                UuidWidget loaded = session.select(UuidWidget.class, generated.getId());
                 assertEquals("generated", loaded.getName());
                 assertTrue(loaded.isEnabled());
 
                 loaded.setName("renamed");
-                assertEquals(1, session.updateRow(loaded));
-                assertEquals("renamed", session.selectRow(UuidWidget.class, generated.getId()).getName());
-                assertEquals("explicit", session.selectRow(UuidWidget.class, explicitId).getName());
+                assertEquals(1, session.update(loaded));
+                assertEquals("renamed", session.select(UuidWidget.class, generated.getId()).getName());
+                assertEquals("explicit", session.select(UuidWidget.class, explicitId).getName());
 
                 assertTrue(session.existsById(UuidWidget.class, generated.getId()));
-                assertEquals(1, session.selectRows(UuidWidget.class, Map.of("name", "explicit")).size());
-                try (var rows = session.streamRows(UuidWidget.class, Map.of("name", "explicit"))) {
+                assertEquals(1, session.select(UuidWidget.class, Map.of("name", "explicit")).size());
+                try (var rows = session.stream(UuidWidget.class, Map.of("name", "explicit"))) {
                     assertEquals(1, rows.count());
                 }
 
@@ -168,23 +168,23 @@ abstract class AbstractOrmContractTest {
                                 + " FROM " + quote("contract_uuid_widgets")
                                 + " WHERE " + quote("name") + " IN (:names)")
                         .setCollection("names", List.of("renamed", "explicit"));
-                assertEquals(2, session.selectRows(UuidWidget.class, byNames).size());
+                assertEquals(2, session.select(UuidWidget.class, byNames).size());
 
                 session.syncEntity(UuidWidgetWithDescription.class);
-                UuidWidgetWithDescription afterSync = session.selectRow(UuidWidgetWithDescription.class, generated.getId());
+                UuidWidgetWithDescription afterSync = session.select(UuidWidgetWithDescription.class, generated.getId());
                 assertEquals("renamed", afterSync.getName());
                 assertNull(afterSync.getDescription());
 
                 assertEquals(1, session.deleteById(UuidWidget.class, explicitId));
-                assertNull(session.selectRow(UuidWidget.class, explicitId));
+                assertNull(session.select(UuidWidget.class, explicitId));
 
-                UuidWidget toDelete = session.selectRow(UuidWidget.class, generated.getId());
-                assertEquals(1, session.deleteRow(toDelete));
-                assertNull(session.selectRow(UuidWidget.class, generated.getId()));
+                UuidWidget toDelete = session.select(UuidWidget.class, generated.getId());
+                assertEquals(1, session.delete(toDelete));
+                assertNull(session.select(UuidWidget.class, generated.getId()));
 
-                UuidWidget remaining = session.insertRow(UuidWidget.of("bulk-delete", true));
-                assertEquals(1, session.deleteAllRows(UuidWidget.class));
-                assertNull(session.selectRow(UuidWidget.class, remaining.getId()));
+                UuidWidget remaining = session.insert(UuidWidget.of("bulk-delete", true));
+                assertEquals(1, session.deleteAll(UuidWidget.class));
+                assertNull(session.select(UuidWidget.class, remaining.getId()));
             }
         }
     }
@@ -196,30 +196,30 @@ abstract class AbstractOrmContractTest {
             try (Session session = orm.openSession()) {
                 session.createEntity(UuidWidget.class);
 
-                UuidWidget first = session.insertRow(UuidWidget.of("alpha", true));
-                UuidWidget second = session.insertRow(UuidWidget.of("beta", false));
-                assertEquals(2, session.selectRows(UuidWidget.class).size());
+                UuidWidget first = session.insert(UuidWidget.of("alpha", true));
+                UuidWidget second = session.insert(UuidWidget.of("beta", false));
+                assertEquals(2, session.selectAll(UuidWidget.class).size());
 
                 session.createEntity(UuidWidget.class);
-                assertEquals(2, session.selectRows(UuidWidget.class).size());
-                assertEquals("alpha", session.selectRow(UuidWidget.class, first.getId()).getName());
-                assertEquals("beta", session.selectRow(UuidWidget.class, second.getId()).getName());
+                assertEquals(2, session.selectAll(UuidWidget.class).size());
+                assertEquals("alpha", session.select(UuidWidget.class, first.getId()).getName());
+                assertEquals("beta", session.select(UuidWidget.class, second.getId()).getName());
 
                 session.updateEntity(UuidWidget.class);
-                assertEquals(2, session.selectRows(UuidWidget.class).size());
-                assertEquals("alpha", session.selectRow(UuidWidget.class, first.getId()).getName());
+                assertEquals(2, session.selectAll(UuidWidget.class).size());
+                assertEquals("alpha", session.select(UuidWidget.class, first.getId()).getName());
 
                 session.updateEntity(UuidWidgetWithDescription.class);
-                assertEquals(2, session.selectRows(UuidWidgetWithDescription.class).size());
-                UuidWidgetWithDescription afterSync = session.selectRow(UuidWidgetWithDescription.class, first.getId());
+                assertEquals(2, session.selectAll(UuidWidgetWithDescription.class).size());
+                UuidWidgetWithDescription afterSync = session.select(UuidWidgetWithDescription.class, first.getId());
                 assertEquals("alpha", afterSync.getName());
                 assertTrue(afterSync.isEnabled());
                 assertNull(afterSync.getDescription());
 
                 session.createEntity(UuidWidgetWithDescription.class);
                 session.updateEntity(UuidWidgetWithDescription.class);
-                assertEquals(2, session.selectRows(UuidWidgetWithDescription.class).size());
-                assertEquals("beta", session.selectRow(UuidWidgetWithDescription.class, second.getId()).getName());
+                assertEquals(2, session.selectAll(UuidWidgetWithDescription.class).size());
+                assertEquals("beta", session.select(UuidWidgetWithDescription.class, second.getId()).getName());
             }
         }
     }
@@ -232,18 +232,18 @@ abstract class AbstractOrmContractTest {
                 session.dropEntity(NumericWidget.class);
                 session.createEntity(NumericWidget.class);
 
-                NumericWidget first = session.insertRow(NumericWidget.of("first"));
+                NumericWidget first = session.insert(NumericWidget.of("first"));
                 assertTrue(first.getId() > 0);
-                assertEquals("first", session.selectRow(NumericWidget.class, first.getId()).getName());
+                assertEquals("first", session.select(NumericWidget.class, first.getId()).getName());
 
                 List<NumericWidget> batch = List.of(
                         NumericWidget.of("a"),
                         NumericWidget.of("b"),
                         NumericWidget.of("c"));
-                assertEquals(3, session.insertRows(batch, 2));
+                assertEquals(3, session.insertAll(batch, 2));
                 assertTrue(batch.get(0).getId() > 0);
                 assertTrue(batch.get(1).getId() > batch.get(0).getId());
-                assertEquals(4, session.selectRows(NumericWidget.class).size());
+                assertEquals(4, session.selectAll(NumericWidget.class).size());
 
                 assertEquals(1, session.execute(Query.of(
                                 "UPDATE " + quote("contract_numeric_widgets")
@@ -251,7 +251,7 @@ abstract class AbstractOrmContractTest {
                         .set("name", "updated")
                         .set("id", first.getId())));
                 session.evict(first);
-                assertEquals("updated", session.selectRow(NumericWidget.class, first.getId()).getName());
+                assertEquals("updated", session.select(NumericWidget.class, first.getId()).getName());
             }
         }
     }

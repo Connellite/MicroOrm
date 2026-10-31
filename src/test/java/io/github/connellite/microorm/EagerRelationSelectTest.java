@@ -153,7 +153,7 @@ class EagerRelationSelectTest {
     void eagerRelationsAreAvailableAfterSessionClosed() throws SQLException {
         Order order;
         try (Session session = orm.openSession()) {
-            order = session.selectRow(Order.class, ORDER_ID);
+            order = session.select(Order.class, ORDER_ID);
             assertNotNull(order);
             assertTrue(order.getCustomer().isLoaded());
             assertTrue(order.getLines().isLoaded());
@@ -172,7 +172,7 @@ class EagerRelationSelectTest {
                     INSERT INTO eager_orders (id, title, customer_id) VALUES (:id, :title, NULL)
                     """).set("id", orphanOrderId).set("title", "No customer"));
 
-            Order order = session.selectRow(Order.class, orphanOrderId);
+            Order order = session.select(Order.class, orphanOrderId);
             assertNotNull(order);
             assertTrue(order.getCustomer().isNull());
             assertNull(order.getCustomer().get());
@@ -180,7 +180,7 @@ class EagerRelationSelectTest {
     }
 
     @Test
-    void insertRowWithEagerRefPersistsForeignKey() throws SQLException {
+    void insertWithEagerRefPersistsForeignKey() throws SQLException {
         Order order = new Order();
         order.id = UUID.randomUUID();
         order.title = "New";
@@ -188,9 +188,9 @@ class EagerRelationSelectTest {
         order.lines = EagerCollection.empty();
 
         try (Session session = orm.openSession()) {
-            session.insertRow(order);
+            session.insert(order);
             session.evict(order);
-            Order loaded = session.selectRow(Order.class, order.id);
+            Order loaded = session.select(Order.class, order.id);
             assertEquals("New", loaded.getTitle());
             assertEquals(CUSTOMER_ID, loaded.getCustomer().get().getId());
         }

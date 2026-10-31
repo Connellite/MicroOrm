@@ -80,7 +80,7 @@ class JsonTypeTest {
                 JsonDoc doc = new JsonDoc();
                 doc.id = id;
                 doc.payload = "{\"a\":1}";
-                session.insertRow(doc);
+                session.insert(doc);
             }
             try (Statement statement = connection.createStatement();
                  ResultSet types = statement.executeQuery(
@@ -89,7 +89,7 @@ class JsonTypeTest {
                 assertEquals("TEXT", types.getString(1));
             }
             try (Session session = orm.openSession()) {
-                assertEquals("{\"a\":1}", session.selectRow(JsonDoc.class, id).payload);
+                assertEquals("{\"a\":1}", session.select(JsonDoc.class, id).payload);
             }
         }
     }

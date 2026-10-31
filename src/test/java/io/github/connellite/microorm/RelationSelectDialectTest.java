@@ -177,20 +177,20 @@ class RelationSelectDialectTest {
             seedLazyGraph(orm);
 
             try (Session session = orm.openSession()) {
-                LazyOrder order = session.selectRow(LazyOrder.class, LAZY_ORDER_ID);
+                LazyOrder order = session.select(LazyOrder.class, LAZY_ORDER_ID);
                 assertNotNull(order);
                 assertFalse(order.getCustomer().isLoaded());
                 assertEquals(LAZY_CUSTOMER_ID, order.getCustomer().get().getId());
                 assertTrue(order.getCustomer().isLoaded());
                 assertEquals(List.of("GADGET", "WIDGET"), order.getLines().get().stream().map(LazyItem::getSku).sorted().toList());
 
-                List<LazyOrder> byCustomer = session.selectRows(EntitySelect.of(LazyOrder.class)
+                List<LazyOrder> byCustomer = session.select(EntitySelect.of(LazyOrder.class)
                         .join("customer")
                         .where(EntitySelect.field("customer.name").eq("Acme")));
                 assertEquals(1, byCustomer.size());
                 assertEquals(LAZY_ORDER_ID, byCustomer.get(0).getId());
 
-                List<LazyOrder> byLine = session.selectRows(EntitySelect.of(LazyOrder.class)
+                List<LazyOrder> byLine = session.select(EntitySelect.of(LazyOrder.class)
                         .leftJoin("lines")
                         .where(EntitySelect.field("lines.sku").in(List.of("WIDGET", "GADGET"))));
                 assertEquals(1, byLine.size());
@@ -200,14 +200,14 @@ class RelationSelectDialectTest {
                 inserted.id = UUID.randomUUID();
                 inserted.title = "New";
                 inserted.customer = LazyRef.toId(LazyCustomer.class, LAZY_CUSTOMER_ID);
-                session.insertRow(inserted);
+                session.insert(inserted);
                 session.evict(inserted);
-                assertEquals(LAZY_CUSTOMER_ID, session.selectRow(LazyOrder.class, inserted.id).getCustomer().get().getId());
+                assertEquals(LAZY_CUSTOMER_ID, session.select(LazyOrder.class, inserted.id).getCustomer().get().getId());
 
-                LazyOrder toUpdate = session.selectRow(LazyOrder.class, LAZY_ORDER_ID);
+                LazyOrder toUpdate = session.select(LazyOrder.class, LAZY_ORDER_ID);
                 toUpdate.title = "Updated title";
-                session.updateRow(toUpdate);
-                assertEquals("Updated title", session.selectRow(LazyOrder.class, LAZY_ORDER_ID).getTitle());
+                session.update(toUpdate);
+                assertEquals("Updated title", session.select(LazyOrder.class, LAZY_ORDER_ID).getTitle());
             }
         }
     }
@@ -221,7 +221,7 @@ class RelationSelectDialectTest {
 
             EagerOrder order;
             try (Session session = orm.openSession()) {
-                order = session.selectRow(EagerOrder.class, EAGER_ORDER_ID);
+                order = session.select(EagerOrder.class, EAGER_ORDER_ID);
                 assertNotNull(order);
                 assertTrue(order.getCustomer().isLoaded());
                 assertTrue(order.getLines().isLoaded());
@@ -235,10 +235,10 @@ class RelationSelectDialectTest {
                 orphan.id = UUID.randomUUID();
                 orphan.title = "No customer";
                 orphan.lines = EagerCollection.empty();
-                session.insertRow(orphan);
+                session.insert(orphan);
                 session.evict(orphan);
 
-                EagerOrder loaded = session.selectRow(EagerOrder.class, orphan.id);
+                EagerOrder loaded = session.select(EagerOrder.class, orphan.id);
                 assertTrue(loaded.getCustomer().isNull());
                 assertNull(loaded.getCustomer().get());
 
@@ -247,9 +247,9 @@ class RelationSelectDialectTest {
                 inserted.title = "New";
                 inserted.customer = EagerRef.toId(EagerCustomer.class, EAGER_CUSTOMER_ID);
                 inserted.lines = EagerCollection.empty();
-                session.insertRow(inserted);
+                session.insert(inserted);
                 session.evict(inserted);
-                assertEquals(EAGER_CUSTOMER_ID, session.selectRow(EagerOrder.class, inserted.id).getCustomer().get().getId());
+                assertEquals(EAGER_CUSTOMER_ID, session.select(EagerOrder.class, inserted.id).getCustomer().get().getId());
             }
         }
     }
@@ -296,10 +296,10 @@ class RelationSelectDialectTest {
         gadget.order = LazyRef.toId(LazyOrder.class, LAZY_ORDER_ID);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(customer);
-            session.insertRow(order);
-            session.insertRow(widget);
-            session.insertRow(gadget);
+            session.insert(customer);
+            session.insert(order);
+            session.insert(widget);
+            session.insert(gadget);
         }
     }
 
@@ -325,10 +325,10 @@ class RelationSelectDialectTest {
         gadget.order = LazyRef.toId(EagerOrder.class, EAGER_ORDER_ID);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(customer);
-            session.insertRow(order);
-            session.insertRow(widget);
-            session.insertRow(gadget);
+            session.insert(customer);
+            session.insert(order);
+            session.insert(widget);
+            session.insert(gadget);
         }
     }
 

@@ -163,7 +163,7 @@ class LazyRelationSelectTest {
     @Test
     void manyToOneLoadsOnFirstGet() throws SQLException {
         try (Session session = orm.openSession()) {
-            Order order = session.selectRow(Order.class, ORDER_ID);
+            Order order = session.select(Order.class, ORDER_ID);
             assertNotNull(order);
             assertFalse(order.getCustomer().isLoaded());
 
@@ -178,7 +178,7 @@ class LazyRelationSelectTest {
     @Test
     void oneToManyLoadsOnFirstGet() throws SQLException {
         try (Session session = orm.openSession()) {
-            Order order = session.selectRow(Order.class, ORDER_ID);
+            Order order = session.select(Order.class, ORDER_ID);
             assertNotNull(order);
             assertFalse(order.getLines().isLoaded());
 
@@ -197,7 +197,7 @@ class LazyRelationSelectTest {
                     INSERT INTO lazy_orders (id, title, customer_id) VALUES (:id, :title, NULL)
                     """).set("id", orphanOrderId).set("title", "No customer"));
 
-            Order order = session.selectRow(Order.class, orphanOrderId);
+            Order order = session.select(Order.class, orphanOrderId);
             assertNotNull(order);
             assertFalse(order.getCustomer().isSet());
             assertNull(order.getCustomer().get());
@@ -209,7 +209,7 @@ class LazyRelationSelectTest {
     void lazyGetFailsAfterSessionClosed() throws SQLException {
         LazyRef<Customer> customerRef;
         try (Session session = orm.openSession()) {
-            Order order = session.selectRow(Order.class, ORDER_ID);
+            Order order = session.select(Order.class, ORDER_ID);
             customerRef = order.getCustomer();
         }
         MicroOrmException ex = assertThrows(MicroOrmException.class, customerRef::get);
@@ -217,16 +217,16 @@ class LazyRelationSelectTest {
     }
 
     @Test
-    void insertRowWithRelationsPersistsGraph() throws SQLException {
+    void insertWithRelationsPersistsGraph() throws SQLException {
         Order order = new Order();
         order.id = UUID.randomUUID();
         order.title = "New";
         order.customer = LazyRef.toId(Customer.class, CUSTOMER_ID);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(order);
+            session.insert(order);
             session.evict(order);
-            Order loaded = session.selectRow(Order.class, order.id);
+            Order loaded = session.select(Order.class, order.id);
             assertEquals("New", loaded.getTitle());
             assertEquals(CUSTOMER_ID, loaded.getCustomer().get().getId());
         }
@@ -239,7 +239,7 @@ class LazyRelationSelectTest {
                     .join("customer")
                     .where(EntitySelect.field("customer.name").eq("Acme"));
 
-            List<Order> rows = session.selectRows(query);
+            List<Order> rows = session.select(query);
 
             assertEquals(1, rows.size());
             assertEquals(ORDER_ID, rows.get(0).getId());
@@ -253,7 +253,7 @@ class LazyRelationSelectTest {
                     .leftJoin("lines")
                     .where(EntitySelect.field("lines.sku").in(List.of("WIDGET", "GADGET")));
 
-            List<Order> rows = session.selectRows(query);
+            List<Order> rows = session.select(query);
 
             assertEquals(1, rows.size());
             assertEquals(ORDER_ID, rows.get(0).getId());
@@ -261,12 +261,12 @@ class LazyRelationSelectTest {
     }
 
     @Test
-    void updateRowWithRelationsUpdatesScalarsAndFk() throws SQLException {
+    void updateWithRelationsUpdatesScalarsAndFk() throws SQLException {
         try (Session session = orm.openSession()) {
-            Order order = session.selectRow(Order.class, ORDER_ID);
+            Order order = session.select(Order.class, ORDER_ID);
             order.title = "Updated title";
-            session.updateRow(order);
-            Order loaded = session.selectRow(Order.class, ORDER_ID);
+            session.update(order);
+            Order loaded = session.select(Order.class, ORDER_ID);
             assertEquals("Updated title", loaded.getTitle());
         }
     }

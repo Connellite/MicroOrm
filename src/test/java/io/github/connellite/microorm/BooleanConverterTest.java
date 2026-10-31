@@ -87,7 +87,7 @@ class BooleanConverterTest {
                 flags.trueFalse = true;
                 flags.yesNo = false;
                 flags.numeric = true;
-                session.insertRow(flags);
+                session.insert(flags);
 
                 try (Statement statement = connection.createStatement();
                      ResultSet rs = statement.executeQuery(
@@ -98,7 +98,7 @@ class BooleanConverterTest {
                     assertEquals(1, rs.getInt(3));
                 }
 
-                BooleanFlags loaded = session.selectRow(BooleanFlags.class, flags.id);
+                BooleanFlags loaded = session.select(BooleanFlags.class, flags.id);
                 assertEquals(true, loaded.trueFalse);
                 assertEquals(false, loaded.yesNo);
                 assertEquals(true, loaded.numeric);

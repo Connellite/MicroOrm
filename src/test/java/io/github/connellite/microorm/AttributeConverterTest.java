@@ -94,11 +94,11 @@ class AttributeConverterTest {
 
                 ConvertedOrder order = new ConvertedOrder();
                 order.total = new Money("USD", new BigDecimal("12.34"));
-                session.insertRow(order);
+                session.insert(order);
 
                 assertEquals("USD:12.34", rawTotal(connection));
 
-                ConvertedOrder loaded = session.selectRow(ConvertedOrder.class, order.id);
+                ConvertedOrder loaded = session.select(ConvertedOrder.class, order.id);
                 assertEquals(new Money("USD", new BigDecimal("12.34")), loaded.total);
 
                 Optional<ConvertedOrder> byConvertedCriterion = session.findOne(EntitySelect.of(ConvertedOrder.class)

@@ -219,11 +219,11 @@ abstract class AbstractLazyRelationWriteTest {
         b.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             assertNotNull(loaded);
             assertEquals("Invoice", loaded.getTitle());
             assertEquals(2, loaded.getFiles().get().size());
@@ -257,15 +257,15 @@ abstract class AbstractLazyRelationWriteTest {
         b.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, documentId);
+            Document loaded = session.select(Document.class, documentId);
             assertEquals(documentId, loaded.getId());
             assertEquals(2, loaded.getFiles().get().size());
-            assertEquals(fileAId, session.selectRow(StoredFile.class, fileAId).getId());
-            assertEquals(fileBId, session.selectRow(StoredFile.class, fileBId).getId());
+            assertEquals(fileAId, session.select(StoredFile.class, fileAId).getId());
+            assertEquals(fileBId, session.select(StoredFile.class, fileBId).getId());
         }
     }
 
@@ -283,11 +283,11 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(file);
+            session.insert(file);
         }
 
         try (Session session = orm.openSession()) {
-            StoredFile loaded = session.selectRow(StoredFile.class, fileId);
+            StoredFile loaded = session.select(StoredFile.class, fileId);
             assertEquals(fileId, loaded.getId());
             assertEquals(documentId, loaded.getDocument().get().getId());
             assertEquals("Migrated contract", loaded.getDocument().get().getTitle());
@@ -304,7 +304,7 @@ abstract class AbstractLazyRelationWriteTest {
         doc.title = "Already stored";
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         StoredFile file = new StoredFile();
@@ -313,11 +313,11 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(file);
+            session.insert(file);
         }
 
         try (Session session = orm.openSession()) {
-            StoredFile loaded = session.selectRow(StoredFile.class, fileId);
+            StoredFile loaded = session.select(StoredFile.class, fileId);
             assertEquals(documentId, loaded.getDocument().get().getId());
         }
     }
@@ -331,11 +331,11 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(file);
+            session.insert(file);
         }
 
         try (Session session = orm.openSession()) {
-            StoredFile loaded = session.selectRow(StoredFile.class, file.id);
+            StoredFile loaded = session.select(StoredFile.class, file.id);
             assertNotNull(loaded);
             assertEquals("signed.pdf", loaded.getName());
             assertEquals("Contract", loaded.getDocument().get().getTitle());
@@ -352,7 +352,7 @@ abstract class AbstractLazyRelationWriteTest {
         oldFile.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         StoredFile newFile = new StoredFile();
@@ -361,11 +361,11 @@ abstract class AbstractLazyRelationWriteTest {
         newFile.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.updateRow(doc);
+            session.update(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             List<StoredFile> files = loaded.getFiles().get();
             assertEquals(1, files.size());
             assertEquals("new.txt", files.get(0).getName());
@@ -382,13 +382,13 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            session.deleteRow(doc);
-            assertNull(session.selectRow(Document.class, doc.id));
-            assertNull(session.selectRow(StoredFile.class, file.id));
+            session.delete(doc);
+            assertNull(session.select(Document.class, doc.id));
+            assertNull(session.select(StoredFile.class, file.id));
         }
     }
 
@@ -402,11 +402,11 @@ abstract class AbstractLazyRelationWriteTest {
         head.files = LazyCollection.of(List.of(file));
 
         try (Session session = orm.openSession()) {
-            session.insertRow(head);
+            session.insert(head);
         }
 
         try (Session session = orm.openSession()) {
-            DocHead loaded = session.selectRow(DocHead.class, head.id);
+            DocHead loaded = session.select(DocHead.class, head.id);
             assertNotNull(loaded);
             assertNotNull(loaded.primaryFile.get());
             assertEquals("cover", loaded.primaryFile.get().label);
@@ -430,11 +430,11 @@ abstract class AbstractLazyRelationWriteTest {
         head.files = LazyCollection.of(List.of(file));
 
         try (Session session = orm.openSession()) {
-            session.insertRow(head);
+            session.insert(head);
         }
 
         try (Session session = orm.openSession()) {
-            DocHead loaded = session.selectRow(DocHead.class, headId);
+            DocHead loaded = session.select(DocHead.class, headId);
             assertEquals(fileId, loaded.primaryFile.get().id);
             assertEquals(headId, loaded.files.get().get(0).head.get().id);
         }
@@ -458,15 +458,15 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Folder loadedFolder = session.selectRow(Folder.class, folder.id);
+            Folder loadedFolder = session.select(Folder.class, folder.id);
             assertEquals("Inbox", loadedFolder.name);
             assertEquals(folderCountBefore, loadedFolder.itemCount);
             assertEquals(1, loadedFolder.documents.get().size());
-            Document loadedDoc = session.selectRow(Document.class, doc.id);
+            Document loadedDoc = session.select(Document.class, doc.id);
             assertEquals(folder.id, loadedDoc.folder.get().id);
             assertEquals("scan.pdf", loadedDoc.files.get().get(0).name);
         }
@@ -482,14 +482,14 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.toId(Folder.class, folder.id);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Folder loadedFolder = session.selectRow(Folder.class, folder.id);
+            Folder loadedFolder = session.select(Folder.class, folder.id);
             assertEquals("Archive", loadedFolder.name);
             assertEquals(5, loadedFolder.itemCount);
-            Document loadedDoc = session.selectRow(Document.class, doc.id);
+            Document loadedDoc = session.select(Document.class, doc.id);
             assertEquals(folder.id, loadedDoc.folder.get().id);
         }
     }
@@ -504,18 +504,18 @@ abstract class AbstractLazyRelationWriteTest {
         doc.title = "Note";
         doc.folder = LazyRef.toId(Folder.class, inbox.id);
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         doc.folder = LazyRef.toId(Folder.class, archive.id);
         try (Session session = orm.openSession()) {
-            session.updateRow(doc);
+            session.update(doc);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals(archive.id, session.selectRow(Document.class, doc.id).folder.get().id);
-            assertEquals("Inbox", session.selectRow(Folder.class, inbox.id).name);
-            assertEquals("Archive", session.selectRow(Folder.class, archive.id).name);
+            assertEquals(archive.id, session.select(Document.class, doc.id).folder.get().id);
+            assertEquals("Inbox", session.select(Folder.class, inbox.id).name);
+            assertEquals("Archive", session.select(Folder.class, archive.id).name);
         }
     }
 
@@ -527,19 +527,19 @@ abstract class AbstractLazyRelationWriteTest {
         doc.title = "Loose note";
         doc.folder = LazyRef.toId(Folder.class, folder.id);
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         doc.folder = null;
         try (Session session = orm.openSession()) {
-            session.updateRow(doc);
+            session.update(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             assertTrue(loaded.folder.isNull());
             assertNull(loaded.folder.get());
-            assertEquals("Inbox", session.selectRow(Folder.class, folder.id).name);
+            assertEquals("Inbox", session.select(Folder.class, folder.id).name);
         }
     }
 
@@ -553,16 +553,16 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.toId(Folder.class, folder.id);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
-            Folder toUpdate = session.selectRow(Folder.class, folder.id);
+            session.insert(doc);
+            Folder toUpdate = session.select(Folder.class, folder.id);
             toUpdate.itemCount = toUpdate.itemCount + 1;
-            session.updateRow(toUpdate);
+            session.update(toUpdate);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals(2, session.selectRow(Folder.class, folder.id).itemCount);
-            assertEquals("Projects", session.selectRow(Folder.class, folder.id).name);
-            assertEquals(folder.id, session.selectRow(Document.class, doc.id).folder.get().id);
+            assertEquals(2, session.select(Folder.class, folder.id).itemCount);
+            assertEquals("Projects", session.select(Folder.class, folder.id).name);
+            assertEquals(folder.id, session.select(Document.class, doc.id).folder.get().id);
         }
     }
 
@@ -579,20 +579,20 @@ abstract class AbstractLazyRelationWriteTest {
         doc.files = LazyCollection.of(List.of(file));
         file.document = LazyRef.to(doc);
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             StoredFile loadedFile = loaded.getFiles().get().get(0);
             loadedFile.name = "v2.pdf";
-            session.updateRow(loadedFile);
+            session.update(loadedFile);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals("v2.pdf", session.selectRow(StoredFile.class, file.id).name);
-            assertEquals("Report", session.selectRow(Document.class, doc.id).title);
-            Folder loadedFolder = session.selectRow(Folder.class, folder.id);
+            assertEquals("v2.pdf", session.select(StoredFile.class, file.id).name);
+            assertEquals("Report", session.select(Document.class, doc.id).title);
+            Folder loadedFolder = session.select(Folder.class, folder.id);
             assertEquals("Shared", loadedFolder.name);
             assertEquals(1, loadedFolder.itemCount);
         }
@@ -607,17 +607,17 @@ abstract class AbstractLazyRelationWriteTest {
         doc.files = LazyCollection.of(List.of(file));
         file.document = LazyRef.to(doc);
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             loaded.title = "Final";
-            session.updateRow(loaded);
+            session.update(loaded);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             assertEquals("Final", loaded.title);
             assertEquals(1, loaded.getFiles().get().size());
             assertEquals("keep.pdf", loaded.getFiles().get().get(0).name);
@@ -633,18 +633,18 @@ abstract class AbstractLazyRelationWriteTest {
         doc.files = LazyCollection.of(List.of(file));
         file.document = LazyRef.to(doc);
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             loaded.getFiles().get();
             loaded.title = "Bundle v2";
-            session.updateRow(loaded);
+            session.update(loaded);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             assertEquals("Bundle v2", loaded.title);
             assertEquals(1, loaded.getFiles().get().size());
             assertEquals("page.pdf", loaded.getFiles().get().get(0).name);
@@ -660,19 +660,19 @@ abstract class AbstractLazyRelationWriteTest {
         doc.files = LazyCollection.of(List.of(file));
         file.document = LazyRef.to(doc);
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             StoredFile loadedFile = loaded.getFiles().get().get(0);
             loaded.title = "Signed contract";
             loadedFile.name = "signed.pdf";
-            session.updateRow(loaded);
+            session.update(loaded);
         }
 
         try (Session session = orm.openSession()) {
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             assertEquals("Signed contract", loaded.title);
             assertEquals("signed.pdf", loaded.getFiles().get().get(0).name);
         }
@@ -690,9 +690,9 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.to(folder);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
             session.evict(doc);
-            Document loaded = session.selectRow(Document.class, doc.id);
+            Document loaded = session.select(Document.class, doc.id);
             assertEquals("Orphaned", loaded.title);
             assertNull(loaded.folder.get());
             assertNull(folder.id);
@@ -711,9 +711,9 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.to(folder);
 
         try (Session session = orm.openSession()) {
-            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insertRow(doc));
+            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insert(doc));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(RequiredDocument.class, doc.id));
+            assertNull(session.select(RequiredDocument.class, doc.id));
         }
     }
 
@@ -730,13 +730,13 @@ abstract class AbstractLazyRelationWriteTest {
         folder.documents = LazyCollection.of(List.of(doc));
 
         try (Session session = orm.openSession()) {
-            session.insertRow(folder);
+            session.insert(folder);
         }
 
         try (Session session = orm.openSession()) {
-            assertNotNull(session.selectRow(Folder.class, folder.id));
-            assertNull(session.selectRow(Document.class, doc.id));
-            assertEquals(0, session.selectRow(Folder.class, folder.id).documents.get().size());
+            assertNotNull(session.select(Folder.class, folder.id));
+            assertNull(session.select(Document.class, doc.id));
+            assertEquals(0, session.select(Folder.class, folder.id).documents.get().size());
         }
     }
 
@@ -753,11 +753,11 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.to(folder);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(doc);
+            session.insert(doc);
             session.evict(doc);
-            assertNotNull(session.selectRow(Document.class, doc.id));
-            assertNull(session.selectRow(Document.class, doc.id).folder.get());
-            assertNull(session.selectRow(Folder.class, folder.id));
+            assertNotNull(session.select(Document.class, doc.id));
+            assertNull(session.select(Document.class, doc.id).folder.get());
+            assertNull(session.select(Folder.class, folder.id));
         }
     }
 
@@ -774,9 +774,9 @@ abstract class AbstractLazyRelationWriteTest {
         doc.folder = LazyRef.to(folder);
 
         try (Session session = orm.openSession()) {
-            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insertRow(doc));
+            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insert(doc));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(RequiredDocument.class, doc.id));
+            assertNull(session.select(RequiredDocument.class, doc.id));
         }
     }
 
@@ -791,7 +791,7 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(doc);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(file);
+            session.insert(file);
         }
 
         Document missing = new Document();
@@ -800,10 +800,10 @@ abstract class AbstractLazyRelationWriteTest {
         file.document = LazyRef.to(missing);
 
         try (Session session = orm.openSession()) {
-            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.updateRow(file));
+            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.update(file));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(Document.class, missing.id));
-            assertEquals(doc.id, session.selectRow(StoredFile.class, file.id).document.get().id);
+            assertNull(session.select(Document.class, missing.id));
+            assertEquals(doc.id, session.select(StoredFile.class, file.id).document.get().id);
         }
     }
 
@@ -813,7 +813,7 @@ abstract class AbstractLazyRelationWriteTest {
         folder.name = name;
         folder.itemCount = itemCount;
         try (Session session = orm.openSession()) {
-            session.insertRow(folder);
+            session.insert(folder);
         }
         return folder;
     }

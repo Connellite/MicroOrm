@@ -103,15 +103,15 @@ class EntityContextSessionTest {
             Item item = new Item();
             item.id = id;
             item.name = "one";
-            session.insertRow(item);
+            session.insert(item);
 
             selectSql.clear();
-            assertSame(item, session.selectRow(Item.class, id));
+            assertSame(item, session.select(Item.class, id));
             assertEquals(0, selectSql.size());
 
             session.clear();
-            Item first = session.selectRow(Item.class, id);
-            Item second = session.selectRow(Item.class, id);
+            Item first = session.select(Item.class, id);
+            Item second = session.select(Item.class, id);
             assertSame(first, second);
             assertEquals(1, selectSql.size());
             assertEquals(1, session.cachedCount());
@@ -125,23 +125,23 @@ class EntityContextSessionTest {
             Item item = new Item();
             item.id = id;
             item.name = "before";
-            session.insertRow(item);
-            session.selectRow(Item.class, id);
+            session.insert(item);
+            session.select(Item.class, id);
 
             item.name = "after";
-            session.updateRow(item);
+            session.update(item);
             selectSql.clear();
-            assertSame(item, session.selectRow(Item.class, id));
+            assertSame(item, session.select(Item.class, id));
             assertEquals(0, selectSql.size());
 
             session.evict(item);
-            Item reloaded = session.selectRow(Item.class, id);
+            Item reloaded = session.select(Item.class, id);
             assertEquals("after", reloaded.name);
             assertEquals(1, selectSql.size());
 
-            session.deleteRow(reloaded);
+            session.delete(reloaded);
             assertEquals(0, session.cachedCount());
-            assertNull(session.selectRow(Item.class, id));
+            assertNull(session.select(Item.class, id));
             assertEquals(2, selectSql.size());
         }
     }
@@ -153,19 +153,19 @@ class EntityContextSessionTest {
             Folder folder = new Folder();
             folder.id = folderId;
             folder.name = "inbox";
-            session.insertRow(folder);
+            session.insert(folder);
 
             selectSql.clear();
-            session.insertRow(document("44444444-4444-4444-8444-444444444444", folder));
-            session.insertRow(document("55555555-5555-4555-8555-555555555555", folder));
+            session.insert(document("44444444-4444-4444-8444-444444444444", folder));
+            session.insert(document("55555555-5555-4555-8555-555555555555", folder));
             assertEquals(0, selectsOn("l1_folders"));
 
-            Document loaded = session.selectRow(Document.class, UUID.fromString("44444444-4444-4444-8444-444444444444"));
+            Document loaded = session.select(Document.class, UUID.fromString("44444444-4444-4444-8444-444444444444"));
             assertSame(folder, loaded.folders.get().get(0));
-            assertSame(folder, session.selectRow(Folder.class, folderId));
+            assertSame(folder, session.select(Folder.class, folderId));
 
             session.evict(loaded);
-            assertSame(folder, session.selectRow(Folder.class, folderId));
+            assertSame(folder, session.select(Folder.class, folderId));
             int folderSelects = selectsOn("l1_folders");
             assertTrue(session.existsById(Folder.class, folderId));
             assertEquals(folderSelects, selectsOn("l1_folders"));
@@ -179,7 +179,7 @@ class EntityContextSessionTest {
             Folder folder = new Folder();
             folder.id = folderId;
             folder.name = "archive";
-            setup.insertRow(folder);
+            setup.insert(folder);
         }
 
         try (Session session = orm.openSession()) {
@@ -187,15 +187,15 @@ class EntityContextSessionTest {
             detached.id = folderId;
             detached.name = "not the cached name";
             selectSql.clear();
-            session.insertRow(document("77777777-7777-4777-8777-777777777771", detached));
+            session.insert(document("77777777-7777-4777-8777-777777777771", detached));
             assertEquals(1, selectsOn("l1_folders"));
-            session.insertRow(document("77777777-7777-4777-8777-777777777772", detached));
+            session.insert(document("77777777-7777-4777-8777-777777777772", detached));
             assertEquals(1, selectsOn("l1_folders"));
 
-            Folder loaded = session.selectRow(Folder.class, folderId);
+            Folder loaded = session.select(Folder.class, folderId);
             assertEquals("archive", loaded.name);
             session.evict(Document.class);
-            Document first = session.selectRow(Document.class, UUID.fromString("77777777-7777-4777-8777-777777777771"));
+            Document first = session.select(Document.class, UUID.fromString("77777777-7777-4777-8777-777777777771"));
             assertSame(loaded, first.folders.get().get(0));
         }
     }
@@ -207,13 +207,13 @@ class EntityContextSessionTest {
             Item item = new Item();
             item.id = id;
             item.name = "cached";
-            session.insertRow(item);
-            assertSame(item, session.selectRow(Item.class, id));
+            session.insert(item);
+            assertSame(item, session.select(Item.class, id));
 
             session.clear();
             assertEquals(0, session.cachedCount());
             selectSql.clear();
-            Item reloaded = session.selectRow(Item.class, id);
+            Item reloaded = session.select(Item.class, id);
             assertEquals("cached", reloaded.name);
             assertEquals(1, selectSql.size());
         }
@@ -226,10 +226,10 @@ class EntityContextSessionTest {
                 Item item = new Item();
                 item.id = UUID.randomUUID();
                 item.name = "row-" + i;
-                session.insertRow(item);
+                session.insert(item);
             }
             session.clear();
-            try (var rows = session.streamRows(Item.class)) {
+            try (var rows = session.stream(Item.class)) {
                 assertEquals(5, rows.toList().size());
             }
             assertEquals(0, session.cachedCount());
@@ -243,9 +243,9 @@ class EntityContextSessionTest {
             missing.id = UUID.fromString("99999999-9999-4999-8999-999999999999");
             missing.name = "gone";
             Document document = document("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", missing);
-            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insertRow(document));
+            MicroOrmException error = assertThrows(MicroOrmException.class, () -> session.insert(document));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(Document.class, document.id));
+            assertNull(session.select(Document.class, document.id));
         }
     }
 

@@ -95,7 +95,7 @@ class OracleOrmContractTest extends AbstractOrmContractTest {
 
             MicroOrm orm = createOrm(connection).register(OracleTemporalRow.class);
             try (Session session = orm.openSession()) {
-                OracleTemporalRow row = session.selectRow(OracleTemporalRow.class, 1L);
+                OracleTemporalRow row = session.select(OracleTemporalRow.class, 1L);
 
                 assertEquals(1L, row.id);
                 assertEquals(expected, row.createdAt);

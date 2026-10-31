@@ -104,14 +104,14 @@ class MssqlOrmContractTest extends AbstractOrmContractTest {
                         new EntityModelRegistry()).register(PrecreatedGuidWidget.class);
 
                 try (Session session = orm.openSession()) {
-                    PrecreatedGuidWidget loaded = session.selectRow(PrecreatedGuidWidget.class, externalId);
+                    PrecreatedGuidWidget loaded = session.select(PrecreatedGuidWidget.class, externalId);
                     assertNotNull(loaded);
                     assertEquals("external", loaded.name);
 
                     PrecreatedGuidWidget inserted = new PrecreatedGuidWidget();
                     inserted.id = UUID.fromString("11111111-2222-3333-4444-555555555555");
                     inserted.name = "orm";
-                    session.insertRow(inserted);
+                    session.insert(inserted);
 
                     try (PreparedStatement ps = connection.prepareStatement(
                             "SELECT id FROM mssql_precreated_guid_widgets WHERE name = ?")) {

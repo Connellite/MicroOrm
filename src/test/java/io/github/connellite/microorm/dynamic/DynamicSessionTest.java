@@ -392,7 +392,7 @@ class DynamicSessionTest {
             entitySession.createEntity(Sidecar.class);
 
             assertTrue(dynamicSession.tableExists("mart"));
-            assertEquals(0, entitySession.selectRows(Sidecar.class).size());
+            assertEquals(0, entitySession.selectAll(Sidecar.class).size());
             }
         }
     }

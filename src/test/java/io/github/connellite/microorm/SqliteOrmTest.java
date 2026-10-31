@@ -286,27 +286,27 @@ class SqliteOrmTest {
 
                 Widget w = new Widget();
                 w.setName("hello");
-                s.insertRow(w);
+                s.insert(w);
                 assertNotNull(w.getId());
 
-                Widget loaded = s.selectRow(Widget.class, w.getId());
+                Widget loaded = s.select(Widget.class, w.getId());
                 assertNotNull(loaded);
                 assertEquals("hello", loaded.getName());
 
                 loaded.setName("world");
-                assertEquals(1, s.updateRow(loaded));
+                assertEquals(1, s.update(loaded));
 
-                List<Widget> all = s.selectRows(Widget.class);
+                List<Widget> all = s.selectAll(Widget.class);
                 assertEquals(1, all.size());
                 assertEquals("world", all.get(0).getName());
 
-                assertEquals(1, s.deleteRow(loaded));
-                assertNull(s.selectRow(Widget.class, w.getId()));
+                assertEquals(1, s.delete(loaded));
+                assertNull(s.select(Widget.class, w.getId()));
 
-                s.insertRow(newWidget("a"));
-                s.insertRow(newWidget("b"));
-                assertEquals(2, s.deleteAllRows(Widget.class));
-                assertEquals(0, s.selectRows(Widget.class).size());
+                s.insert(newWidget("a"));
+                s.insert(newWidget("b"));
+                assertEquals(2, s.deleteAll(Widget.class));
+                assertEquals(0, s.selectAll(Widget.class).size());
             }
         }
     }
@@ -344,17 +344,17 @@ class SqliteOrmTest {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
 
-                Widget generated = s.insertRow(newWidget("generated"));
+                Widget generated = s.insert(newWidget("generated"));
                 assertNotNull(generated.getId());
 
                 UUID explicitId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
                 Widget explicit = new Widget();
                 explicit.id = explicitId;
                 explicit.setName("explicit");
-                s.insertRow(explicit);
+                s.insert(explicit);
 
                 assertEquals(explicitId, explicit.getId());
-                assertEquals("explicit", s.selectRow(Widget.class, explicitId).getName());
+                assertEquals("explicit", s.select(Widget.class, explicitId).getName());
                 assertTrue(s.existsById(Widget.class, generated.getId()));
             }
         }
@@ -369,11 +369,11 @@ class SqliteOrmTest {
 
                 UuidGeneratedWidget generated = new UuidGeneratedWidget();
                 generated.setName("uuid7");
-                s.insertRow(generated);
+                s.insert(generated);
 
                 assertNotNull(generated.getId());
                 assertEquals(7, generated.getId().version());
-                assertEquals("uuid7", s.selectRow(UuidGeneratedWidget.class, generated.getId()).getName());
+                assertEquals("uuid7", s.select(UuidGeneratedWidget.class, generated.getId()).getName());
             }
         }
     }
@@ -386,22 +386,22 @@ class SqliteOrmTest {
                 s.dropEntity(NumericWidget.class);
                 s.createEntity(NumericWidget.class);
 
-                NumericWidget first = s.insertRow(newNumericWidget("first"));
-                NumericWidget second = s.insertRow(newNumericWidget("second"));
+                NumericWidget first = s.insert(newNumericWidget("first"));
+                NumericWidget second = s.insert(newNumericWidget("second"));
                 assertEquals(1L, first.getId());
                 assertEquals(2L, second.getId());
 
-                NumericWidget loaded = s.selectRow(NumericWidget.class, first.getId());
+                NumericWidget loaded = s.select(NumericWidget.class, first.getId());
                 assertNotNull(loaded);
                 assertEquals("first", loaded.getName());
 
                 loaded.setName("updated");
-                assertEquals(1, s.updateRow(loaded));
-                assertEquals("updated", s.selectRow(NumericWidget.class, first.getId()).getName());
+                assertEquals(1, s.update(loaded));
+                assertEquals("updated", s.select(NumericWidget.class, first.getId()).getName());
 
                 assertTrue(s.existsById(NumericWidget.class, second.getId()));
                 assertEquals(1, s.deleteById(NumericWidget.class, second.getId()));
-                assertNull(s.selectRow(NumericWidget.class, second.getId()));
+                assertNull(s.select(NumericWidget.class, second.getId()));
             }
         }
     }
@@ -419,11 +419,11 @@ class SqliteOrmTest {
                         newNumericWidget("b"),
                         newNumericWidget("c"));
 
-                assertEquals(3, s.insertRows(widgets, 2));
+                assertEquals(3, s.insertAll(widgets, 2));
                 assertEquals(1L, widgets.get(0).getId());
                 assertEquals(2L, widgets.get(1).getId());
                 assertEquals(3L, widgets.get(2).getId());
-                assertEquals(3, s.selectRows(NumericWidget.class).size());
+                assertEquals(3, s.selectAll(NumericWidget.class).size());
             }
         }
     }
@@ -438,7 +438,7 @@ class SqliteOrmTest {
 
                 NativeNumericWidget widget = new NativeNumericWidget();
                 widget.setName("native");
-                s.insertRow(widget);
+                s.insert(widget);
 
                 assertEquals(1L, widget.getId());
             }
@@ -466,10 +466,10 @@ class SqliteOrmTest {
 
                 SequenceNumericWidget widget = new SequenceNumericWidget();
                 widget.setName("sequence");
-                s.insertRow(widget);
+                s.insert(widget);
 
                 assertEquals(1L, widget.getId());
-                assertEquals("sequence", s.selectRow(SequenceNumericWidget.class, widget.getId()).getName());
+                assertEquals("sequence", s.select(SequenceNumericWidget.class, widget.getId()).getName());
             }
         }
     }
@@ -485,11 +485,11 @@ class SqliteOrmTest {
                         newSequenceWidget("b"),
                         newSequenceWidget("c"));
 
-                assertEquals(3, s.insertRows(widgets, 2));
+                assertEquals(3, s.insertAll(widgets, 2));
                 assertEquals(1L, widgets.get(0).getId());
                 assertEquals(2L, widgets.get(1).getId());
                 assertEquals(3L, widgets.get(2).getId());
-                assertEquals(3, s.selectRows(SequenceNumericWidget.class).size());
+                assertEquals(3, s.selectAll(SequenceNumericWidget.class).size());
             }
         }
     }
@@ -502,15 +502,15 @@ class SqliteOrmTest {
                 s.dropEntity(AssignedNumericWidget.class);
                 s.createEntity(AssignedNumericWidget.class);
 
-                AssignedNumericWidget saved = s.insertRow(new AssignedNumericWidget(42, "answer"));
+                AssignedNumericWidget saved = s.insert(new AssignedNumericWidget(42, "answer"));
                 assertEquals(42, saved.getId());
-                assertEquals("answer", s.selectRow(AssignedNumericWidget.class, 42).getName());
+                assertEquals("answer", s.select(AssignedNumericWidget.class, 42).getName());
 
                 List<AssignedNumericWidget> more = List.of(
                         new AssignedNumericWidget(43, "next"),
                         new AssignedNumericWidget(44, "last"));
-                assertEquals(2, s.insertRows(more, 1));
-                assertEquals(3, s.selectRows(AssignedNumericWidget.class).size());
+                assertEquals(2, s.insertAll(more, 1));
+                assertEquals(3, s.selectAll(AssignedNumericWidget.class).size());
             }
         }
     }
@@ -523,24 +523,24 @@ class SqliteOrmTest {
                 s.dropEntity(AssignedStringUser.class);
                 s.createEntity(AssignedStringUser.class);
 
-                AssignedStringUser saved = s.insertRow(new AssignedStringUser("ada", "Ada"));
+                AssignedStringUser saved = s.insert(new AssignedStringUser("ada", "Ada"));
                 assertEquals("ada", saved.getUserId());
-                AssignedStringUser loaded = s.selectRow(AssignedStringUser.class, "ada");
+                AssignedStringUser loaded = s.select(AssignedStringUser.class, "ada");
                 assertEquals("Ada", loaded.getName());
 
                 loaded.setName("Ada Lovelace");
-                assertEquals(1, s.updateRow(loaded));
-                assertEquals("Ada Lovelace", s.selectRow(AssignedStringUser.class, "ada").getName());
+                assertEquals(1, s.update(loaded));
+                assertEquals("Ada Lovelace", s.select(AssignedStringUser.class, "ada").getName());
 
                 MicroOrmException missing = assertThrows(MicroOrmException.class,
-                        () -> s.insertRow(new AssignedStringUser()));
+                        () -> s.insert(new AssignedStringUser()));
                 assertTrue(missing.getMessage().contains("Primary key"));
                 MicroOrmException blank = assertThrows(MicroOrmException.class,
-                        () -> s.insertRow(new AssignedStringUser("  ", "blank")));
+                        () -> s.insert(new AssignedStringUser("  ", "blank")));
                 assertTrue(blank.getMessage().contains("Primary key"));
 
-                assertEquals(1, s.deleteRow(loaded));
-                assertNull(s.selectRow(AssignedStringUser.class, "ada"));
+                assertEquals(1, s.delete(loaded));
+                assertNull(s.select(AssignedStringUser.class, "ada"));
             }
         }
     }
@@ -564,12 +564,12 @@ class SqliteOrmTest {
                 s.beginTransaction();
                 Widget w = new Widget();
                 w.setName("tx");
-                s.insertRow(w);
+                s.insert(w);
                 id = w.getId();
                 s.commitTransaction();
             }
             try (Session s2 = orm.openSession()) {
-                Widget w = s2.selectRow(Widget.class, id);
+                Widget w = s2.select(Widget.class, id);
                 assertNotNull(w);
                 assertEquals("tx", w.getName());
             }
@@ -585,28 +585,28 @@ class SqliteOrmTest {
                 s.createEntity(Widget.class);
 
                 List<Widget> widgets = List.of(newWidget("a"), newWidget("b"), newWidget("b"));
-                assertEquals(3, s.insertRows(widgets, 2));
+                assertEquals(3, s.insertAll(widgets, 2));
                 assertNotNull(widgets.get(0).getId());
                 assertTrue(s.existsById(Widget.class, widgets.get(1).getId()));
 
-                assertEquals(2, s.selectRows(Widget.class, Map.of("name", "b")).size());
-                try (var rows = s.streamRows(Widget.class, Map.of("name", "b"))) {
+                assertEquals(2, s.select(Widget.class, Map.of("name", "b")).size());
+                try (var rows = s.stream(Widget.class, Map.of("name", "b"))) {
                     assertEquals(2, rows.count());
                 }
 
                 Map<String, Object> filters = new LinkedHashMap<>();
                 filters.put("name", "a");
-                assertEquals(1, s.selectRows(Widget.class, filters).size());
+                assertEquals(1, s.select(Widget.class, filters).size());
 
                 Query byIds = Query.of("SELECT id, name FROM widgets WHERE id IN (:ids) ORDER BY name")
                         .setCollection("ids", List.of(widgets.get(0).getId(), widgets.get(2).getId()));
-                List<Widget> selected = s.selectRows(Widget.class, byIds);
+                List<Widget> selected = s.select(Widget.class, byIds);
                 assertEquals(2, selected.size());
                 assertEquals("a", selected.get(0).getName());
                 assertEquals("b", selected.get(1).getName());
 
                 assertEquals(1, s.deleteById(Widget.class, widgets.get(1).getId()));
-                assertEquals(2, s.selectRows(Widget.class).size());
+                assertEquals(2, s.selectAll(Widget.class).size());
             }
         }
     }
@@ -618,25 +618,25 @@ class SqliteOrmTest {
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
-                s.insertRows(List.of(newWidget("a"), newWidget("b"), newWidget("b"), newWidget("c")));
+                s.insertAll(List.of(newWidget("a"), newWidget("b"), newWidget("b"), newWidget("c")));
 
                 EntitySelect<Widget> query = EntitySelect.of(Widget.class)
                         .where(EntitySelect.field("name").in(List.of("b", "c")))
                         .orderBy(EntitySelect.field("name").desc())
                         .limit(2);
 
-                List<Widget> selected = s.selectRows(query);
+                List<Widget> selected = s.select(query);
                 assertEquals(2, selected.size());
                 assertEquals("c", selected.get(0).getName());
                 assertEquals("b", selected.get(1).getName());
 
-                try (var rows = s.streamRows(query)) {
+                try (var rows = s.stream(query)) {
                     assertEquals(2, rows.count());
                 }
 
-                assertTrue(s.selectRows(EntitySelect.of(Widget.class)
+                assertTrue(s.select(EntitySelect.of(Widget.class)
                         .where(EntitySelect.field("name").in(List.of()))).isEmpty());
-                assertEquals(4, s.selectRows(EntitySelect.of(Widget.class)
+                assertEquals(4, s.select(EntitySelect.of(Widget.class)
                         .where(EntitySelect.field("name").notIn(List.of()))).size());
             }
         }
@@ -649,19 +649,19 @@ class SqliteOrmTest {
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
-                s.insertRows(List.of(newWidget("Ada"), newWidget("bob")));
+                s.insertAll(List.of(newWidget("Ada"), newWidget("bob")));
 
-                List<Widget> selected = s.selectRows(EntitySelect.of(Widget.class)
+                List<Widget> selected = s.select(EntitySelect.of(Widget.class)
                         .where(EntitySelect.field("name").equalsIgnoreCase("ADA")));
                 assertEquals(1, selected.size());
                 assertEquals("Ada", selected.get(0).getName());
 
-                List<Widget> liked = s.selectRows(EntitySelect.of(Widget.class)
+                List<Widget> liked = s.select(EntitySelect.of(Widget.class)
                         .where(EntitySelect.field("name").likeIgnoreCase("B%")));
                 assertEquals(1, liked.size());
                 assertEquals("bob", liked.get(0).getName());
 
-                List<Widget> byFn = s.selectRows(EntitySelect.of(Widget.class)
+                List<Widget> byFn = s.select(EntitySelect.of(Widget.class)
                         .where(EntitySelect.fn("lower", EntitySelect.field("name")).eq("ada")));
                 assertEquals(1, byFn.size());
                 assertEquals("Ada", byFn.get(0).getName());
@@ -676,9 +676,9 @@ class SqliteOrmTest {
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
-                Widget first = s.insertRow(newWidget("a"));
-                s.insertRow(newWidget("b"));
-                s.insertRow(newWidget("b"));
+                Widget first = s.insert(newWidget("a"));
+                s.insert(newWidget("b"));
+                s.insert(newWidget("b"));
 
                 assertEquals("a", s.findById(Widget.class, first.getId()).orElseThrow().getName());
                 assertFalse(s.findById(Widget.class, UUID.randomUUID()).isPresent());
@@ -719,13 +719,13 @@ class SqliteOrmTest {
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
-                s.insertRows(List.of(newWidget("a"), newWidget("b")));
+                s.insertAll(List.of(newWidget("a"), newWidget("b")));
 
-                try (var first = s.streamRows(Widget.class)) {
-                    assertThrows(MicroOrmException.class, () -> s.streamRows(Widget.class));
+                try (var first = s.stream(Widget.class)) {
+                    assertThrows(MicroOrmException.class, () -> s.stream(Widget.class));
                 }
 
-                try (var second = s.streamRows(Widget.class)) {
+                try (var second = s.stream(Widget.class)) {
                     assertEquals(2, second.count());
                 }
             }
@@ -738,16 +738,16 @@ class SqliteOrmTest {
             MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class);
             try (Session s = orm.openSession()) {
                 s.createEntity(Widget.class);
-                Widget saved = s.insertRow(newWidget("startup-row"));
+                Widget saved = s.insert(newWidget("startup-row"));
                 UUID id = saved.getId();
 
                 s.createEntity(Widget.class);
                 s.createEntity(Widget.class);
 
-                Widget loaded = s.selectRow(Widget.class, id);
+                Widget loaded = s.select(Widget.class, id);
                 assertNotNull(loaded);
                 assertEquals("startup-row", loaded.getName());
-                assertEquals(1, s.selectRows(Widget.class).size());
+                assertEquals(1, s.selectAll(Widget.class).size());
             }
         }
     }
@@ -758,16 +758,16 @@ class SqliteOrmTest {
             MicroOrm orm = MicroOrm.sqlite(c).register(Widget.class, WidgetWithDescription.class);
             try (Session s = orm.openSession()) {
                 s.createEntity(Widget.class);
-                Widget saved = s.insertRow(newWidget("kept-on-update"));
+                Widget saved = s.insert(newWidget("kept-on-update"));
                 UUID id = saved.getId();
 
                 s.updateEntity(Widget.class);
                 s.updateEntity(Widget.class);
 
-                Widget loaded = s.selectRow(Widget.class, id);
+                Widget loaded = s.select(Widget.class, id);
                 assertNotNull(loaded);
                 assertEquals("kept-on-update", loaded.getName());
-                assertEquals(1, s.selectRows(Widget.class).size());
+                assertEquals(1, s.selectAll(Widget.class).size());
             }
         }
     }
@@ -779,11 +779,11 @@ class SqliteOrmTest {
             try (Session s = orm.openSession()) {
                 s.dropEntity(Widget.class);
                 s.createEntity(Widget.class);
-                Widget saved = s.insertRow(newWidget("kept"));
+                Widget saved = s.insert(newWidget("kept"));
 
                 s.syncEntity(WidgetWithDescription.class);
 
-                WidgetWithDescription loaded = s.selectRow(WidgetWithDescription.class, saved.getId());
+                WidgetWithDescription loaded = s.select(WidgetWithDescription.class, saved.getId());
                 assertNotNull(loaded);
                 assertEquals(saved.getId(), loaded.getId());
                 assertEquals("kept", loaded.getName());

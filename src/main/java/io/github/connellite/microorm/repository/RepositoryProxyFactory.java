@@ -147,9 +147,8 @@ public final class RepositoryProxyFactory {
                         session.dropEntity(entityType);
                         yield null;
                     }
-                    case "deleteAllRows" -> session.deleteAllRows(entityType);
-                    case "selectRows" -> session.selectRows(entityType);
-                    case "streamRows" -> session.streamRows(entityType);
+                    case "deleteAll" -> session.deleteAll(entityType);
+                    case "stream" -> session.stream(entityType);
                     case "clear" -> {
                         session.clear();
                         yield null;
@@ -165,14 +164,14 @@ public final class RepositoryProxyFactory {
             if (parameters.length == 1) {
                 Object arg = args[0];
                 switch (name) {
-                    case "insertRow" -> {
-                        return session.insertRow(arg);
+                    case "insert" -> {
+                        return session.insert(arg);
                     }
-                    case "updateRow" -> {
-                        return session.updateRow(arg);
+                    case "update" -> {
+                        return session.update(arg);
                     }
-                    case "deleteRow" -> {
-                        return session.deleteRow(arg);
+                    case "delete" -> {
+                        return session.delete(arg);
                     }
                     case "deleteById" -> {
                         return session.deleteById(entityType, arg);
@@ -180,8 +179,8 @@ public final class RepositoryProxyFactory {
                     case "existsById" -> {
                         return session.existsById(entityType, arg);
                     }
-                    case "selectRow" -> {
-                        return session.selectRow(entityType, arg);
+                    case "select" -> {
+                        return session.select(entityType, arg);
                     }
                     case "findById" -> {
                         return session.findById(entityType, arg);
@@ -195,20 +194,11 @@ public final class RepositoryProxyFactory {
                         return null;
                     }
                 }
-                if ("insertRows".equals(name) && List.class.isAssignableFrom(parameters[0])) {
-                    return session.insertRows((List<?>) arg);
+                if ("stream".equals(name) && Map.class.isAssignableFrom(parameters[0])) {
+                    return session.stream(entityType, (Map<String, ?>) arg);
                 }
-                if ("selectRows".equals(name) && Map.class.isAssignableFrom(parameters[0])) {
-                    return session.selectRows(entityType, (Map<String, ?>) arg);
-                }
-                if ("streamRows".equals(name) && Map.class.isAssignableFrom(parameters[0])) {
-                    return session.streamRows(entityType, (Map<String, ?>) arg);
-                }
-                if ("selectRows".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
-                    return session.selectRows((EntitySelect<?>) arg);
-                }
-                if ("streamRows".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
-                    return session.streamRows((EntitySelect<?>) arg);
+                if ("stream".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
+                    return session.stream((EntitySelect<?>) arg);
                 }
                 if ("selectOne".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
                     return session.selectOne((EntitySelect<?>) arg);
@@ -216,11 +206,8 @@ public final class RepositoryProxyFactory {
                 if ("findOne".equals(name) && EntitySelect.class.isAssignableFrom(parameters[0])) {
                     return session.findOne((EntitySelect<?>) arg);
                 }
-                if ("selectRows".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
-                    return session.selectRows(entityType, (Query) arg);
-                }
-                if ("streamRows".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
-                    return session.streamRows(entityType, (Query) arg);
+                if ("stream".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
+                    return session.stream(entityType, (Query) arg);
                 }
                 if ("selectOne".equals(name) && Query.class.isAssignableFrom(parameters[0])) {
                     return session.selectOne(entityType, (Query) arg);
@@ -230,10 +217,10 @@ public final class RepositoryProxyFactory {
                 }
             }
             if (parameters.length == 2
-                    && "insertRows".equals(name)
+                    && "insertAll".equals(name)
                     && List.class.isAssignableFrom(parameters[0])
                     && parameters[1] == int.class) {
-                return session.insertRows((List<?>) args[0], (Integer) args[1]);
+                return session.insertAll((List<?>) args[0], (Integer) args[1]);
             }
             return unsupported(method);
         }
@@ -258,10 +245,10 @@ public final class RepositoryProxyFactory {
                 return session.execute(query) > 0;
             }
             if (List.class.isAssignableFrom(returnType)) {
-                return session.selectRows(entityType, query);
+                return session.select(entityType, query);
             }
             if (Stream.class.isAssignableFrom(returnType)) {
-                return session.streamRows(entityType, query);
+                return session.stream(entityType, query);
             }
             if (Optional.class.isAssignableFrom(returnType)) {
                 return session.findOne(entityType, query);

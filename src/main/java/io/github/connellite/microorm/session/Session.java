@@ -241,10 +241,10 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Auto-increment and UUID primary keys are filled on the entity when applicable.
      */
     @Override
-    public <T> T insertRow(T entity) {
-        Objects.requireNonNull(entity, "insertRow entity cannot be null");
+    public <T> T insert(T entity) {
+        Objects.requireNonNull(entity, "insert entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
-        requireMutable(m, "insertRow");
+        requireMutable(m, "insert");
         if (m.hasRelations()) {
             return RelationPersister.insert(this, entity);
         }
@@ -260,23 +260,23 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
 
     /**
      * Batch insert of entities of the same class. Uses JDBC batching when the dialect supports it.
-     * Entities with relations fall back to sequential {@link #insertRow(Object)} calls.
+     * Entities with relations fall back to sequential {@link #insert(Object)} calls.
      *
      * @param batchSize JDBC batch chunk size (values {@code <= 0} use an internal default)
      * @return number of rows inserted
      */
     @Override
-    public <T> int insertRows(List<T> entities, int batchSize) {
+    public <T> int insertAll(List<T> entities, int batchSize) {
         if (entities == null || entities.isEmpty()) {
             return 0;
         }
         Class<?> entityClass = entities.get(0).getClass();
         EntityModel m = registry.get(entityClass);
-        requireMutable(m, "insertRows");
+        requireMutable(m, "insertAll");
         if (m.hasRelations()) {
             int total = 0;
             for (T entity : entities) {
-                insertRow(entity);
+                insert(entity);
                 total++;
             }
             return total;
@@ -317,10 +317,10 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Updates one row by primary key. Returns {@code 0} when no row matched.
      */
     @Override
-    public int updateRow(Object entity) {
-        Objects.requireNonNull(entity, "updateRow entity cannot be null");
+    public int update(Object entity) {
+        Objects.requireNonNull(entity, "update entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
-        requireMutable(m, "updateRow");
+        requireMutable(m, "update");
         EntityHydrator.requirePkSet(entity, m.primaryKey());
         if (m.hasRelations()) {
             return RelationPersister.update(this, entity);
@@ -340,10 +340,10 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Deletes one row by primary key on the entity. Returns {@code 0} when no row matched.
      */
     @Override
-    public int deleteRow(Object entity) {
-        Objects.requireNonNull(entity, "deleteRow entity cannot be null");
+    public int delete(Object entity) {
+        Objects.requireNonNull(entity, "delete entity cannot be null");
         EntityModel m = registry.get(entity.getClass());
-        requireMutable(m, "deleteRow");
+        requireMutable(m, "delete");
         if (m.hasRelations()) {
             return RelationPersister.delete(this, entity);
         }
@@ -373,9 +373,9 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Deletes all rows from the entity table (table definition is kept).
      */
     @Override
-    public int deleteAllRows(Class<?> entityClass) {
+    public int deleteAll(Class<?> entityClass) {
         EntityModel m = registry.get(entityClass);
-        requireMutable(m, "deleteAllRows");
+        requireMutable(m, "deleteAll");
         context.evict(m.entityClass());
         String q = "DELETE FROM " + m.sqlTableName(dialect);
         return SqlExecutor.executeUpdate(connection, BoundStatement.of(q, Map.of()));
@@ -403,11 +403,11 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Returns {@code null} when no row matches the primary key.
      */
     @Override
-    public <T> T selectRow(Class<T> type, Object id) {
-        return selectRow(type, id, lazyLoadContext());
+    public <T> T select(Class<T> type, Object id) {
+        return select(type, id, lazyLoadContext());
     }
 
-    <T> T selectRow(Class<T> type, Object id, SessionLazyContext lazy) {
+    <T> T select(Class<T> type, Object id, SessionLazyContext lazy) {
         EntityModel m = registry.get(type);
         EntityHydrator.requirePkValue(id, m.primaryKey());
         Object key = cacheKey(m, id);
@@ -433,11 +433,11 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
      * Lazy row stream; must be closed (try-with-resources) to release JDBC resources.
      * Hydrated entities receive a session-scoped {@link io.github.connellite.microorm.relation.LazyLoadContext}
      * so lazy relation wrappers can load related rows until {@link #close()}.
-     * Prefer {@link EntitySession#selectRows(Class)} when the full result fits in memory.
+     * Prefer {@link EntitySession#selectAll(Class)} when the full result fits in memory.
      * Streamed rows are not stored in the session context.
      */
     @Override
-    public <T> Stream<T> streamRows(Class<T> type) {
+    public <T> Stream<T> stream(Class<T> type) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
             SessionLazyContext context = lazyLoadContext();
@@ -447,10 +447,10 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     }
 
     /**
-     * Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
+     * Lazy filtered row stream; must be closed (try-with-resources). Supports lazy associations like {@link #stream(Class)}.
      */
     @Override
-    public <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
+    public <T> Stream<T> stream(Class<T> type, Map<String, ?> filters) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
             SessionLazyContext context = lazyLoadContext();
@@ -460,10 +460,10 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     }
 
     /**
-     * Lazy entity-query stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
+     * Lazy entity-query stream; must be closed (try-with-resources). Supports lazy associations like {@link #stream(Class)}.
      */
     @Override
-    public <T> Stream<T> streamRows(EntitySelect<T> query) {
+    public <T> Stream<T> stream(EntitySelect<T> query) {
         Objects.requireNonNull(query, "query cannot be null");
         return openStream(() -> {
             EntityModel m = registry.get(query.entityType());
@@ -474,10 +474,10 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
     }
 
     /**
-     * Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #streamRows(Class)}.
+     * Lazy custom-query row stream; must be closed (try-with-resources). Supports lazy associations like {@link #stream(Class)}.
      */
     @Override
-    public <T> Stream<T> streamRows(Class<T> type, Query query) {
+    public <T> Stream<T> stream(Class<T> type, Query query) {
         return openStream(() -> {
             EntityModel m = registry.get(type);
             SessionLazyContext context = lazyLoadContext();
@@ -891,7 +891,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
 
     @Override
     public Object currentForeignKey(EntityModel model, ManyToOneField relation, Object ownerPk) {
-        Object owner = selectRow(model.entityClass(), ownerPk);
+        Object owner = select(model.entityClass(), ownerPk);
         if (owner == null) {
             return null;
         }
@@ -904,7 +904,7 @@ public final class Session implements JdbcSession, TransactionalEventSession, En
 
     @Override
     public <T> T selectByPrimaryKey(Class<T> type, Object id) {
-        return selectRow(type, id);
+        return select(type, id);
     }
 
     /**

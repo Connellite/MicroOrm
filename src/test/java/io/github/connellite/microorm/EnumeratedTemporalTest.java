@@ -76,9 +76,9 @@ class EnumeratedTemporalTest {
                 item.clock = Time.valueOf(LocalTime.of(21, 50, 45));
                 item.occurredAt = Timestamp.valueOf(LocalDateTime.of(2026, 7, 13, 21, 50, 45));
                 item.calendar = new GregorianCalendar(2026, Calendar.JULY, 13, 21, 50, 45);
-                session.insertRow(item);
+                session.insert(item);
 
-                EnumeratedTemporalItem loaded = session.selectRow(EnumeratedTemporalItem.class, item.id);
+                EnumeratedTemporalItem loaded = session.select(EnumeratedTemporalItem.class, item.id);
                 assertEquals(Status.CLOSED, loaded.ordinalStatus);
                 assertEquals(Status.OPEN, loaded.namedStatus);
                 assertEquals(LocalDate.of(2026, 7, 13), new java.sql.Date(loaded.day.getTime()).toLocalDate());

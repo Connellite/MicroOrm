@@ -58,7 +58,7 @@ final class SessionLazyContext implements LazyLoadContext {
     public <T> T loadById(Class<T> type, Object id) {
         ensureOpen();
         LogHolder.logger.trace(() -> "Lazy loading " + type.getName() + " by id " + id);
-        return session.selectRow(type, id, this);
+        return session.select(type, id, this);
     }
 
     @Override

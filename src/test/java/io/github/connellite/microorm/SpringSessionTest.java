@@ -59,12 +59,12 @@ class SpringSessionTest {
             UUID id = fixture.inTransaction(session -> {
                 Widget widget = new Widget();
                 widget.setName("spring-tx");
-                session.insertRow(widget);
+                session.insert(widget);
                 return widget.getId();
             });
 
             try (Session verify = fixture.orm.openSession()) {
-                Widget loaded = verify.selectRow(Widget.class, id);
+                Widget loaded = verify.select(Widget.class, id);
                 assertNotNull(loaded);
                 assertEquals("spring-tx", loaded.getName());
             }
@@ -82,7 +82,7 @@ class SpringSessionTest {
                     () -> service.createWidget("annotated-tx"));
 
             try (Session verify = fixture.orm.openSession()) {
-                Widget loaded = verify.selectRow(Widget.class, id);
+                Widget loaded = verify.select(Widget.class, id);
                 assertNotNull(loaded);
                 assertEquals("annotated-tx", loaded.getName());
             }
@@ -99,7 +99,7 @@ class SpringSessionTest {
                 try (Session session = fixture.orm.openSession()) {
                     Widget widget = new Widget();
                     widget.setName("doomed");
-                    session.insertRow(widget);
+                    session.insert(widget);
                     id[0] = widget.getId();
                     throw new RuntimeException("boom");
                 } catch (SQLException e) {
@@ -108,7 +108,7 @@ class SpringSessionTest {
             }));
 
             try (Session verify = fixture.orm.openSession()) {
-                assertNull(verify.selectRow(Widget.class, id[0]));
+                assertNull(verify.select(Widget.class, id[0]));
             }
         }
     }
@@ -125,7 +125,7 @@ class SpringSessionTest {
                     try (Session session = fixture.orm.openSession()) {
                         Widget widget = new Widget();
                         widget.setName("rollback-only");
-                        session.insertRow(widget);
+                        session.insert(widget);
                         id[0] = widget.getId();
                         status.setRollbackOnly();
                     } catch (SQLException e) {
@@ -135,7 +135,7 @@ class SpringSessionTest {
             });
 
             try (Session verify = fixture.orm.openSession()) {
-                assertNull(verify.selectRow(Widget.class, id[0]));
+                assertNull(verify.select(Widget.class, id[0]));
             }
         }
     }
@@ -148,7 +148,7 @@ class SpringSessionTest {
             UUID baselineId = fixture.inTransaction(session -> {
                 Widget baseline = new Widget();
                 baseline.setName("baseline");
-                session.insertRow(baseline);
+                session.insert(baseline);
                 return baseline.getId();
             });
 
@@ -158,12 +158,12 @@ class SpringSessionTest {
                 try (Session session = fixture.orm.openSession()) {
                     Widget first = new Widget();
                     first.setName("first");
-                    session.insertRow(first);
+                    session.insert(first);
                     firstId[0] = first.getId();
 
                     Widget second = new Widget();
                     second.setName("second");
-                    session.insertRow(second);
+                    session.insert(second);
                     secondId[0] = second.getId();
 
                     throw new RuntimeException("fail after second insert");
@@ -173,9 +173,9 @@ class SpringSessionTest {
             }));
 
             try (Session verify = fixture.orm.openSession()) {
-                assertEquals("baseline", verify.selectRow(Widget.class, baselineId).getName());
-                assertNull(verify.selectRow(Widget.class, firstId[0]));
-                assertNull(verify.selectRow(Widget.class, secondId[0]));
+                assertEquals("baseline", verify.select(Widget.class, baselineId).getName());
+                assertNull(verify.select(Widget.class, firstId[0]));
+                assertNull(verify.select(Widget.class, secondId[0]));
             }
         }
     }
@@ -190,11 +190,11 @@ class SpringSessionTest {
                 try (Session insert = fixture.orm.openSession()) {
                     Widget widget = new Widget();
                     widget.setName("shared-connection");
-                    insert.insertRow(widget);
+                    insert.insert(widget);
                     insertedId = widget.getId();
                 }
                 try (Session read = fixture.orm.openSession()) {
-                    Widget loaded = read.selectRow(Widget.class, insertedId);
+                    Widget loaded = read.select(Widget.class, insertedId);
                     assertNotNull(loaded);
                     assertEquals("shared-connection", loaded.getName());
                 }
@@ -202,7 +202,7 @@ class SpringSessionTest {
             });
 
             try (Session verify = fixture.orm.openSession()) {
-                assertEquals("shared-connection", verify.selectRow(Widget.class, id).getName());
+                assertEquals("shared-connection", verify.select(Widget.class, id).getName());
             }
         }
     }
@@ -246,12 +246,12 @@ class SpringSessionTest {
                 setup.beginTransaction();
                 Widget widget = new Widget();
                 widget.setName("rolled-back");
-                setup.insertRow(widget);
+                setup.insert(widget);
                 id = widget.getId();
             }
 
             try (Session verify = orm.openSession()) {
-                assertNull(verify.selectRow(Widget.class, id));
+                assertNull(verify.select(Widget.class, id));
             }
         }
     }
@@ -266,13 +266,13 @@ class SpringSessionTest {
                 session.beginTransaction();
                 Widget widget = new Widget();
                 widget.setName("explicit-rollback");
-                session.insertRow(widget);
+                session.insert(widget);
                 id = widget.getId();
                 session.rollbackTransaction();
             }
 
             try (Session verify = orm.openSession()) {
-                assertNull(verify.selectRow(Widget.class, id));
+                assertNull(verify.select(Widget.class, id));
             }
         }
     }
@@ -340,7 +340,7 @@ class SpringSessionTest {
             try (Session session = orm.openSession()) {
                 Widget widget = new Widget();
                 widget.setName(name);
-                session.insertRow(widget);
+                session.insert(widget);
                 return widget.getId();
             } catch (SQLException e) {
                 throw new RuntimeException(e);

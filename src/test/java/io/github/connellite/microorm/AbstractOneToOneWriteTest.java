@@ -222,15 +222,15 @@ abstract class AbstractOneToOneWriteTest {
         user.profile = LazyRef.to(profile);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         try (Session session = orm.openSession()) {
-            User loaded = session.selectRow(User.class, user.id);
+            User loaded = session.select(User.class, user.id);
             assertEquals("Ada", loaded.name);
             assertNotNull(loaded.profile.get());
             assertEquals("Notes", loaded.profile.get().bio);
-            Profile loadedProfile = session.selectRow(Profile.class, profile.id);
+            Profile loadedProfile = session.select(Profile.class, profile.id);
             assertEquals(user.id, loadedProfile.user.get().id);
         }
     }
@@ -248,12 +248,12 @@ abstract class AbstractOneToOneWriteTest {
         user.profile = LazyRef.to(profile);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals(profileId, session.selectRow(User.class, userId).profile.get().id);
-            assertEquals(userId, session.selectRow(Profile.class, profileId).user.get().id);
+            assertEquals(profileId, session.select(User.class, userId).profile.get().id);
+            assertEquals(userId, session.select(Profile.class, profileId).user.get().id);
         }
     }
 
@@ -263,7 +263,7 @@ abstract class AbstractOneToOneWriteTest {
         profile.id = UUID.fromString("33333333-3333-4333-8333-333333333333");
         profile.bio = "Standalone";
         try (Session session = orm.openSession()) {
-            session.insertRow(profile);
+            session.insert(profile);
         }
 
         User user = new User();
@@ -271,12 +271,12 @@ abstract class AbstractOneToOneWriteTest {
         user.name = "Linker";
         user.profile = LazyRef.to(profile);
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals("Standalone", session.selectRow(User.class, user.id).profile.get().bio);
-            assertEquals(1, session.selectRows(Profile.class).size());
+            assertEquals("Standalone", session.select(User.class, user.id).profile.get().bio);
+            assertEquals(1, session.selectAll(Profile.class).size());
         }
     }
 
@@ -286,7 +286,7 @@ abstract class AbstractOneToOneWriteTest {
         user.id = UUID.fromString("55555555-5555-4555-8555-555555555555");
         user.name = "Inverse";
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
         Profile profile = new Profile();
         profile.id = UUID.fromString("66666666-6666-4666-8666-666666666666");
@@ -294,12 +294,12 @@ abstract class AbstractOneToOneWriteTest {
         profile.user = LazyRef.to(user);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(profile);
+            session.insert(profile);
         }
 
         try (Session session = orm.openSession()) {
-            assertNotNull(session.selectRow(Profile.class, profile.id));
-            assertNull(session.selectRow(User.class, user.id).profile.get());
+            assertNotNull(session.select(Profile.class, profile.id));
+            assertNull(session.select(User.class, user.id).profile.get());
         }
     }
 
@@ -312,13 +312,13 @@ abstract class AbstractOneToOneWriteTest {
         employee.desk = LazyRef.to(desk);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(employee);
+            session.insert(employee);
         }
 
         try (Session session = orm.openSession()) {
-            Employee loaded = session.selectRow(Employee.class, employee.id);
+            Employee loaded = session.select(Employee.class, employee.id);
             assertEquals("A-1", loaded.desk.get().code);
-            assertEquals(employee.id, session.selectRow(Desk.class, desk.id).employee.get().id);
+            assertEquals(employee.id, session.select(Desk.class, desk.id).employee.get().id);
         }
     }
 
@@ -330,19 +330,19 @@ abstract class AbstractOneToOneWriteTest {
         oldProfile.bio = "Draft";
         user.profile = LazyRef.to(oldProfile);
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         Profile newProfile = new Profile();
         newProfile.bio = "Final";
         user.profile = LazyRef.to(newProfile);
         try (Session session = orm.openSession()) {
-            session.updateRow(user);
+            session.update(user);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals("Final", session.selectRow(User.class, user.id).profile.get().bio);
-            assertNotNull(session.selectRow(Profile.class, oldProfile.id));
+            assertEquals("Final", session.select(User.class, user.id).profile.get().bio);
+            assertNotNull(session.select(Profile.class, oldProfile.id));
         }
     }
 
@@ -354,19 +354,19 @@ abstract class AbstractOneToOneWriteTest {
         oldProfile.bio = "Old";
         user.profile = LazyRef.to(oldProfile);
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         RemoveProfile newProfile = new RemoveProfile();
         newProfile.bio = "New";
         user.profile = LazyRef.to(newProfile);
         try (Session session = orm.openSession()) {
-            session.updateRow(user);
+            session.update(user);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals("New", session.selectRow(RemoveUser.class, user.id).profile.get().bio);
-            assertNull(session.selectRow(RemoveProfile.class, oldProfile.id));
+            assertEquals("New", session.select(RemoveUser.class, user.id).profile.get().bio);
+            assertNull(session.select(RemoveProfile.class, oldProfile.id));
         }
     }
 
@@ -378,19 +378,19 @@ abstract class AbstractOneToOneWriteTest {
         oldDesk.code = "B-1";
         employee.desk = LazyRef.to(oldDesk);
         try (Session session = orm.openSession()) {
-            session.insertRow(employee);
+            session.insert(employee);
         }
 
         Desk newDesk = new Desk();
         newDesk.code = "B-2";
         employee.desk = LazyRef.to(newDesk);
         try (Session session = orm.openSession()) {
-            session.updateRow(employee);
+            session.update(employee);
         }
 
         try (Session session = orm.openSession()) {
-            assertEquals("B-2", session.selectRow(Employee.class, employee.id).desk.get().code);
-            assertNull(session.selectRow(Desk.class, oldDesk.id));
+            assertEquals("B-2", session.select(Employee.class, employee.id).desk.get().code);
+            assertNull(session.select(Desk.class, oldDesk.id));
         }
     }
 
@@ -402,13 +402,13 @@ abstract class AbstractOneToOneWriteTest {
         profile.bio = "Keep";
         user.profile = LazyRef.to(profile);
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         try (Session session = orm.openSession()) {
-            session.deleteRow(user);
-            assertNull(session.selectRow(User.class, user.id));
-            assertNotNull(session.selectRow(Profile.class, profile.id));
+            session.delete(user);
+            assertNull(session.select(User.class, user.id));
+            assertNotNull(session.select(Profile.class, profile.id));
         }
     }
 
@@ -420,13 +420,13 @@ abstract class AbstractOneToOneWriteTest {
         profile.bio = "Gone";
         user.profile = LazyRef.to(profile);
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         try (Session session = orm.openSession()) {
-            session.deleteRow(user);
-            assertNull(session.selectRow(RemoveUser.class, user.id));
-            assertNull(session.selectRow(RemoveProfile.class, profile.id));
+            session.delete(user);
+            assertNull(session.select(RemoveUser.class, user.id));
+            assertNull(session.select(RemoveProfile.class, profile.id));
         }
     }
 
@@ -440,9 +440,9 @@ abstract class AbstractOneToOneWriteTest {
         user.profile = LazyRef.to(profile);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
             session.evict(user);
-            PlainUser loaded = session.selectRow(PlainUser.class, user.id);
+            PlainUser loaded = session.select(PlainUser.class, user.id);
             assertEquals("No cascade", loaded.name);
             assertNull(loaded.profile.get());
             assertNull(profile.id);
@@ -461,9 +461,9 @@ abstract class AbstractOneToOneWriteTest {
         try (Session session = orm.openSession()) {
             var error = assertThrows(
                     io.github.connellite.microorm.exception.MicroOrmException.class,
-                    () -> session.insertRow(user));
+                    () -> session.insert(user));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(RequiredUser.class, user.id));
+            assertNull(session.select(RequiredUser.class, user.id));
         }
     }
 
@@ -478,12 +478,12 @@ abstract class AbstractOneToOneWriteTest {
         user.profile = LazyRef.to(profile);
 
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
             session.evict(user);
-            PlainUser loaded = session.selectRow(PlainUser.class, user.id);
+            PlainUser loaded = session.select(PlainUser.class, user.id);
             assertEquals("Assigned missing", loaded.name);
             assertNull(loaded.profile.get());
-            assertNull(session.selectRow(Profile.class, profile.id));
+            assertNull(session.select(Profile.class, profile.id));
         }
     }
 
@@ -500,9 +500,9 @@ abstract class AbstractOneToOneWriteTest {
         try (Session session = orm.openSession()) {
             var error = assertThrows(
                     io.github.connellite.microorm.exception.MicroOrmException.class,
-                    () -> session.insertRow(user));
+                    () -> session.insert(user));
             assertTrue(error.getMessage().contains("transient instance must be saved"));
-            assertNull(session.selectRow(RequiredUser.class, user.id));
+            assertNull(session.select(RequiredUser.class, user.id));
         }
     }
 
@@ -514,11 +514,11 @@ abstract class AbstractOneToOneWriteTest {
         profile.bio = "Queryable";
         user.profile = LazyRef.to(profile);
         try (Session session = orm.openSession()) {
-            session.insertRow(user);
+            session.insert(user);
         }
 
         try (Session session = orm.openSession()) {
-            List<User> found = session.selectRows(EntitySelect.of(User.class)
+            List<User> found = session.select(EntitySelect.of(User.class)
                     .join("profile")
                     .where(EntitySelect.field("profile.bio").eq("Queryable")));
             assertEquals(1, found.size());

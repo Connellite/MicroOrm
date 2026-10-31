@@ -35,7 +35,7 @@ import java.util.OptionalInt;
  * EntitySelect<Doc> converted = EntitySelect.of(Doc.class)
  *         .where(EntitySelect.field("objectId").eq(EntitySelect.fn("dbo.uuid2obj", uuid)));
  *
- * List<User> users = session.selectRows(query);
+ * List<User> users = session.select(query);
  * }</pre>
  *
  * @param <T> entity type selected by this query

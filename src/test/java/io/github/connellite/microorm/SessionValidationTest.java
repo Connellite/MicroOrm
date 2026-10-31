@@ -47,31 +47,31 @@ class SessionValidationTest {
     }
 
     @Test
-    void insertRowRejectsNullEntity() throws SQLException {
+    void insertRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
-                assertThrows(NullPointerException.class, () -> session.insertRow(null));
+                assertThrows(NullPointerException.class, () -> session.insert(null));
             }
         }
     }
 
     @Test
-    void updateRowRejectsNullEntity() throws SQLException {
+    void updateRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
-                assertThrows(NullPointerException.class, () -> session.updateRow(null));
+                assertThrows(NullPointerException.class, () -> session.update(null));
             }
         }
     }
 
     @Test
-    void deleteRowRejectsNullEntity() throws SQLException {
+    void deleteRejectsNullEntity() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
-                assertThrows(NullPointerException.class, () -> session.deleteRow(null));
+                assertThrows(NullPointerException.class, () -> session.delete(null));
             }
         }
     }
@@ -84,17 +84,17 @@ class SessionValidationTest {
                 java.util.ArrayList<Item> batch = new java.util.ArrayList<>();
                 batch.add(new Item());
                 batch.add(null);
-                assertThrows(IllegalArgumentException.class, () -> session.insertRows(batch));
+                assertThrows(IllegalArgumentException.class, () -> session.insertAll(batch));
             }
         }
     }
 
     @Test
-    void selectRowRejectsNullId() throws SQLException {
+    void selectRejectsNullId() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(Item.class);
             try (Session session = orm.openSession()) {
-                assertThrows(MicroOrmException.class, () -> session.selectRow(Item.class, null));
+                assertThrows(MicroOrmException.class, () -> session.select(Item.class, (Object) null));
             }
         }
     }
@@ -120,15 +120,15 @@ class SessionValidationTest {
     }
 
     @Test
-    void updateRowRejectsEntityWithOnlyPrimaryKey() throws SQLException {
+    void updateRejectsEntityWithOnlyPrimaryKey() throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite::memory:")) {
             MicroOrm orm = MicroOrm.sqlite(c).register(PkOnly.class);
             try (Session session = orm.openSession()) {
                 session.createEntity(PkOnly.class);
                 PkOnly row = new PkOnly();
                 row.id = UUID.randomUUID();
-                session.insertRow(row);
-                assertThrows(MicroOrmException.class, () -> session.updateRow(row));
+                session.insert(row);
+                assertThrows(MicroOrmException.class, () -> session.update(row));
             }
         }
     }
@@ -162,7 +162,7 @@ class SessionValidationTest {
                 RelationOrder order = new RelationOrder();
                 order.id = UUID.randomUUID();
 
-                MicroOrmException ex = assertThrows(MicroOrmException.class, () -> session.insertRow(order));
+                MicroOrmException ex = assertThrows(MicroOrmException.class, () -> session.insert(order));
 
                 assertTrue(ex.getMessage().contains("does not support relation persistence"));
             }

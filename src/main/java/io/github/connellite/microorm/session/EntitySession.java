@@ -15,7 +15,7 @@ import java.util.stream.Stream;
 
 /**
  * Entity CRUD, typed mutation DSL, and query surface implemented by {@link Session}.
- * Materializing {@code selectRows}/{@code selectOne}/{@code findOne} methods are defaults over {@link #streamRows}.
+ * Materializing {@code select}/{@code selectAll}/{@code selectOne}/{@code findOne} methods are defaults over {@link #stream(Class)}.
  */
 public interface EntitySession {
 
@@ -31,21 +31,21 @@ public interface EntitySession {
         syncEntity(entityClass);
     }
 
-    <T> T insertRow(T entity);
+    <T> T insert(T entity);
 
-    <T> int insertRows(List<T> entities, int batchSize);
+    <T> int insertAll(List<T> entities, int batchSize);
 
-    default <T> int insertRows(List<T> entities) {
-        return insertRows(entities, DEFAULT_INSERT_BATCH_SIZE);
+    default <T> int insertAll(List<T> entities) {
+        return insertAll(entities, DEFAULT_INSERT_BATCH_SIZE);
     }
 
-    int updateRow(Object entity);
+    int update(Object entity);
 
-    int deleteRow(Object entity);
+    int delete(Object entity);
 
     int deleteById(Class<?> entityClass, Object id);
 
-    int deleteAllRows(Class<?> entityClass);
+    int deleteAll(Class<?> entityClass);
 
     /**
      * Drops every cached instance and known id. The next read goes to the database.
@@ -80,58 +80,148 @@ public interface EntitySession {
 
     boolean existsById(Class<?> type, Object id);
 
-    <T> T selectRow(Class<T> type, Object id);
+    <T> T select(Class<T> type, Object id);
 
     default <T> Optional<T> findById(Class<T> type, Object id) {
-        return Optional.ofNullable(selectRow(type, id));
+        return Optional.ofNullable(select(type, id));
     }
 
-    <T> Stream<T> streamRows(Class<T> type);
+    <T> Stream<T> stream(Class<T> type);
 
-    <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters);
+    <T> Stream<T> stream(Class<T> type, Map<String, ?> filters);
 
-    <T> Stream<T> streamRows(EntitySelect<T> query);
+    <T> Stream<T> stream(EntitySelect<T> query);
 
-    <T> Stream<T> streamRows(Class<T> type, Query query);
+    <T> Stream<T> stream(Class<T> type, Query query);
 
-    default <T> List<T> selectRows(Class<T> type) {
-        try (Stream<T> rows = streamRows(type)) {
+    default <T> List<T> selectAll(Class<T> type) {
+        try (Stream<T> rows = stream(type)) {
             return rows.toList();
         }
     }
 
-    default <T> List<T> selectRows(Class<T> type, Map<String, ?> filters) {
-        try (Stream<T> rows = streamRows(type, filters)) {
+    default <T> List<T> select(Class<T> type, Map<String, ?> filters) {
+        try (Stream<T> rows = stream(type, filters)) {
             return rows.toList();
         }
     }
 
-    default <T> List<T> selectRows(EntitySelect<T> query) {
-        try (Stream<T> rows = streamRows(query)) {
+    default <T> List<T> select(EntitySelect<T> query) {
+        try (Stream<T> rows = stream(query)) {
             return rows.toList();
         }
     }
 
-    default <T> List<T> selectRows(Class<T> type, Query query) {
-        try (Stream<T> rows = streamRows(type, query)) {
+    default <T> List<T> select(Class<T> type, Query query) {
+        try (Stream<T> rows = stream(type, query)) {
             return rows.toList();
         }
     }
 
     default <T> T selectOne(EntitySelect<T> query) {
-        return singleResult(collectAtMostTwo(streamRows(query)), true);
+        return singleResult(collectAtMostTwo(stream(query)), true);
     }
 
     default <T> Optional<T> findOne(EntitySelect<T> query) {
-        return Optional.ofNullable(singleResult(collectAtMostTwo(streamRows(query)), false));
+        return Optional.ofNullable(singleResult(collectAtMostTwo(stream(query)), false));
     }
 
     default <T> T selectOne(Class<T> type, Query query) {
-        return singleResult(collectAtMostTwo(streamRows(type, query)), true);
+        return singleResult(collectAtMostTwo(stream(type, query)), true);
     }
 
     default <T> Optional<T> findOne(Class<T> type, Query query) {
-        return Optional.ofNullable(singleResult(collectAtMostTwo(streamRows(type, query)), false));
+        return Optional.ofNullable(singleResult(collectAtMostTwo(stream(type, query)), false));
+    }
+
+    /** @deprecated Use {@link #insert(Object)}. */
+    @Deprecated(forRemoval = true)
+    default <T> T insertRow(T entity) {
+        return insert(entity);
+    }
+
+    /** @deprecated Use {@link #insertAll(List, int)}. */
+    @Deprecated(forRemoval = true)
+    default <T> int insertRows(List<T> entities, int batchSize) {
+        return insertAll(entities, batchSize);
+    }
+
+    /** @deprecated Use {@link #insertAll(List)}. */
+    @Deprecated(forRemoval = true)
+    default <T> int insertRows(List<T> entities) {
+        return insertAll(entities);
+    }
+
+    /** @deprecated Use {@link #update(Object)}. */
+    @Deprecated(forRemoval = true)
+    default int updateRow(Object entity) {
+        return update(entity);
+    }
+
+    /** @deprecated Use {@link #delete(Object)}. */
+    @Deprecated(forRemoval = true)
+    default int deleteRow(Object entity) {
+        return delete(entity);
+    }
+
+    /** @deprecated Use {@link #deleteAll(Class)}. */
+    @Deprecated(forRemoval = true)
+    default int deleteAllRows(Class<?> entityClass) {
+        return deleteAll(entityClass);
+    }
+
+    /** @deprecated Use {@link #select(Class, Object)}. */
+    @Deprecated(forRemoval = true)
+    default <T> T selectRow(Class<T> type, Object id) {
+        return select(type, id);
+    }
+
+    /** @deprecated Use {@link #stream(Class)}. */
+    @Deprecated(forRemoval = true)
+    default <T> Stream<T> streamRows(Class<T> type) {
+        return stream(type);
+    }
+
+    /** @deprecated Use {@link #stream(Class, Map)}. */
+    @Deprecated(forRemoval = true)
+    default <T> Stream<T> streamRows(Class<T> type, Map<String, ?> filters) {
+        return stream(type, filters);
+    }
+
+    /** @deprecated Use {@link #stream(EntitySelect)}. */
+    @Deprecated(forRemoval = true)
+    default <T> Stream<T> streamRows(EntitySelect<T> query) {
+        return stream(query);
+    }
+
+    /** @deprecated Use {@link #stream(Class, Query)}. */
+    @Deprecated(forRemoval = true)
+    default <T> Stream<T> streamRows(Class<T> type, Query query) {
+        return stream(type, query);
+    }
+
+    /** @deprecated Use {@link #selectAll(Class)}. */
+    @Deprecated(forRemoval = true)
+    default <T> List<T> selectRows(Class<T> type) {
+        return selectAll(type);
+    }
+
+    /** @deprecated Use {@link #select(Class, Map)}. */
+    @Deprecated(forRemoval = true)
+    default <T> List<T> selectRows(Class<T> type, Map<String, ?> filters) {
+        return select(type, filters);
+    }
+
+    /** @deprecated Use {@link #select(EntitySelect)}. */
+    @Deprecated(forRemoval = true)
+    default <T> List<T> selectRows(EntitySelect<T> query) {
+        return select(query);
+    }
+
+    /** @deprecated Use {@link #select(Class, Query)}. */
+    @Deprecated(forRemoval = true)
+    default <T> List<T> selectRows(Class<T> type, Query query) {
+        return select(type, query);
     }
 
     private static <T> List<T> collectAtMostTwo(Stream<T> rows) {

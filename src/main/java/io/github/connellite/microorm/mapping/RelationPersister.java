@@ -29,7 +29,7 @@ import java.util.Set;
  *       {@code TransientPropertyValueException}; optional/nullable transients are nullified</li>
  *   <li>{@code remove}: delete cascaded children first, then the owner</li>
  * </ul>
- * {@code insertRow} is persist, {@code updateRow} is merge, {@code deleteRow} is remove.
+ * {@code insert} is persist, {@code update} is merge, {@code delete} is remove.
  * Associations cascade only when {@link CascadeType} is set; {@code orphanRemoval} is independent.
  *
  * @see <a href="https://github.com/hibernate/hibernate-orm/blob/7.4.7/hibernate-core/src/main/java/org/hibernate/event/internal/AbstractSaveEventListener.java#L264">AbstractSaveEventListener.performSaveOrReplicate</a>
