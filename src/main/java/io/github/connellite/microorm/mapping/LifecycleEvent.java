@@ -29,4 +29,12 @@ public enum LifecycleEvent {
     Class<? extends Annotation> annotationType() {
         return annotationType;
     }
+
+    /** {@code @PostPersist}, {@code @PostUpdate}, {@code @PostRemove}, and {@code @PostLoad}. */
+    boolean post() {
+        return switch (this) {
+            case POST_PERSIST, POST_UPDATE, POST_REMOVE, POST_LOAD -> true;
+            case PRE_PERSIST, PRE_UPDATE, PRE_REMOVE -> false;
+        };
+    }
 }
